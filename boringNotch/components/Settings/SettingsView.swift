@@ -52,7 +52,11 @@ struct SettingsView: View {
                     Label("Shelf", systemImage: "books.vertical")
                 }
                 NavigationLink(value: "Seven Island") {
-                    Label("Seven Island", systemImage: "sparkles.rectangle.stack")
+                    Label {
+                        Text("Seven Island")
+                    } icon: {
+                        CodexGlyphIcon(size: 15, foreground: .primary)
+                    }
                 }
                 NavigationLink(value: "Shortcuts") {
                     Label("Shortcuts", systemImage: "keyboard")

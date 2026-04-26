@@ -3,7 +3,6 @@ import SwiftUI
 struct SevenIslandSettingsView: View {
     @AppStorage("sevenIslandClipboardHistoryEnabled") private var clipboardHistoryEnabled = true
     @AppStorage("sevenIslandClipboardHistoryLimit") private var clipboardHistoryLimit = 100
-    @AppStorage("sevenIslandShowMissingVSCodeProjects") private var showMissingVSCodeProjects = false
 
     var body: some View {
         Form {
@@ -23,13 +22,13 @@ struct SevenIslandSettingsView: View {
             }
 
             Section {
-                Toggle("Show missing project folders", isOn: $showMissingVSCodeProjects)
-                    .tint(.effectiveAccent)
-                Button("Refresh recent projects") {
-                    VSCodeRecentProjectsService.shared.refresh(includeMissing: showMissingVSCodeProjects)
+                Button("Refresh Projects folders") {
+                    VSCodeRecentProjectsService.shared.refresh()
                 }
             } header: {
                 Text("VS Code")
+            } footer: {
+                Text("Seven Island lists first-level folders from ~/Projects and opens them in a new VS Code window.")
             }
 
             Section {

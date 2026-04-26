@@ -2,16 +2,30 @@ import Foundation
 
 struct ClipboardHistoryItem: Codable, Equatable, Identifiable {
     let id: UUID
-    let content: String
     let createdAt: Date
+    let content: String?
+    let imageData: Data?
 
-    init(id: UUID = UUID(), content: String, createdAt: Date = Date()) {
-        self.id = id
+    init(content: String) {
+        self.id = UUID()
+        self.createdAt = Date()
         self.content = content
-        self.createdAt = createdAt
+        self.imageData = nil
     }
 
+    init(imageData: Data) {
+        self.id = UUID()
+        self.createdAt = Date()
+        self.content = nil
+        self.imageData = imageData
+    }
+
+    var isImage: Bool { imageData != nil }
+
     var preview: String {
-        content.replacingOccurrences(of: "\n", with: " ")
+        if let text = content {
+            return text.replacingOccurrences(of: "\n", with: " ")
+        }
+        return "[Image]"
     }
 }

@@ -8,21 +8,24 @@ final class VSCodeRecentProjectsService: ObservableObject {
 
     private let storageJSONURL: URL
     private let stateDatabaseURL: URL
+    private let projectsDirectoryURL: URL
 
     init(
         storageJSONURL: URL = VSCodeRecentProjectsService.defaultStorageJSONURL(),
-        stateDatabaseURL: URL = VSCodeRecentProjectsService.defaultStateDatabaseURL()
+        stateDatabaseURL: URL = VSCodeRecentProjectsService.defaultStateDatabaseURL(),
+        projectsDirectoryURL: URL = VSCodeRecentProjectsService.defaultProjectsDirectoryURL()
     ) {
         self.storageJSONURL = storageJSONURL
         self.stateDatabaseURL = stateDatabaseURL
+        self.projectsDirectoryURL = projectsDirectoryURL
     }
 
     func refresh(includeMissing: Bool = false) {
-        projects = loadProjects(includeMissing: includeMissing, limit: 30)
+        projects = loadProjects(includeMissing: includeMissing, limit: .max)
     }
 
     func loadProjects(includeMissing: Bool, limit: Int) -> [VSCodeProjectItem] {
-        let urls = localFolderURLsFromStorageJSON() + localFolderURLsFromStateDatabase()
+        let urls = localProjectsFromDirectory(projectsDirectoryURL)
         var seen = Set<String>()
         var items: [VSCodeProjectItem] = []
 
@@ -48,6 +51,21 @@ final class VSCodeRecentProjectsService: ObservableObject {
         AppLauncherService.openVSCodeProject(item.url)
     }
 
+    private func localProjectsFromDirectory(_ dir: URL) -> [URL] {
+        guard FileManager.default.fileExists(atPath: dir.path) else { return [] }
+        return (try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ))?.filter { url in
+            var isDir: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+        }
+        .sorted { lhs, rhs in
+            lhs.lastPathComponent.localizedStandardCompare(rhs.lastPathComponent) == .orderedAscending
+        } ?? []
+    }
+
     static func defaultStorageJSONURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Code/User/globalStorage/storage.json")
@@ -56,6 +74,11 @@ final class VSCodeRecentProjectsService: ObservableObject {
     static func defaultStateDatabaseURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Code/User/globalStorage/state.vscdb")
+    }
+
+    static func defaultProjectsDirectoryURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Projects")
     }
 
     private func localFolderURLsFromStorageJSON() -> [URL] {

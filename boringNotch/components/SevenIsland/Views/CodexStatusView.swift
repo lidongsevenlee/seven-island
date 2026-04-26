@@ -6,24 +6,18 @@ struct CodexStatusView: View {
     @State private var selectedSessionID: CodexSessionSummary.ID?
 
     private var sessionListHeight: CGFloat {
-        selectedSessionID == nil ? 134 : 212
+        max(
+            CodexStatusLayout.minimumListHeight,
+            targetNotchHeight - CodexStatusLayout.notchChromeHeight
+        )
+    }
+
+    private var targetNotchHeight: CGFloat {
+        selectedSessionID == nil ? sevenIslandFeatureNotchHeight : codexExpandedNotchHeight
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Spacer()
-                HoverButton(icon: "arrow.up.forward.app", iconColor: .gray, scale: .medium) {
-                    service.openCodex()
-                }
-                .help("Open Codex")
-                HoverButton(icon: "arrow.clockwise", iconColor: .gray, scale: .medium) {
-                    service.refresh()
-                }
-                .help("Refresh Codex status")
-            }
-            .frame(height: 18)
-
             HStack(alignment: .top, spacing: 8) {
                 CodexSessionList(
                     sessions: service.snapshot.recentSessions,
@@ -33,19 +27,18 @@ struct CodexStatusView: View {
                         withAnimation(.smooth(duration: 0.24)) {
                             selectedSessionID = selectedSessionID == session.id ? nil : session.id
                         }
+                    },
+                    onOpen: { session in
+                        service.openCodex(session: session)
                     }
                 )
             }
             .frame(height: sessionListHeight)
         }
         .padding(.horizontal, 12)
-        .padding(.bottom, 2)
+        .padding(.bottom, 1)
         .onAppear {
             service.refresh()
-            updateNotchHeight(hasExpandedDetail: selectedSessionID != nil)
-        }
-        .onDisappear {
-            vm.resetOpenNotchSize()
         }
         .onChange(of: selectedSessionID) { _, selectedSessionID in
             updateNotchHeight(hasExpandedDetail: selectedSessionID != nil)
@@ -63,9 +56,14 @@ struct CodexStatusView: View {
 
     private func updateNotchHeight(hasExpandedDetail: Bool) {
         withAnimation(.smooth(duration: 0.24)) {
-            vm.setOpenNotchHeight(hasExpandedDetail ? codexExpandedNotchHeight : openNotchSize.height)
+            vm.setOpenNotchHeight(hasExpandedDetail ? codexExpandedNotchHeight : sevenIslandFeatureNotchHeight)
         }
     }
+}
+
+private enum CodexStatusLayout {
+    static let minimumListHeight: CGFloat = 158 * 1.5
+    static let notchChromeHeight: CGFloat = 102
 }
 
 private struct CodexSessionList: View {
@@ -73,6 +71,7 @@ private struct CodexSessionList: View {
     let selectedSessionID: CodexSessionSummary.ID?
     let snapshot: CodexStatusSnapshot
     let onSelect: (CodexSessionSummary) -> Void
+    let onOpen: (CodexSessionSummary) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -83,12 +82,12 @@ private struct CodexSessionList: View {
                     LazyVStack(spacing: 6) {
                         ForEach(sessions) { session in
                             VStack(spacing: 6) {
-                                Button {
-                                    onSelect(session)
-                                } label: {
-                                    CodexSessionRow(session: session, isSelected: session.id == selectedSessionID)
-                                }
-                                .buttonStyle(.plain)
+                                CodexSessionRow(
+                                    session: session,
+                                    isSelected: session.id == selectedSessionID,
+                                    onSelect: { onSelect(session) },
+                                    onOpen: { onOpen(session) }
+                                )
 
                                 if session.id == selectedSessionID {
                                     CodexSessionDetail(session: session, snapshot: snapshot)
@@ -108,8 +107,7 @@ private struct CodexSessionList: View {
 private struct CodexEmptySessionsView: View {
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "bubble.left.and.text.bubble.right")
-                .foregroundStyle(.secondary)
+            CodexGlyphIcon(size: 16, foreground: .secondary)
             Text("No local Codex sessions found")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -335,37 +333,62 @@ private struct CodexMetricPill: View {
 private struct CodexSessionRow: View {
     let session: CodexSessionSummary
     let isSelected: Bool
+    let onSelect: () -> Void
+    let onOpen: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: session.activity?.state == .working ? "bolt.circle" : "bubble.left.and.text.bubble.right")
-                .foregroundStyle(session.activity?.state == .working ? Color.green : Color.secondary)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(session.title)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    if session.activity?.state == .working {
-                        Text("Working")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color.green)
+            Button(action: onSelect) {
+                HStack(spacing: 10) {
+                    CodexGlyphIcon(
+                        size: 18,
+                        foreground: session.activity?.state == .working ? Color.green : Color.secondary
+                    )
+                    .frame(width: 18)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(session.title)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            if session.activity?.state == .working {
+                                Text("Working")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(Color.green)
+                            }
+                        }
+                        Text(session.activity?.headline ?? "\(session.tokensDisplayText) tokens · \(session.model ?? "model unknown")")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
-                Text(session.activity?.headline ?? "\(session.tokensDisplayText) tokens · \(session.model ?? "model unknown")")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+
             Spacer(minLength: 8)
+
+            HoverButton(icon: "arrow.up.forward.app", iconColor: .gray, scale: .medium, action: onOpen)
+                .help("Open this Codex session")
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
-        .background((isSelected ? Color.green.opacity(0.13) : Color.white.opacity(0.08)), in: RoundedRectangle(cornerRadius: 8))
+        .background(
+            (isSelected ? Color.green.opacity(0.13) : (isHovering ? Color.white.opacity(0.15) : Color.white.opacity(0.08))),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isSelected ? Color.green.opacity(0.35) : Color.white.opacity(0.06), lineWidth: 1)
         )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovering = hovering
+            }
+            hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
+        }
     }
 }

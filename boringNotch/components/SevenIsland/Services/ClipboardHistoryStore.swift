@@ -44,12 +44,25 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func copyToPasteboard(_ item: ClipboardHistoryItem) {
         pasteboard.clearContents()
-        pasteboard.setString(item.content, forType: .string)
+        if let imageData = item.imageData {
+            pasteboard.setData(imageData, forType: .png)
+        } else if let text = item.content {
+            pasteboard.setString(text, forType: .string)
+        }
         lastChangeCount = pasteboard.changeCount
     }
 
     func record(_ content: String) {
         items = Self.nextItems(inserting: content, into: items, limit: maxItemCount)
+        save()
+    }
+
+    func recordImage(from tiffData: Data) {
+        guard let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [.compressionFactor: 0.8]) else {
+            return
+        }
+        items = Self.nextItems(insertingImageData: pngData, into: items, limit: maxItemCount)
         save()
     }
 
@@ -69,6 +82,16 @@ final class ClipboardHistoryStore: ObservableObject {
 
         var next = currentItems.filter { $0.content != normalized }
         next.insert(ClipboardHistoryItem(content: normalized), at: 0)
+        return Array(next.prefix(max(1, limit)))
+    }
+
+    static func nextItems(
+        insertingImageData data: Data,
+        into currentItems: [ClipboardHistoryItem],
+        limit: Int
+    ) -> [ClipboardHistoryItem] {
+        var next = currentItems.filter { $0.imageData != data }
+        next.insert(ClipboardHistoryItem(imageData: data), at: 0)
         return Array(next.prefix(max(1, limit)))
     }
 
@@ -111,6 +134,8 @@ final class ClipboardHistoryStore: ObservableObject {
 
         if let string = pasteboard.string(forType: .string) {
             record(string)
+        } else if let tiffData = pasteboard.data(forType: .tiff) {
+            recordImage(from: tiffData)
         }
     }
 

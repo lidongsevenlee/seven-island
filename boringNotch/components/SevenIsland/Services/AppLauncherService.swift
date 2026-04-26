@@ -30,6 +30,29 @@ enum AppLauncherService {
         }
     }
 
+    static func openCodexSession(id: String) {
+        if let sessionURL = codexSessionURL(for: id),
+           NSWorkspace.shared.open(sessionURL) {
+            return
+        }
+
+        openCodexApp()
+    }
+
+    static func codexSessionURL(for id: String) -> URL? {
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isCodexConversationID(trimmedID) else {
+            return nil
+        }
+
+        return URL(string: "codex://threads/\(trimmedID)")
+    }
+
+    private static func isCodexConversationID(_ id: String) -> Bool {
+        let pattern = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
+        return id.range(of: pattern, options: .regularExpression) != nil
+    }
+
     private static func runCodeCLI(arguments: [String]) -> Bool {
         let candidates = [
             "/opt/homebrew/bin/code",

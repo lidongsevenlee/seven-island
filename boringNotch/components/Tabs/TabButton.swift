@@ -1,21 +1,14 @@
-//
-//  TabButton.swift
-//  boringNotch
-//
-//  Created by Hugo Persson on 2024-08-24.
-//
-
 import SwiftUI
 
-struct TabButton: View {
+struct TabButton<IconView: View>: View {
     let label: String
-    let icon: String
+    let icon: IconView
     let selected: Bool
     let onClick: () -> Void
-    
+
     var body: some View {
         Button(action: onClick) {
-            Image(systemName: icon)
+            icon
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 32, height: 26)
                 .contentShape(Rectangle())
@@ -26,7 +19,7 @@ struct TabButton: View {
 }
 
 #Preview {
-    TabButton(label: "Home", icon: "tray.fill", selected: true) {
+    TabButton(label: "Home", icon: Image(systemName: "tray.fill"), selected: true) {
         print("Tapped")
     }
 }

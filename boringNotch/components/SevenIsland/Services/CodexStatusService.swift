@@ -41,6 +41,10 @@ final class CodexStatusService: ObservableObject {
         AppLauncherService.openCodexApp()
     }
 
+    func openCodex(session: CodexSessionSummary) {
+        AppLauncherService.openCodexSession(id: session.id)
+    }
+
     private static func loadSnapshot(codexDirectory: URL, currentWorkspacePath: String) -> CodexStatusSnapshot {
         let databaseURL = codexDirectory.appendingPathComponent("state_5.sqlite")
         let authURL = codexDirectory.appendingPathComponent("auth.json")

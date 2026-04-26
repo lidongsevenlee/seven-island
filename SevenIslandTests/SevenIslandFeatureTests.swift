@@ -45,37 +45,38 @@ func testClipboardHistoryRespectsMaximumItemLimit() {
     expectEqual(items.map(\.content), ["item 5", "item 4", "item 3"], "keeps newest items up to limit")
 }
 
-func testVSCodeStorageJsonParsesExistingLocalFoldersOnly() throws {
+func testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly() throws {
     let temp = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: temp) }
 
-    let project = temp.appendingPathComponent("Project", isDirectory: true)
-    try FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
+    let projectsDirectory = temp.appendingPathComponent("Projects", isDirectory: true)
+    try FileManager.default.createDirectory(at: projectsDirectory, withIntermediateDirectories: true)
 
-    let storage = temp.appendingPathComponent("storage.json")
-    let encodedPath = project.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)!
-    try """
-    {
-      "profileAssociations": {
-        "workspaces": {
-          "file://\(encodedPath)": "__default__profile__",
-          "vscode-vfs://github/example/repo": "__default__profile__",
-          "file:///definitely/not/here": "__default__profile__"
-        }
-      }
-    }
-    """.write(to: storage, atomically: true, encoding: .utf8)
+    let beta = projectsDirectory.appendingPathComponent("Beta", isDirectory: true)
+    let alpha = projectsDirectory.appendingPathComponent("Alpha", isDirectory: true)
+    let hidden = projectsDirectory.appendingPathComponent(".Hidden", isDirectory: true)
+    let nested = beta.appendingPathComponent("Nested", isDirectory: true)
+    try FileManager.default.createDirectory(at: beta, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: alpha, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+    try "not a folder".write(to: projectsDirectory.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
 
     let service = VSCodeRecentProjectsService(
-        storageJSONURL: storage,
-        stateDatabaseURL: temp.appendingPathComponent("missing.vscdb")
+        storageJSONURL: temp.appendingPathComponent("missing-storage.json"),
+        stateDatabaseURL: temp.appendingPathComponent("missing.vscdb"),
+        projectsDirectoryURL: projectsDirectory
     )
 
     let projects = service.loadProjects(includeMissing: false, limit: 30)
-    expectEqual(projects.map { $0.url.standardizedFileURL.path }, [project.standardizedFileURL.path], "parses existing local VS Code folders")
-    expectEqual(projects.first?.name, "Project", "uses folder name as display name")
+    expectEqual(
+        projects.map { $0.url.standardizedFileURL.path },
+        [alpha.standardizedFileURL.path, beta.standardizedFileURL.path],
+        "loads sorted first-level folders from Projects only"
+    )
+    expectEqual(projects.first?.name, "Alpha", "uses folder name as display name")
 }
 
 func testCodexRolloutActivityParsesToolAndQuota() {
@@ -217,18 +218,27 @@ func testCodexSnapshotShowsClosedLiveActivityWhenWorking() {
     expectEqual(snapshot.shouldShowClosedLiveActivity, true, "shows closed Codex activity while Codex is working")
 }
 
+func testCodexSessionURLUsesLocalConversationRoute() {
+    let url = AppLauncherService.codexSessionURL(for: "7d8f927e-32b5-4c1d-9a31-8dcf53b8d4ef")
+    expectEqual(url?.absoluteString, "codex://threads/7d8f927e-32b5-4c1d-9a31-8dcf53b8d4ef", "builds Codex local conversation deeplink")
+
+    let invalidURL = AppLauncherService.codexSessionURL(for: "thread abc/1")
+    expectEqual(invalidURL?.absoluteString, nil, "rejects Codex deeplinks that Codex Desktop will ignore")
+}
+
 @main
 enum SevenIslandFeatureTestRunner {
     static func main() {
         do {
             testClipboardHistoryDeduplicatesAndFiltersSensitiveText()
             testClipboardHistoryRespectsMaximumItemLimit()
-            try testVSCodeStorageJsonParsesExistingLocalFoldersOnly()
+            try testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly()
             testCodexRolloutActivityParsesToolAndQuota()
             testCodexRolloutParsesLastConversationTurn()
             testCodexRolloutParsesOpenLastConversationTurn()
             testCodexSnapshotFormatsQuotaFromActivity()
             testCodexSnapshotShowsClosedLiveActivityWhenWorking()
+            testCodexSessionURLUsesLocalConversationRoute()
             print("SevenIslandFeatureTests passed")
         } catch {
             fputs("FAIL: \(error.localizedDescription)\n", stderr)

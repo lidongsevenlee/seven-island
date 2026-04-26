@@ -20,4 +20,8 @@ struct VSCodeProjectItem: Equatable, Identifiable {
     var detail: String {
         url.deletingLastPathComponent().path
     }
+
+    func matches(query: String) -> Bool {
+        name.lowercased().contains(query) || detail.lowercased().contains(query)
+    }
 }

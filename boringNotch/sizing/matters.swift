@@ -13,8 +13,9 @@ let downloadSneakSize: CGSize = .init(width: 65, height: 1)
 let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 let shadowPadding: CGFloat = 20
-let openNotchSize: CGSize = .init(width: 640, height: 190)
-let codexExpandedNotchHeight: CGFloat = 270
+let openNotchSize: CGSize = .init(width: 640, height: 240)
+let sevenIslandFeatureNotchHeight: CGFloat = openNotchSize.height * 1.5
+let codexExpandedNotchHeight: CGFloat = openNotchSize.height * 2
 let windowSize: CGSize = .init(width: openNotchSize.width, height: max(openNotchSize.height, codexExpandedNotchHeight) + shadowPadding)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 
