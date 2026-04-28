@@ -10,9 +10,10 @@ import SwiftUI
 
 struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
-    @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
+    @ObservedObject var codexService = CodexStatusService.shared
+    @ObservedObject var claudeService = ClaudeStatusService.shared
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -42,6 +43,48 @@ struct BoringHeader: View {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     } else {
+                        // Codex quick-access
+                        let codexWorking = codexService.snapshot.currentActivity?.state == .working
+                        let codexSelected = coordinator.currentView == .codexStatus
+                        Button {
+                            withAnimation(.smooth) {
+                                coordinator.currentView = .codexStatus
+                            }
+                        } label: {
+                            ZStack {
+                                if codexSelected {
+                                    Capsule()
+                                        .fill(Color(nsColor: .secondarySystemFill))
+                                }
+                                CodexGlyphIcon(size: 15, foreground: codexWorking ? .green : codexSelected ? .white : .gray)
+                            }
+                            .frame(width: 32, height: 26)
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(codexService.snapshot.currentActivity?.headline ?? "Codex")
+
+                        // Claude quick-access
+                        let claudeWorking = claudeService.snapshot.currentActivity?.state == .working
+                        let claudeSelected = coordinator.currentView == .claudeStatus
+                        Button {
+                            withAnimation(.smooth) {
+                                coordinator.currentView = .claudeStatus
+                            }
+                        } label: {
+                            ZStack {
+                                if claudeSelected {
+                                    Capsule()
+                                        .fill(Color(nsColor: .secondarySystemFill))
+                                }
+                                ClaudeGlyphIcon(size: 15, foreground: claudeWorking ? .orange : claudeSelected ? .white : .gray)
+                            }
+                            .frame(width: 32, height: 26)
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(claudeService.snapshot.currentActivity?.headline ?? "Claude")
+
                         if Defaults[.showMirror] {
                             Button(action: {
                                 vm.toggleCameraPreview()
@@ -63,7 +106,7 @@ struct BoringHeader: View {
                                 DispatchQueue.main.async {
                                     SettingsWindowController.shared.showWindow()
                                 }
-                                
+
                             }) {
                                 Capsule()
                                     .fill(.black)
@@ -76,18 +119,6 @@ struct BoringHeader: View {
                                     }
                             }
                             .buttonStyle(PlainButtonStyle())
-                        }
-                        if Defaults[.showBatteryIndicator] {
-                            BoringBatteryView(
-                                batteryWidth: 30,
-                                isCharging: batteryModel.isCharging,
-                                isInLowPowerMode: batteryModel.isInLowPowerMode,
-                                isPluggedIn: batteryModel.isPluggedIn,
-                                levelBattery: batteryModel.levelBattery,
-                                maxCapacity: batteryModel.maxCapacity,
-                                timeToFullCharge: batteryModel.timeToFullCharge,
-                                isForNotification: false
-                            )
                         }
                     }
                 }

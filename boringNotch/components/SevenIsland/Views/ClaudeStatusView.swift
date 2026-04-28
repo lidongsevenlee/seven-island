@@ -1,8 +1,8 @@
 import SwiftUI
 
-struct CodexStatusView: View {
+struct ClaudeStatusView: View {
     @EnvironmentObject private var vm: BoringViewModel
-    @ObservedObject private var service = CodexStatusService.shared
+    @ObservedObject private var service = ClaudeStatusService.shared
 
     private func updateNotchHeight() {
         let count = service.snapshot.recentSessions.count
@@ -22,10 +22,10 @@ struct CodexStatusView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 8) {
                 ScrollView(.vertical, showsIndicators: true) {
-                    CodexSessionList(
+                    ClaudeSessionList(
                         sessions: service.snapshot.recentSessions,
                         onOpen: { session in
-                            service.openCodex(session: session)
+                            service.openClaude(session: session)
                         }
                     )
                 }
@@ -46,18 +46,18 @@ struct CodexStatusView: View {
     }
 }
 
-private struct CodexSessionList: View {
-    let sessions: [CodexSessionSummary]
-    let onOpen: (CodexSessionSummary) -> Void
+private struct ClaudeSessionList: View {
+    let sessions: [ClaudeSessionSummary]
+    let onOpen: (ClaudeSessionSummary) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             if sessions.isEmpty {
-                CodexEmptySessionsView()
+                ClaudeEmptySessionsView()
             } else {
                 VStack(spacing: 6) {
                     ForEach(sessions) { session in
-                        CodexSessionRow(
+                        ClaudeSessionRow(
                             session: session,
                             onOpen: { onOpen(session) }
                         )
@@ -71,11 +71,11 @@ private struct CodexSessionList: View {
     }
 }
 
-private struct CodexEmptySessionsView: View {
+private struct ClaudeEmptySessionsView: View {
     var body: some View {
         HStack(spacing: 8) {
-            CodexGlyphIcon(size: 16, foreground: .secondary)
-            Text("No local Codex sessions found")
+            ClaudeGlyphIcon(size: 16, foreground: .secondary)
+            Text("No local Claude sessions found")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -84,18 +84,19 @@ private struct CodexEmptySessionsView: View {
     }
 }
 
-private struct CodexSessionRow: View {
-    let session: CodexSessionSummary
+private struct ClaudeSessionRow: View {
+    let session: ClaudeSessionSummary
     let onOpen: () -> Void
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 10) {
-            CodexGlyphIcon(
+            ClaudeGlyphIcon(
                 size: 18,
-                foreground: session.activity?.state == .working ? Color.green : Color.secondary
+                foreground: session.activity?.state == .working ? Color.orange : Color.secondary
             )
             .frame(width: 18)
+
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(session.title)
@@ -105,13 +106,25 @@ private struct CodexSessionRow: View {
                     if session.activity?.state == .working {
                         Text("Working")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(Color.green)
+                            .foregroundStyle(Color.orange)
+                    }
+                    if session.activity?.pendingAction != nil {
+                        Text("Needs approval")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(Color.yellow)
                     }
                 }
-                Text(session.activity?.headline ?? "\(session.tokensDisplayText) tokens · \(session.model ?? "model unknown")")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if let pending = session.activity?.pendingAction {
+                    Text(pending.command ?? pending.toolName)
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.yellow.opacity(0.85))
+                        .lineLimit(1)
+                } else {
+                    Text(session.activity?.headline ?? "\(session.model ?? "model unknown")")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 8)

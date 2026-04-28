@@ -17,8 +17,7 @@ let tabs = [
     TabModel(label: "Home", view: .home),
     TabModel(label: "Shelf", view: .shelf),
     TabModel(label: "Clipboard", view: .clipboard),
-    TabModel(label: "VS Code", view: .vscodeProjects),
-    TabModel(label: "Codex", view: .codexStatus)
+    TabModel(label: "VS Code", view: .vscodeProjects)
 ]
 
 struct TabSelectionView: View {
@@ -53,7 +52,8 @@ struct TabSelectionView: View {
                 .zIndex(isSelected ? 1 : 0)
             }
         }
-        .padding(.horizontal, 2)
+        .padding(.leading, 2)
+        .padding(.trailing, 12)
         .clipShape(Capsule())
     }
 
@@ -73,17 +73,9 @@ struct TabSelectionView: View {
         case .vscodeProjects:
             Image(systemName: "chevron.left.forwardslash.chevron.right")
                 .foregroundStyle(color)
-        case .codexStatus:
-            CodexTabIcon(color: color)
+        case .codexStatus, .claudeStatus:
+            EmptyView()
         }
-    }
-}
-
-private struct CodexTabIcon: View {
-    let color: Color
-
-    var body: some View {
-        CodexGlyphIcon(size: 15, foreground: color)
     }
 }
 

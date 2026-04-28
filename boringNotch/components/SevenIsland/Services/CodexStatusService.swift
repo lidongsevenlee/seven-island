@@ -68,9 +68,9 @@ final class CodexStatusService: ObservableObject {
     ) -> [CodexSessionSummary] {
         let current = sessions.filter { $0.cwd == currentWorkspacePath }
         if current.isEmpty {
-            return Array(sessions.prefix(5))
+            return Array(sessions.prefix(10))
         }
-        return Array((current + sessions.filter { $0.cwd != currentWorkspacePath }).prefix(5))
+        return Array((current + sessions.filter { $0.cwd != currentWorkspacePath }).prefix(10))
     }
 
     private static func loadRecentSessions(databaseURL: URL) -> [CodexSessionSummary] {
@@ -260,7 +260,7 @@ final class CodexStatusService: ObservableObject {
             }
         }
 
-        let isRecent = now.timeIntervalSince(latestTimestamp) <= 10 * 60
+        let isRecent = now.timeIntervalSince(latestTimestamp) <= 2 * 60
         let state: CodexWorkState = isRecent ? .working : .idle
         let fallbackHeadline = isRecent ? "Codex is working" : "Codex is idle"
 
