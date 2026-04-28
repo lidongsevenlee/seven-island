@@ -12,13 +12,28 @@ import SwiftUI
 
 // MARK: - Music Player Components
 
+struct AlbumArtSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        value = CGSize(width: max(value.width, next.width), height: max(value.height, next.height))
+    }
+}
+
 struct MusicPlayerView: View {
     @EnvironmentObject var vm: BoringViewModel
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
         HStack {
-            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).padding(.all, 5)
+            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
+                .padding(.all, 5)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(key: AlbumArtSizePreferenceKey.self, value: geometry.size)
+                    }
+                }
             MusicControlsView().drawingGroup().compositingGroup()
         }
     }
@@ -153,39 +168,6 @@ struct MusicControlsView: View {
                 frameWidth: width
             )
             .fontWeight(.medium)
-            if Defaults[.enableLyrics] {
-                TimelineView(.animation(minimumInterval: 0.25)) { timeline in
-                    let currentElapsed: Double = {
-                        guard musicManager.isPlaying else { return musicManager.elapsedTime }
-                        let delta = timeline.date.timeIntervalSince(musicManager.timestampDate)
-                        let progressed = musicManager.elapsedTime + (delta * musicManager.playbackRate)
-                        return min(max(progressed, 0), musicManager.songDuration)
-                    }()
-                    let line: String = {
-                        if musicManager.isFetchingLyrics { return "Loading lyrics…" }
-                        if !musicManager.syncedLyrics.isEmpty {
-                            return musicManager.lyricLine(at: currentElapsed)
-                        }
-                        let trimmed = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
-                        return trimmed.isEmpty ? "No lyrics found" : trimmed.replacingOccurrences(of: "\n", with: " ")
-                    }()
-                    let isPersian = line.unicodeScalars.contains { scalar in
-                        let v = scalar.value
-                        return v >= 0x0600 && v <= 0x06FF
-                    }
-                    MarqueeText(
-                        .constant(line),
-                        font: .subheadline,
-                        nsFont: .subheadline,
-                        textColor: musicManager.isFetchingLyrics ? .gray.opacity(0.7) : .gray,
-                        frameWidth: width
-                    )
-                    .font(isPersian ? .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize) : .subheadline)
-                    .lineLimit(1)
-                    .opacity(musicManager.isPlaying ? 1 : 0)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
         }
     }
 
@@ -416,6 +398,241 @@ struct VolumeControlView: View {
     }
 }
 
+enum MusicLyricsDisplayMode {
+    case closed
+    case expanded
+}
+
+struct MusicLyricsDisplayView: View {
+    @ObservedObject var musicManager = MusicManager.shared
+    let mode: MusicLyricsDisplayMode
+
+    private var maxLines: Int {
+        mode == .expanded ? 5 : 1
+    }
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: mode == .closed ? 0.035 : 0.25)) { timeline in
+            let elapsed = estimatedElapsed(at: timeline.date)
+            Group {
+                switch mode {
+                case .closed:
+                    let text = closedLyricText(at: elapsed)
+                    if !text.isEmpty {
+                        GeometryReader { geo in
+                            closedLyrics(
+                                text,
+                                lineProgress: closedLyricLineProgress(at: elapsed),
+                                width: geo.size.width
+                            )
+                                .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                        }
+                    }
+                case .expanded:
+                    let lines = expandedLyricLines(at: elapsed)
+                    if !lines.isEmpty {
+                        expandedLyrics(lines)
+                    }
+                }
+            }
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    private var lyricColor: Color {
+        if musicManager.isFetchingLyrics {
+            return .gray.opacity(0.7)
+        }
+        return Defaults[.playerColorTinting]
+            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.68)
+            : .gray
+    }
+
+    private func lyricFont(for text: String) -> Font {
+        if LyricsDisplayText.containsPersianScript(text) {
+            return .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
+        }
+        return .subheadline
+    }
+
+    private func estimatedElapsed(at date: Date) -> Double {
+        guard musicManager.isPlaying else { return musicManager.elapsedTime }
+        let delta = date.timeIntervalSince(musicManager.timestampDate)
+        let progressed = musicManager.elapsedTime + (delta * musicManager.playbackRate)
+        return min(max(progressed, 0), musicManager.songDuration)
+    }
+
+    private func closedLyricText(at elapsed: Double) -> String {
+        if musicManager.isFetchingLyrics {
+            return LyricsDisplayText.displayFallback(isFetching: true)
+        }
+
+        if let currentIndex = LyricsDisplayText.currentSyncedIndex(
+            from: musicManager.syncedLyrics,
+            elapsed: elapsed
+        ) {
+            return musicManager.syncedLyrics[currentIndex].text
+        }
+
+        let lyrics = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !lyrics.isEmpty else {
+            return ""
+        }
+        return LyricsDisplayText.singleLine(fromPlainLyrics: lyrics)
+    }
+
+    @ViewBuilder
+    private func closedLyrics(_ text: String, lineProgress: Double?, width: CGFloat) -> some View {
+        if closedLyricWidth(text) <= max(width - 2, 0) {
+            KTVClosedLyricText(
+                text: text,
+                progress: lineProgress,
+                baseColor: lyricColor.opacity(0.45),
+                activeColor: lyricColor
+            )
+                .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            MarqueeText(
+                .constant(text),
+                font: .caption,
+                nsFont: .caption1,
+                textColor: lyricColor,
+                minDuration: 1,
+                frameWidth: width
+            )
+            .frame(width: width, alignment: .center)
+        }
+    }
+
+    private func closedLyricLineProgress(at elapsed: Double) -> Double? {
+        guard !musicManager.isFetchingLyrics, !musicManager.syncedLyrics.isEmpty else {
+            return nil
+        }
+        return LyricsDisplayText.activeLineProgress(from: musicManager.syncedLyrics, elapsed: elapsed, leadTime: 0.22)
+    }
+
+    private func closedLyricWidth(_ text: String) -> CGFloat {
+        let font = NSFont.preferredFont(forTextStyle: .caption1)
+        return ceil((text as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    private func expandedLyricLines(at elapsed: Double) -> [LyricsDisplayText.Line] {
+        if musicManager.isFetchingLyrics {
+            return [LyricsDisplayText.Line(text: LyricsDisplayText.displayFallback(isFetching: true), isCurrent: true)]
+        }
+
+        if !musicManager.syncedLyrics.isEmpty {
+            return LyricsDisplayText.syncedWindow(from: musicManager.syncedLyrics, elapsed: elapsed, limit: maxLines)
+        }
+
+        let lyrics = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lines = Array(LyricsDisplayText.lines(fromPlainLyrics: lyrics).prefix(maxLines))
+        if lines.isEmpty {
+            return [LyricsDisplayText.Line(text: LyricsDisplayText.displayFallback(isFetching: false), isCurrent: true)]
+        }
+
+        return lines.enumerated().map { index, text in
+            LyricsDisplayText.Line(text: text, isCurrent: index == min(1, lines.count - 1))
+        }
+    }
+
+    private func expandedLyrics(_ lines: [LyricsDisplayText.Line]) -> some View {
+        let signature = lines.map { $0.text }.joined(separator: "|")
+
+        return ZStack {
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                Text(line.text.isEmpty ? " " : line.text)
+                    .font(lyricFont(for: line.text))
+                    .fontWeight(line.isCurrent ? .semibold : .regular)
+                    .foregroundStyle(line.isCurrent ? activeLyricColor : inactiveLyricColor)
+                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity, minHeight: 18, alignment: .center)
+                    .scaleEffect(line.isCurrent ? 1.03 : 0.94)
+                    .opacity(line.text.isEmpty ? 0 : (line.isCurrent ? 1 : 0.34))
+                    .offset(y: lyricYOffset(for: index, count: lines.count))
+                    .id("\(index)-\(line.text)")
+                    .transition(.asymmetric(
+                        insertion: .offset(y: 18).combined(with: .opacity),
+                        removal: .offset(y: -18).combined(with: .opacity)
+                    ))
+                    .animation(
+                        .easeInOut(duration: 0.32).delay(Double(index) * 0.035),
+                        value: signature
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .clipped()
+        .animation(.easeInOut(duration: 0.34), value: signature)
+    }
+
+    private func lyricYOffset(for index: Int, count: Int) -> CGFloat {
+        let center = CGFloat(max(count - 1, 0)) / 2
+        return (CGFloat(index) - center) * 20
+    }
+
+    private var activeLyricColor: Color {
+        Defaults[.playerColorTinting]
+            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.78)
+            : .white
+    }
+
+    private var inactiveLyricColor: Color {
+        .gray.opacity(0.72)
+    }
+}
+
+struct KTVClosedLyricText: View {
+    let text: String
+    let progress: Double?
+    let baseColor: Color
+    let activeColor: Color
+    @State private var textSize: CGSize = .zero
+
+    var body: some View {
+        ZStack {
+            lyricText(color: baseColor)
+                .modifier(MeasureSizeModifier())
+                .onPreferenceChange(SizePreferenceKey.self) { size in
+                    textSize = size
+                }
+
+            lyricText(color: activeColor)
+                .mask(alignment: .leading) {
+                    Rectangle()
+                        .frame(width: max(0, textSize.width * CGFloat(progress ?? 0)))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(width: textSize.width, alignment: .leading)
+                .animation(.linear(duration: 0.035), value: progress)
+        }
+        .frame(height: 18, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .clipped()
+    }
+
+    private func lyricText(color: Color) -> some View {
+        Text(text)
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+struct ClosedMusicLyricsLineView: View {
+    let width: CGFloat
+
+    var body: some View {
+        MusicLyricsDisplayView(mode: .closed)
+            .padding(.horizontal, 18)
+            .frame(width: width, height: 24, alignment: .center)
+    }
+}
+
 // MARK: - Main View
 
 struct NotchHomeView: View {
@@ -423,6 +640,8 @@ struct NotchHomeView: View {
     @ObservedObject var webcamManager = WebcamManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @ObservedObject var musicManager = MusicManager.shared
+    @State private var albumArtHeight: CGFloat = 0
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
@@ -441,7 +660,27 @@ struct NotchHomeView: View {
 
     private var mainContent: some View {
         HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            MusicPlayerView(albumArtNamespace: albumArtNamespace)
+            HStack(alignment: .center, spacing: 12) {
+                MusicPlayerView(albumArtNamespace: albumArtNamespace)
+                    .onPreferenceChange(AlbumArtSizePreferenceKey.self) { size in
+                        guard size.height > 0 else { return }
+                        albumArtHeight = size.height
+                    }
+
+                if shouldShowExpandedLyrics {
+                    MusicLyricsDisplayView(mode: .expanded)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(width: 190, alignment: .center)
+                        .frame(height: expandedLyricsHeight, alignment: .center)
+                        .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(.white.opacity(0.06), lineWidth: 1)
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                }
+            }
 
             if Defaults[.showCalendar] {
                 CalendarView()
@@ -463,6 +702,14 @@ struct NotchHomeView: View {
         }
         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
+    }
+
+    private var shouldShowExpandedLyrics: Bool {
+        Defaults[.enableLyrics] && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+    }
+
+    private var expandedLyricsHeight: CGFloat {
+        max(albumArtHeight, MusicPlayerImageSizes.size.opened.height + 10)
     }
 }
 

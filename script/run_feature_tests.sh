@@ -23,6 +23,7 @@ xcrun swiftc \
   "$ROOT_DIR/boringNotch/components/SevenIsland/Services/ClipboardHistoryStore.swift" \
   "$ROOT_DIR/boringNotch/components/SevenIsland/Services/VSCodeRecentProjectsService.swift" \
   "$ROOT_DIR/boringNotch/components/SevenIsland/Services/AppLauncherService.swift" \
-  "$ROOT_DIR/boringNotch/components/SevenIsland/Services/CodexStatusService.swift"
+  "$ROOT_DIR/boringNotch/components/SevenIsland/Services/CodexStatusService.swift" \
+  "$ROOT_DIR/boringNotch/components/Notch/LyricsDisplayText.swift"
 
 "$TEST_BINARY"

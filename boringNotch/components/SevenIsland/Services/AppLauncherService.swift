@@ -39,6 +39,20 @@ enum AppLauncherService {
         openCodexApp()
     }
 
+    static func openClaudeSession(id: String, cwd: String?) {
+        let appURL = URL(fileURLWithPath: "/Applications/Claude.app")
+        if FileManager.default.fileExists(atPath: appURL.path) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.createsNewApplicationInstance = false
+            NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+            return
+        }
+
+        if let claudeURL = URL(string: "claude://") {
+            NSWorkspace.shared.open(claudeURL)
+        }
+    }
+
     static func codexSessionURL(for id: String) -> URL? {
         let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isCodexConversationID(trimmedID) else {

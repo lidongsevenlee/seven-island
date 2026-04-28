@@ -24,6 +24,8 @@ struct ContentView: View {
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
     @ObservedObject var codexStatusService = CodexStatusService.shared
+    @ObservedObject var claudeStatusService = ClaudeStatusService.shared
+    @State private var showClaudeInAlternation = false
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -66,7 +68,7 @@ struct ContentView: View {
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
-        } else if shouldShowCodexLiveActivity {
+        } else if shouldShowCodexLiveActivity || shouldShowClaudeLiveActivity {
             chinWidth += (max(0, vm.effectiveClosedNotchHeight - 12) + codexClosedSessionCountWidth + 20)
         } else if shouldShowMusicLiveActivity {
             chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
@@ -92,12 +94,32 @@ struct ContentView: View {
             && !vm.hideOnClosed
     }
 
+    private var shouldShowClosedLyrics: Bool {
+        Defaults[.enableLyrics]
+            && shouldShowMusicLiveActivity
+            && (musicManager.isFetchingLyrics
+                || !musicManager.syncedLyrics.isEmpty
+                || !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
     private var shouldShowCodexLiveActivity: Bool {
         !coordinator.expandingView.show
             && vm.notchState == .closed
             && !vm.hideOnClosed
             && codexStatusService.snapshot.shouldShowClosedLiveActivity
             && (coordinator.currentView == .codexStatus || !shouldShowMusicLiveActivity)
+    }
+
+    private var shouldShowClaudeLiveActivity: Bool {
+        !coordinator.expandingView.show
+            && vm.notchState == .closed
+            && !vm.hideOnClosed
+            && claudeStatusService.snapshot.shouldShowClosedLiveActivity
+            && (coordinator.currentView == .claudeStatus || !shouldShowMusicLiveActivity)
+    }
+
+    private var bothActive: Bool {
+        shouldShowCodexLiveActivity && shouldShowClaudeLiveActivity
     }
 
     var body: some View {
@@ -142,7 +164,7 @@ struct ContentView: View {
                     .conditionalModifier(true) { view in
                         let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
                         let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
-                        
+
                         return view
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
                             .animation(.smooth, value: gestureProgress)
@@ -196,8 +218,12 @@ struct ContentView: View {
                                 switch coordinator.currentView {
                                 case .home, .shelf:
                                     return openNotchSize.height
-                                case .clipboard, .vscodeProjects, .codexStatus:
+                                case .clipboard, .vscodeProjects:
                                     return sevenIslandFeatureNotchHeight
+                                case .codexStatus, .claudeStatus:
+                                    return sevenIslandFeatureNotchHeight
+                                default:
+                                    return openNotchSize.height
                                 }
                             }()
                             withAnimation(.smooth(duration: 0.35)) {
@@ -210,8 +236,12 @@ struct ContentView: View {
                             switch newView {
                             case .home, .shelf:
                                 return openNotchSize.height
-                            case .clipboard, .vscodeProjects, .codexStatus:
+                            case .clipboard, .vscodeProjects:
                                 return sevenIslandFeatureNotchHeight
+                            case .codexStatus, .claudeStatus:
+                                return sevenIslandFeatureNotchHeight
+                            default:
+                                return openNotchSize.height
                             }
                         }()
                         withAnimation(.smooth(duration: 0.35)) {
@@ -267,9 +297,21 @@ struct ContentView: View {
         .environmentObject(vm)
         .onAppear {
             codexStatusService.refresh()
+            claudeStatusService.refresh()
         }
         .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
             codexStatusService.refresh()
+            claudeStatusService.refresh()
+        }
+        .onReceive(Timer.publish(every: 3, on: .main, in: .common).autoconnect()) { _ in
+            if bothActive {
+                showClaudeInAlternation.toggle()
+            }
+        }
+        .onChange(of: bothActive) { _, isBothActive in
+            if !isBothActive {
+                showClaudeInAlternation = false
+            }
         }
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
@@ -344,12 +386,29 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
+                      } else if bothActive {
+                          Group {
+                              if showClaudeInAlternation {
+                                  ClaudeLiveActivity()
+                              } else {
+                                  CodexLiveActivity()
+                              }
+                          }
+                          .frame(alignment: .center)
+                      } else if shouldShowClaudeLiveActivity {
+                          ClaudeLiveActivity()
+                              .frame(alignment: .center)
                       } else if shouldShowCodexLiveActivity {
                           CodexLiveActivity()
                               .frame(alignment: .center)
                       } else if shouldShowMusicLiveActivity {
                           MusicLiveActivity()
                               .frame(alignment: .center)
+                          if shouldShowClosedLyrics {
+                              ClosedMusicLyricsLineView(width: computedChinWidth)
+                                  .allowsHitTesting(false)
+                                  .transition(.opacity.combined(with: .move(edge: .top)))
+                          }
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
@@ -415,6 +474,8 @@ struct ContentView: View {
                         VSCodeProjectsView()
                     case .codexStatus:
                         CodexStatusView()
+                    case .claudeStatus:
+                        ClaudeStatusView()
                     }
                 }
                 .transition(
@@ -482,6 +543,41 @@ struct ContentView: View {
 
             CodexClosedSessionCountBadge(count: codexStatusService.snapshot.recentSessions.count, width: codexClosedSessionCountWidth)
             .help("\(codexStatusService.snapshot.recentSessions.count) Codex sessions")
+        }
+        .frame(height: vm.effectiveClosedNotchHeight, alignment: .center)
+    }
+
+    @ViewBuilder
+    func ClaudeLiveActivity() -> some View {
+        let activity = claudeStatusService.snapshot.currentActivity
+        let statusSize = max(0, vm.effectiveClosedNotchHeight - 12)
+
+        HStack {
+            ClaudeAppIcon(size: statusSize, isWorking: activity?.state == .working)
+            .help(activity?.headline ?? "Claude is working")
+
+            Rectangle()
+                .fill(.black)
+                .overlay(
+                    HStack(alignment: .center, spacing: 8) {
+                        if coordinator.expandingView.show && Defaults[.sneakPeekStyles] == .inline {
+                            MarqueeText(
+                                .constant(activity?.headline ?? "Claude is working"),
+                                textColor: .orange,
+                                minDuration: 0.4,
+                                frameWidth: 120
+                            )
+                            Spacer(minLength: vm.closedNotchSize.width)
+                            Text(activity?.lastToolName ?? "Claude")
+                                .lineLimit(1)
+                                .foregroundStyle(Color.orange)
+                        }
+                    }
+                )
+                .frame(width: vm.closedNotchSize.width + -cornerRadiusInsets.closed.top)
+
+            ClaudeClosedSessionCountBadge(count: claudeStatusService.snapshot.recentSessions.count, width: codexClosedSessionCountWidth)
+            .help("\(claudeStatusService.snapshot.recentSessions.count) Claude sessions")
         }
         .frame(height: vm.effectiveClosedNotchHeight, alignment: .center)
     }
@@ -616,10 +712,8 @@ struct ContentView: View {
         hoverTask?.cancel()
         
         if hovering {
-            withAnimation(animationSpring) {
-                isHovering = true
-            }
-            
+            isHovering = true
+
             if vm.notchState == .closed && Defaults[.enableHaptics] {
                 haptics.toggle()
             }
@@ -644,12 +738,12 @@ struct ContentView: View {
             hoverTask = Task {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }
-                
+
                 await MainActor.run {
                     withAnimation(animationSpring) {
                         self.isHovering = false
                     }
-                    
+
                     if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
                         self.vm.close()
                     }
@@ -718,7 +812,7 @@ private struct CodexAppIcon: View {
     @State private var isAnimating = false
 
     var body: some View {
-        CodexGlyphIcon(size: size * 0.76, foreground: .white)
+        CodexGlyphIcon(size: size * 0.76, foreground: isWorking ? .green : .white)
             .opacity(isWorking ? 1 : 0.72)
             .scaleEffect(isWorking && isAnimating ? 1.06 : 0.94)
             .frame(width: size, height: size)
@@ -846,6 +940,150 @@ private struct CodexClosedSessionCountBadge: View {
             .overlay(
                 Circle()
                     .stroke(Color.green.opacity(0.22), lineWidth: 1)
+            )
+    }
+}
+
+private struct ClaudeAppIcon: View {
+    let size: CGFloat
+    let isWorking: Bool
+    @State private var isAnimating = false
+
+    var body: some View {
+        ClaudeGlyphIcon(size: size * 0.76, foreground: isWorking ? .orange : .white)
+            .opacity(isWorking ? 1 : 0.72)
+            .scaleEffect(isWorking && isAnimating ? 1.06 : 0.94)
+            .frame(width: size, height: size)
+            .animation(
+                isWorking
+                    ? Animation.easeInOut(duration: 0.9).repeatForever(autoreverses: true)
+                    : .smooth(duration: 0.18),
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = isWorking
+            }
+            .onChange(of: isWorking) { _, isWorking in
+                isAnimating = false
+                if isWorking {
+                    DispatchQueue.main.async {
+                        isAnimating = true
+                    }
+                }
+            }
+    }
+}
+
+struct ClaudeGlyphIcon: View {
+    let size: CGFloat
+    let foreground: Color
+
+    var body: some View {
+        ClaudeAppIconShape()
+            .fill(foreground)
+            .frame(width: size, height: size)
+    }
+}
+
+struct ClaudeAppIconShape: Shape {
+    private static let pathData = "M 75 30 L 73 31 L 69 36 L 70 46 L 75 53 L 84 70 L 86 72 L 95 90 L 93 91 L 53 61 L 47 61 L 43 65 L 44 72 L 59 84 L 93 106 L 96 110 L 95 111 L 90 111 L 89 110 L 80 110 L 79 109 L 66 109 L 65 108 L 51 108 L 50 107 L 37 107 L 34 106 L 31 108 L 31 111 L 36 115 L 47 115 L 48 116 L 72 116 L 73 117 L 94 117 L 96 119 L 94 122 L 62 139 L 56 144 L 48 149 L 48 154 L 51 157 L 52 156 L 58 156 L 100 128 L 103 129 L 95 138 L 86 151 L 67 175 L 67 179 L 71 181 L 74 180 L 74 179 L 86 167 L 91 159 L 111 133 L 112 134 L 112 137 L 111 138 L 109 155 L 108 156 L 108 160 L 106 165 L 106 169 L 105 170 L 105 174 L 104 175 L 104 179 L 102 185 L 104 190 L 108 193 L 114 190 L 114 186 L 115 185 L 115 175 L 116 174 L 116 164 L 117 163 L 117 153 L 118 152 L 118 143 L 120 138 L 124 143 L 131 156 L 148 180 L 154 180 L 156 179 L 157 177 L 156 176 L 156 170 L 137 142 L 138 139 L 160 158 L 172 167 L 175 167 L 176 165 L 175 161 L 137 126 L 138 124 L 141 124 L 142 125 L 145 125 L 154 128 L 158 128 L 159 129 L 162 129 L 163 130 L 166 130 L 175 133 L 179 133 L 184 135 L 186 135 L 193 131 L 193 127 L 186 121 L 166 120 L 165 119 L 142 119 L 138 117 L 141 115 L 145 115 L 146 114 L 149 114 L 150 113 L 153 113 L 162 110 L 166 110 L 167 109 L 171 109 L 172 108 L 176 108 L 181 106 L 189 105 L 191 104 L 193 100 L 193 98 L 189 95 L 183 95 L 182 96 L 177 96 L 176 97 L 171 97 L 170 98 L 156 100 L 155 101 L 147 102 L 146 103 L 143 103 L 142 102 L 147 92 L 170 63 L 170 60 L 172 56 L 167 48 L 161 48 L 159 49 L 144 65 L 130 84 L 125 88 L 124 87 L 124 83 L 125 82 L 125 78 L 126 77 L 126 73 L 128 67 L 128 62 L 130 56 L 130 51 L 131 50 L 131 45 L 132 44 L 132 37 L 126 32 L 121 36 L 119 41 L 118 58 L 117 59 L 117 68 L 116 69 L 116 77 L 115 78 L 115 90 L 113 93 L 111 91 L 110 85 L 95 57 L 95 55 L 90 46 L 90 44 L 86 37 L 85 33 L 83 31 L 80 31 L 79 30 Z"
+
+    private static let logoPath: CGPath = {
+        var tokens: [String] = []
+        var tokBuf = ""
+        for ch in pathData {
+            if ch.isLetter {
+                if !tokBuf.isEmpty { tokens.append(tokBuf); tokBuf = "" }
+                tokens.append(String(ch))
+            } else if ch.isWhitespace || ch == "," {
+                if !tokBuf.isEmpty { tokens.append(tokBuf); tokBuf = "" }
+            } else {
+                tokBuf.append(ch)
+            }
+        }
+        if !tokBuf.isEmpty { tokens.append(tokBuf) }
+
+        let path = CGMutablePath()
+        var i = 0
+        var current = CGPoint.zero
+        var start = CGPoint.zero
+
+        while i < tokens.count {
+            switch tokens[i] {
+            case "M":
+                if i + 2 < tokens.count,
+                   let x = Double(tokens[i + 1]),
+                   let y = Double(tokens[i + 2])
+                {
+                    let pt = CGPoint(x: x, y: y)
+                    path.move(to: pt)
+                    current = pt
+                    start = pt
+                    i += 3
+                } else {
+                    i += 1
+                }
+            case "L":
+                if i + 2 < tokens.count,
+                   let x = Double(tokens[i + 1]),
+                   let y = Double(tokens[i + 2])
+                {
+                    let pt = CGPoint(x: x, y: y)
+                    path.addLine(to: pt)
+                    current = pt
+                    i += 3
+                } else {
+                    i += 1
+                }
+            case "Z", "z":
+                path.closeSubpath()
+                current = start
+                i += 1
+            default:
+                i += 1
+            }
+        }
+        return path
+    }()
+
+    func path(in rect: CGRect) -> Path {
+        // SVG viewBox is 225x224 but actual path content is ~162x163 (X:31→193, Y:30→193)
+        let contentWidth: CGFloat = 162
+        let contentHeight: CGFloat = 163
+        let scale = min(rect.width / contentWidth, rect.height / contentHeight)
+        let contentCenterX: CGFloat = 112 // (31 + 193) / 2
+        let contentCenterY: CGFloat = 111.5 // (30 + 193) / 2
+
+        var transform = CGAffineTransform(
+            translationX: rect.midX - contentCenterX * scale,
+            y: rect.midY - contentCenterY * scale
+        ).scaledBy(x: scale, y: scale)
+
+        guard let scaled = Self.logoPath.copy(using: &transform) else {
+            return Path()
+        }
+        return Path(scaled)
+    }
+}
+
+private struct ClaudeClosedSessionCountBadge: View {
+    let count: Int
+    let width: CGFloat
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 11, weight: .bold, design: .monospaced))
+            .foregroundStyle(Color.orange)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(width: width, height: width)
+            .background(
+                Circle()
+                    .fill(Color.orange.opacity(0.12))
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.orange.opacity(0.22), lineWidth: 1)
             )
     }
 }

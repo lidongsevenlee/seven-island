@@ -218,6 +218,94 @@ func testCodexSnapshotShowsClosedLiveActivityWhenWorking() {
     expectEqual(snapshot.shouldShowClosedLiveActivity, true, "shows closed Codex activity while Codex is working")
 }
 
+func testLyricsDisplayTextBuildsSingleAndMultilineLyrics() {
+    let plainLyrics = """
+
+    First line
+
+    Second line
+    Third line
+    Fourth line
+    """
+
+    expectEqual(
+        LyricsDisplayText.singleLine(fromPlainLyrics: plainLyrics),
+        "First line",
+        "closed notch uses the first non-empty plain lyric line"
+    )
+    expectEqual(
+        LyricsDisplayText.multiline(fromPlainLyrics: plainLyrics, limit: 3),
+        "First line\nSecond line\nThird line",
+        "expanded home limits plain lyrics to multiple readable lines"
+    )
+}
+
+func testLyricsDisplayTextCentersCurrentSyncedLyricInWindow() {
+    let syncedLyrics: [(time: Double, text: String)] = [
+        (0, "Before"),
+        (10, "Current"),
+        (20, "After"),
+        (30, "Later")
+    ]
+
+    let window = LyricsDisplayText.syncedWindow(from: syncedLyrics, elapsed: 12)
+    expectEqual(window.map(\.text), ["Before", "Current", "After"], "expanded synced lyrics centers the current line")
+    expectEqual(window.map(\.isCurrent), [false, true, false], "marks only the center current lyric as active")
+}
+
+func testLyricsDisplayTextEstimatesActiveCharacter() {
+    let syncedLyrics: [(time: Double, text: String)] = [
+        (10, "Hello"),
+        (20, "World")
+    ]
+
+    expectEqual(
+        LyricsDisplayText.activeCharacterIndex(from: syncedLyrics, elapsed: 10),
+        0,
+        "starts the character pulse at the first character"
+    )
+    expectEqual(
+        LyricsDisplayText.activeCharacterIndex(from: syncedLyrics, elapsed: 15),
+        2,
+        "moves the character pulse through the lyric line over time"
+    )
+    expectEqual(
+        LyricsDisplayText.activeCharacterIndex(from: syncedLyrics, elapsed: 19.9),
+        4,
+        "keeps the active character inside the current lyric line"
+    )
+}
+
+func testLyricsDisplayTextUsesKaraokeProgressCurve() {
+    let linearHalf = 0.5
+    let karaokeHalf = LyricsDisplayText.karaokeProgress(
+        for: "我靜靜悄悄默默淡淡的止住呼吸",
+        rawProgress: linearHalf,
+        duration: 4
+    )
+    let karaokeStart = LyricsDisplayText.karaokeProgress(
+        for: "慢慢的流",
+        rawProgress: 0.04,
+        duration: 3
+    )
+
+    expectEqual(karaokeHalf > 0.35 && karaokeHalf < 0.65, true, "keeps karaoke progress near the sung midpoint")
+    expectEqual(karaokeStart < 0.04, true, "holds the start briefly instead of rushing the first character")
+}
+
+func testLyricsDisplayTextProvidesUnavailableFallback() {
+    expectEqual(
+        LyricsDisplayText.displayFallback(isFetching: false),
+        "无歌词",
+        "uses localized no-lyrics placeholder when lookup finishes without text"
+    )
+    expectEqual(
+        LyricsDisplayText.displayFallback(isFetching: true),
+        "Loading lyrics...",
+        "keeps loading state visible during lookup"
+    )
+}
+
 func testCodexSessionURLUsesLocalConversationRoute() {
     let url = AppLauncherService.codexSessionURL(for: "7d8f927e-32b5-4c1d-9a31-8dcf53b8d4ef")
     expectEqual(url?.absoluteString, "codex://threads/7d8f927e-32b5-4c1d-9a31-8dcf53b8d4ef", "builds Codex local conversation deeplink")
@@ -238,6 +326,11 @@ enum SevenIslandFeatureTestRunner {
             testCodexRolloutParsesOpenLastConversationTurn()
             testCodexSnapshotFormatsQuotaFromActivity()
             testCodexSnapshotShowsClosedLiveActivityWhenWorking()
+            testLyricsDisplayTextBuildsSingleAndMultilineLyrics()
+            testLyricsDisplayTextCentersCurrentSyncedLyricInWindow()
+            testLyricsDisplayTextEstimatesActiveCharacter()
+            testLyricsDisplayTextUsesKaraokeProgressCurve()
+            testLyricsDisplayTextProvidesUnavailableFallback()
             testCodexSessionURLUsesLocalConversationRoute()
             print("SevenIslandFeatureTests passed")
         } catch {

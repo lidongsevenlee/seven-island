@@ -18,6 +18,9 @@
 		7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000090000000000000009 /* VSCodeProjectsView.swift */; };
 		7E10010A000000000000000A /* CodexStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000A000000000000000A /* CodexStatusView.swift */; };
 		7E10010B000000000000000B /* SevenIslandSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000B000000000000000B /* SevenIslandSettingsView.swift */; };
+		7E10010C000000000000000C /* ClaudeStatusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */; };
+		7E10010D000000000000000D /* ClaudeStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* ClaudeStatusService.swift */; };
+		7E10010E000000000000000E /* ClaudeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000E000000000000000E /* ClaudeStatusView.swift */; };
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
 		110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */; };
 		1100292A2E8691B400035A57 /* FileShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029292E8691B400035A57 /* FileShareView.swift */; };
@@ -66,6 +69,7 @@
 		1194E87C2EA19E09009C82D6 /* ImageProcessingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1194E87B2EA19E09009C82D6 /* ImageProcessingService.swift */; };
 		1194E8852EA57D23009C82D6 /* SkyLightWindow in Frameworks */ = {isa = PBXBuildFile; productRef = 1194E8842EA57D23009C82D6 /* SkyLightWindow */; };
 		1194E8872EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */; };
+		1194E9412EACC653009C82D6 /* LyricsDisplayText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1194E9422EACC653009C82D6 /* LyricsDisplayText.swift */; };
 		1194E9402EACC652009C82D6 /* Color+AccentColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1194E93F2EACC652009C82D6 /* Color+AccentColor.swift */; };
 		11A45C792E34E63100CEB175 /* MediaChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11A45C782E34E63100CEB175 /* MediaChecker.swift */; };
 		11C5E3132DFE85970065821E /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C5E3112DFE85970065821E /* SettingsWindowController.swift */; };
@@ -203,6 +207,9 @@
 		7E1000090000000000000009 /* VSCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectsView.swift; sourceTree = "<group>"; };
 		7E10000A000000000000000A /* CodexStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexStatusView.swift; sourceTree = "<group>"; };
 		7E10000B000000000000000B /* SevenIslandSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenIslandSettingsView.swift; sourceTree = "<group>"; };
+		7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusSnapshot.swift; sourceTree = "<group>"; };
+		7E10000D000000000000000D /* ClaudeStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusService.swift; sourceTree = "<group>"; };
+		7E10000E000000000000000E /* ClaudeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusView.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
 		110029292E8691B400035A57 /* FileShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShareView.swift; sourceTree = "<group>"; };
@@ -245,6 +252,7 @@
 		118EBE3A2E9720C500D54B5A /* ShelfStateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfStateViewModel.swift; sourceTree = "<group>"; };
 		1194E87B2EA19E09009C82D6 /* ImageProcessingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcessingService.swift; sourceTree = "<group>"; };
 		1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoringNotchSkyLightWindow.swift; sourceTree = "<group>"; };
+		1194E9422EACC653009C82D6 /* LyricsDisplayText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsDisplayText.swift; sourceTree = "<group>"; };
 		1194E93F2EACC652009C82D6 /* Color+AccentColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+AccentColor.swift"; sourceTree = "<group>"; };
 		11A45C782E34E63100CEB175 /* MediaChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaChecker.swift; sourceTree = "<group>"; };
 		11C5E3112DFE85970065821E /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
@@ -546,6 +554,7 @@
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
 				7E1000030000000000000003 /* CodexStatusSnapshot.swift */,
+				7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -556,6 +565,7 @@
 				7E1000040000000000000004 /* ClipboardHistoryStore.swift */,
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
+				7E10000D000000000000000D /* ClaudeStatusService.swift */,
 				7E1000070000000000000007 /* CodexStatusService.swift */,
 			);
 			path = Services;
@@ -567,6 +577,7 @@
 				7E1000080000000000000008 /* ClipboardHistoryView.swift */,
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
 				7E10000A000000000000000A /* CodexStatusView.swift */,
+				7E10000E000000000000000E /* ClaudeStatusView.swift */,
 				7E10000B000000000000000B /* SevenIslandSettingsView.swift */,
 			);
 			path = Views;
@@ -772,6 +783,7 @@
 				1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */,
 				1160F8D72DD98230006FBB94 /* NotchShape.swift */,
 				9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */,
+				1194E9422EACC653009C82D6 /* LyricsDisplayText.swift */,
 				14D570C52C5F38210011E668 /* BoringHeader.swift */,
 				14D570D12C5F6C6A0011E668 /* BoringExtrasMenu.swift */,
 				1471A8582C6281BD0058408D /* BoringNotchWindow.swift */,
@@ -981,6 +993,9 @@
 				7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */,
 				7E10010A000000000000000A /* CodexStatusView.swift in Sources */,
 				7E10010B000000000000000B /* SevenIslandSettingsView.swift in Sources */,
+				7E10010C000000000000000C /* ClaudeStatusSnapshot.swift in Sources */,
+				7E10010D000000000000000D /* ClaudeStatusService.swift in Sources */,
+				7E10010E000000000000000E /* ClaudeStatusView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
@@ -998,6 +1013,7 @@
 				B1D365D02C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift in Sources */,
 				1194E87C2EA19E09009C82D6 /* ImageProcessingService.swift in Sources */,
 				1194E8872EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift in Sources */,
+				1194E9412EACC653009C82D6 /* LyricsDisplayText.swift in Sources */,
 				14D570CB2C5F4B2C0011E668 /* BatteryStatusViewModel.swift in Sources */,
 				9A0887322C7A693000C160EA /* TabButton.swift in Sources */,
 				1153BD9C2D98853B00979FB0 /* NowPlayingController.swift in Sources */,
