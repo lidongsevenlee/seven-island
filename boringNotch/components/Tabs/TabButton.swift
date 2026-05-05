@@ -19,7 +19,7 @@ struct TabButton<IconView: View>: View {
 }
 
 #Preview {
-    TabButton(label: "Home", icon: Image(systemName: "tray.fill"), selected: true) {
+    TabButton(label: "Music", icon: Image(systemName: "music.note"), selected: true) {
         print("Tapped")
     }
 }

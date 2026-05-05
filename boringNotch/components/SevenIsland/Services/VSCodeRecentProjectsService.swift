@@ -1,4 +1,5 @@
 import AppKit
+import Defaults
 import Foundation
 
 final class VSCodeRecentProjectsService: ObservableObject {
@@ -8,24 +9,29 @@ final class VSCodeRecentProjectsService: ObservableObject {
 
     private let storageJSONURL: URL
     private let stateDatabaseURL: URL
-    private let projectsDirectoryURL: URL
 
     init(
         storageJSONURL: URL = VSCodeRecentProjectsService.defaultStorageJSONURL(),
-        stateDatabaseURL: URL = VSCodeRecentProjectsService.defaultStateDatabaseURL(),
-        projectsDirectoryURL: URL = VSCodeRecentProjectsService.defaultProjectsDirectoryURL()
+        stateDatabaseURL: URL = VSCodeRecentProjectsService.defaultStateDatabaseURL()
     ) {
         self.storageJSONURL = storageJSONURL
         self.stateDatabaseURL = stateDatabaseURL
-        self.projectsDirectoryURL = projectsDirectoryURL
+    }
+
+    static func effectiveProjectsDirectoryURL() -> URL {
+        let configured = Defaults[.vscodeProjectsDirectory]
+        if !configured.isEmpty {
+            return URL(fileURLWithPath: (configured as NSString).expandingTildeInPath)
+        }
+        return defaultProjectsDirectoryURL()
     }
 
     func refresh(includeMissing: Bool = false) {
-        projects = loadProjects(includeMissing: includeMissing, limit: .max)
+        projects = loadProjects(from: Self.effectiveProjectsDirectoryURL(), includeMissing: includeMissing, limit: .max)
     }
 
-    func loadProjects(includeMissing: Bool, limit: Int) -> [VSCodeProjectItem] {
-        let urls = localProjectsFromDirectory(projectsDirectoryURL)
+    func loadProjects(from directory: URL, includeMissing: Bool, limit: Int) -> [VSCodeProjectItem] {
+        let urls = localProjectsFromDirectory(directory)
         var seen = Set<String>()
         var items: [VSCodeProjectItem] = []
 

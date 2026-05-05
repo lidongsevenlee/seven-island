@@ -199,7 +199,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func setOpenNotchHeight(_ height: CGFloat) {
         guard notchState == .open else { return }
-        let clampedHeight = min(max(height, openNotchSize.height), codexExpandedNotchHeight)
+        let clampedHeight = min(max(height, openNotchSize.height), sevenIslandFeatureNotchHeight)
         guard abs(notchSize.height - clampedHeight) > 0.5 else { return }
         notchSize = CGSize(width: openNotchSize.width, height: clampedHeight)
     }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct SevenIslandSettingsView: View {
+struct ClipboardSettingsView: View {
     @AppStorage("sevenIslandClipboardHistoryEnabled") private var clipboardHistoryEnabled = true
     @AppStorage("sevenIslandClipboardHistoryLimit") private var clipboardHistoryLimit = 100
 
@@ -20,31 +20,9 @@ struct SevenIslandSettingsView: View {
             } footer: {
                 Text("Seven Island stores only text and links copied while the app is running.")
             }
-
-            Section {
-                Button("Refresh Projects folders") {
-                    VSCodeRecentProjectsService.shared.refresh()
-                }
-            } header: {
-                Text("VS Code")
-            } footer: {
-                Text("Seven Island lists first-level folders from ~/Projects and opens them in a new VS Code window.")
-            }
-
-            Section {
-                Button("Open Codex") {
-                    CodexStatusService.shared.openCodex()
-                }
-                Button("Refresh Codex status") {
-                    CodexStatusService.shared.refresh()
-                }
-            } header: {
-                Text("Codex")
-            } footer: {
-                Text("Quota is not read from private APIs. Open Codex to view current quota and account details.")
-            }
         }
-        .navigationTitle("Seven Island")
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Clipboard")
         .onChange(of: clipboardHistoryLimit) {
             ClipboardHistoryStore.shared.reloadConfiguration()
         }

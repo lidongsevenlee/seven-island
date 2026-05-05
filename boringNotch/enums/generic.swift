@@ -25,12 +25,10 @@ public enum NotchState {
 }
 
 public enum NotchViews: String {
-    case home
+    case music = "home"
     case shelf
     case clipboard
     case vscodeProjects
-    case codexStatus
-    case claudeStatus
 }
 
 enum SettingsEnum {

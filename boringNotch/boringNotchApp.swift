@@ -29,7 +29,7 @@ struct DynamicNotchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Seven Island", image: "MenuBarIcon", isInserted: $showMenuBarIcon) {
+        MenuBarExtra(isInserted: $showMenuBarIcon) {
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
@@ -45,6 +45,9 @@ struct DynamicNotchApp: App {
                 NSApplication.shared.terminate(self)
             }
             .keyboardShortcut(KeyEquivalent("Q"), modifiers: .command)
+        } label: {
+            Image("MenuBarIcon")
+                .renderingMode(.template)
         }
     }
 }

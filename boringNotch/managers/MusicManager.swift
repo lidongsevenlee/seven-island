@@ -15,6 +15,12 @@ let defaultImage: NSImage = .init(
 )!
 
 class MusicManager: ObservableObject {
+    enum LyricsSource: Equatable {
+        case none
+        case appleMusicOfficial
+        case web
+    }
+
     // MARK: - Properties
     static let shared = MusicManager()
     private var cancellables = Set<AnyCancellable>()
@@ -51,6 +57,8 @@ class MusicManager: ObservableObject {
     @Published var currentLyrics: String = ""
     @Published var isFetchingLyrics: Bool = false
     @Published var syncedLyrics: [(time: Double, text: String)] = []
+    @Published var syncedLyricCharacterTimes: [[Double]] = []
+    @Published var lyricsSource: LyricsSource = .none
     @Published var canFavoriteTrack: Bool = false
     @Published var isFavoriteTrack: Bool = false
 
@@ -67,12 +75,31 @@ class MusicManager: ObservableObject {
     private var completedLyricsFetches = Set<LyricsTrackKey>()
     private var activeLyricsFetchKey: LyricsTrackKey?
     private var lyricsFetchTask: Task<Void, Never>?
+    private struct WebLyricsCandidate {
+        let plain: String
+        let synced: String
+        let parsed: (lines: [LyricsDisplayText.SyncedLine], characterTimes: [[Double]])
 
-    // Store last values at the time artwork was changed
-    private var lastArtworkTitle: String = "I'm Handsome"
-    private var lastArtworkArtist: String = "Me"
-    private var lastArtworkAlbum: String = "Self Love"
-    private var lastArtworkBundleIdentifier: String? = nil
+        var hasText: Bool {
+            !plain.isEmpty || !synced.isEmpty || !parsed.lines.isEmpty
+        }
+
+        var hasCharacterTiming: Bool {
+            parsed.characterTimes.contains { !$0.isEmpty }
+        }
+
+        var displayLyrics: String {
+            if !plain.isEmpty { return plain }
+            if !synced.isEmpty { return synced }
+            return parsed.lines.map(\.text).joined(separator: "\n")
+        }
+    }
+
+    // Track the last processed media item independently from artwork updates.
+    private var lastTrackTitle: String = "I'm Handsome"
+    private var lastTrackArtist: String = "Me"
+    private var lastTrackAlbum: String = "Self Love"
+    private var lastTrackBundleIdentifier: String? = nil
 
     @Published var isFlipping: Bool = false
     private var flipWorkItem: DispatchWorkItem?
@@ -206,15 +233,16 @@ class MusicManager: ObservableObject {
             }
         }
 
-        // Check for changes in track metadata using last artwork change values
-        let titleChanged = state.title != self.lastArtworkTitle
-        let artistChanged = state.artist != self.lastArtworkArtist
-        let albumChanged = state.album != self.lastArtworkAlbum
-        let bundleChanged = state.bundleIdentifier != self.lastArtworkBundleIdentifier
+        // Track metadata changes independently from artwork delivery timing.
+        let titleChanged = state.title != self.lastTrackTitle
+        let artistChanged = state.artist != self.lastTrackArtist
+        let albumChanged = state.album != self.lastTrackAlbum
+        let bundleChanged = state.bundleIdentifier != self.lastTrackBundleIdentifier
 
         // Check for artwork changes
         let artworkChanged = state.artwork != nil && state.artwork != self.artworkData
-        let hasContentChange = titleChanged || artistChanged || albumChanged || artworkChanged || bundleChanged
+        let metadataChanged = titleChanged || artistChanged || albumChanged || bundleChanged
+        let hasContentChange = metadataChanged || artworkChanged
 
         // Handle artwork and visual transitions for changed content
         if hasContentChange {
@@ -222,6 +250,16 @@ class MusicManager: ObservableObject {
 
             if artworkChanged, let artwork = state.artwork {
                 self.updateArtwork(artwork)
+            } else if metadataChanged && (albumChanged || bundleChanged) {
+                // Avoid showing the previous cover with the next track's metadata while
+                // Apple Music is still catching up with fresh artwork for the new item.
+                if let appIconImage = AppIconAsNSImage(for: state.bundleIdentifier) {
+                    self.usingAppIconForArtwork = true
+                    self.updateAlbumArt(newAlbumArt: appIconImage)
+                } else {
+                    self.usingAppIconForArtwork = false
+                    self.updateAlbumArt(newAlbumArt: defaultImage)
+                }
             } else if state.artwork == nil {
                 // Try to use app icon if no artwork but track changed
                 if let appIconImage = AppIconAsNSImage(for: state.bundleIdentifier) {
@@ -231,13 +269,10 @@ class MusicManager: ObservableObject {
             }
             self.artworkData = state.artwork
 
-            if artworkChanged || state.artwork == nil {
-                // Update last artwork change values
-                self.lastArtworkTitle = state.title
-                self.lastArtworkArtist = state.artist
-                self.lastArtworkAlbum = state.album
-                self.lastArtworkBundleIdentifier = state.bundleIdentifier
-            }
+            self.lastTrackTitle = state.title
+            self.lastTrackArtist = state.artist
+            self.lastTrackAlbum = state.album
+            self.lastTrackBundleIdentifier = state.bundleIdentifier
 
             // Only update sneak peek if there's actual content and something changed
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
@@ -374,6 +409,8 @@ class MusicManager: ObservableObject {
                 self.isFetchingLyrics = false
                 self.currentLyrics = ""
                 self.syncedLyrics = []
+                self.syncedLyricCharacterTimes = []
+                self.lyricsSource = .none
             }
             return
         }
@@ -393,6 +430,8 @@ class MusicManager: ObservableObject {
             self.isFetchingLyrics = true
             self.currentLyrics = ""
             self.syncedLyrics = []
+            self.syncedLyricCharacterTimes = []
+            self.lyricsSource = .none
 
             var didLoadLyrics = false
             while !Task.isCancelled,
@@ -410,6 +449,8 @@ class MusicManager: ObservableObject {
             } else if !Task.isCancelled {
                 self.currentLyrics = ""
                 self.syncedLyrics = []
+                self.syncedLyricCharacterTimes = []
+                self.lyricsSource = .none
             }
 
             if self.activeLyricsFetchKey == key {
@@ -428,6 +469,8 @@ class MusicManager: ObservableObject {
                     if let lyrics = try await fetchLyricsFromAppleMusic(), !lyrics.isEmpty {
                         currentLyrics = lyrics
                         syncedLyrics = []
+                        syncedLyricCharacterTimes = []
+                        lyricsSource = .appleMusicOfficial
                         return true
                     }
                 } catch {
@@ -502,6 +545,7 @@ class MusicManager: ObservableObject {
     @MainActor
     private func fetchLyricsFromWeb(title: String, artist: String) async -> Bool {
         let cleanArtist = normalizedQuery(artist)
+        var fallbackCandidate: WebLyricsCandidate?
 
         // LRCLIB simple search (no auth): https://lrclib.net/api/search?track_name=...&artist_name=...
         for titleQuery in lyricTitleQueries(from: title) {
@@ -515,54 +559,180 @@ class MusicManager: ObservableObject {
                     continue
                 }
 
-                if let match = jsonArray.first(where: { result in
+                let candidates = jsonArray.compactMap { result -> WebLyricsCandidate? in
                     let plain = (result["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let synced = (result["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    return !plain.isEmpty || !synced.isEmpty
-                }) {
-                    let plain = (match["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let synced = (match["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let resolved = plain.isEmpty ? synced : plain
-                    self.currentLyrics = resolved
-                    self.syncedLyrics = synced.isEmpty ? [] : self.parseLRC(synced)
+                    let parsed = synced.isEmpty ? (lines: [], characterTimes: []) : LyricsDisplayText.parseSyncedLyrics(synced)
+                    let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed)
+                    return candidate.hasText ? candidate : nil
+                }
+
+                if let enhanced = candidates.first(where: \.hasCharacterTiming) {
+                    applyWebLyricsCandidate(enhanced)
                     return true
+                }
+
+                if fallbackCandidate == nil {
+                    fallbackCandidate = candidates.first
                 }
             } catch {
                 continue
             }
         }
 
+        if let enhanced = await fetchEnhancedLyricsFromAdditionalWebProviders(title: title, artist: artist) {
+            applyWebLyricsCandidate(enhanced)
+            return true
+        }
+
+        if let fallbackCandidate {
+            applyWebLyricsCandidate(fallbackCandidate)
+            return true
+        }
+
         self.currentLyrics = ""
         self.syncedLyrics = []
+        self.syncedLyricCharacterTimes = []
+        self.lyricsSource = .none
         return false
+    }
+
+    @MainActor
+    private func applyWebLyricsCandidate(_ candidate: WebLyricsCandidate) {
+        self.currentLyrics = candidate.displayLyrics
+        self.syncedLyrics = candidate.parsed.lines
+        self.syncedLyricCharacterTimes = candidate.hasCharacterTiming ? candidate.parsed.characterTimes : []
+        self.lyricsSource = .web
+    }
+
+    private func fetchEnhancedLyricsFromAdditionalWebProviders(title: String, artist: String) async -> WebLyricsCandidate? {
+        await fetchEnhancedLyricsFromQQMusic(title: title, artist: artist)
+    }
+
+    private func fetchEnhancedLyricsFromQQMusic(title: String, artist: String) async -> WebLyricsCandidate? {
+        let query = [normalizedQuery(title), normalizedQuery(artist)]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !query.isEmpty,
+              var components = URLComponents(string: "https://oiapi.net/api/QQMusicLyric") else {
+            return nil
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "keyword", value: query),
+            URLQueryItem(name: "format", value: "qrc"),
+            URLQueryItem(name: "type", value: "json")
+        ]
+
+        guard let url = components.url else { return nil }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+
+            if let candidate = qrcCandidate(from: json) {
+                return candidate
+            }
+
+            if let results = json["data"] as? [[String: Any]] {
+                for result in results.prefix(5) {
+                    guard let id = lyricSearchResultID(from: result),
+                          let candidate = await fetchQQMusicLyricByID(id) else {
+                        continue
+                    }
+                    return candidate
+                }
+            }
+
+            return nil
+        } catch {
+            return nil
+        }
+    }
+
+    private func fetchQQMusicLyricByID(_ id: String) async -> WebLyricsCandidate? {
+        guard var components = URLComponents(string: "https://oiapi.net/api/QQMusicLyric") else {
+            return nil
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "id", value: id),
+            URLQueryItem(name: "format", value: "qrc"),
+            URLQueryItem(name: "type", value: "json")
+        ]
+
+        guard let url = components.url else { return nil }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+
+            return qrcCandidate(from: json)
+        } catch {
+            return nil
+        }
+    }
+
+    private func qrcCandidate(from json: [String: Any]) -> WebLyricsCandidate? {
+        if let lyric = lyricPayloadText(from: json) {
+            let parsed = LyricsDisplayText.parseQQMusicQRC(lyric)
+            let candidate = WebLyricsCandidate(plain: "", synced: lyric, parsed: parsed)
+            return candidate.hasCharacterTiming ? candidate : nil
+        }
+
+        if let data = json["data"] as? [String: Any],
+           let lyric = lyricPayloadText(from: data) {
+            let parsed = LyricsDisplayText.parseQQMusicQRC(lyric)
+            let candidate = WebLyricsCandidate(plain: "", synced: lyric, parsed: parsed)
+            return candidate.hasCharacterTiming ? candidate : nil
+        }
+
+        return nil
+    }
+
+    private func lyricSearchResultID(from result: [String: Any]) -> String? {
+        let keys = ["id", "mid", "songmid", "songMid", "song_id"]
+        for key in keys {
+            if let value = result[key] as? String, !value.isEmpty {
+                return value
+            }
+            if let value = result[key] as? Int {
+                return String(value)
+            }
+        }
+        return nil
+    }
+
+    private func lyricPayloadText(from dictionary: [String: Any]) -> String? {
+        let keys = ["conteng", "content", "lyric", "lyrics", "qrc", "lrc"]
+        for key in keys {
+            if let value = dictionary[key] as? String,
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return value.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        if let base64 = dictionary["base64"] as? String,
+           let data = Data(base64Encoded: base64),
+           let decoded = String(data: data, encoding: .utf8),
+           !decoded.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return decoded.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return nil
     }
 
     // MARK: - Synced lyrics helpers
     private func parseLRC(_ lrc: String) -> [(time: Double, text: String)] {
-        var result: [(Double, String)] = []
-        lrc.split(separator: "\n").forEach { lineSub in
-            let line = String(lineSub)
-            // Match [mm:ss.xx] or [m:ss]
-            let pattern = #"\[(\d{1,2}):(\d{2})(?:\.(\d{1,2}))?\]"#
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
-            let nsLine = line as NSString
-            if let match = regex.firstMatch(in: line, range: NSRange(location: 0, length: nsLine.length)) {
-                let minStr = nsLine.substring(with: match.range(at: 1))
-                let secStr = nsLine.substring(with: match.range(at: 2))
-                let csRange = match.range(at: 3)
-                let centiStr = csRange.location != NSNotFound ? nsLine.substring(with: csRange) : "0"
-                let minutes = Double(minStr) ?? 0
-                let seconds = Double(secStr) ?? 0
-                let centis = Double(centiStr) ?? 0
-                let time = minutes * 60 + seconds + centis / 100.0
-                let textStart = match.range.location + match.range.length
-                let text = nsLine.substring(from: textStart).trimmingCharacters(in: .whitespaces)
-                if !text.isEmpty {
-                    result.append((time, text))
-                }
-            }
-        }
-        return result.sorted { $0.0 < $1.0 }
+        LyricsDisplayText.parseSyncedLyrics(lrc).lines
     }
 
     func lyricLine(at elapsed: Double) -> String {

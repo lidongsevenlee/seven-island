@@ -12,8 +12,7 @@ struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
-    @ObservedObject var codexService = CodexStatusService.shared
-    @ObservedObject var claudeService = ClaudeStatusService.shared
+    @State private var isSettingsHovered = false
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -43,48 +42,6 @@ struct BoringHeader: View {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
                     } else {
-                        // Codex quick-access
-                        let codexWorking = codexService.snapshot.currentActivity?.state == .working
-                        let codexSelected = coordinator.currentView == .codexStatus
-                        Button {
-                            withAnimation(.smooth) {
-                                coordinator.currentView = .codexStatus
-                            }
-                        } label: {
-                            ZStack {
-                                if codexSelected {
-                                    Capsule()
-                                        .fill(Color(nsColor: .secondarySystemFill))
-                                }
-                                CodexGlyphIcon(size: 15, foreground: codexWorking ? .green : codexSelected ? .white : .gray)
-                            }
-                            .frame(width: 32, height: 26)
-                            .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .help(codexService.snapshot.currentActivity?.headline ?? "Codex")
-
-                        // Claude quick-access
-                        let claudeWorking = claudeService.snapshot.currentActivity?.state == .working
-                        let claudeSelected = coordinator.currentView == .claudeStatus
-                        Button {
-                            withAnimation(.smooth) {
-                                coordinator.currentView = .claudeStatus
-                            }
-                        } label: {
-                            ZStack {
-                                if claudeSelected {
-                                    Capsule()
-                                        .fill(Color(nsColor: .secondarySystemFill))
-                                }
-                                ClaudeGlyphIcon(size: 15, foreground: claudeWorking ? .orange : claudeSelected ? .white : .gray)
-                            }
-                            .frame(width: 32, height: 26)
-                            .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .help(claudeService.snapshot.currentActivity?.headline ?? "Claude")
-
                         if Defaults[.showMirror] {
                             Button(action: {
                                 vm.toggleCameraPreview()
@@ -106,19 +63,22 @@ struct BoringHeader: View {
                                 DispatchQueue.main.async {
                                     SettingsWindowController.shared.showWindow()
                                 }
-
                             }) {
                                 Capsule()
-                                    .fill(.black)
-                                    .frame(width: 30, height: 30)
+                                    .fill(Color(nsColor: .secondarySystemFill).opacity(isSettingsHovered ? 1 : 0))
+                                    .frame(width: 24, height: 24)
                                     .overlay {
-                                        Image(systemName: "gear")
-                                            .foregroundColor(.white)
-                                            .padding()
-                                            .imageScale(.medium)
+                                        Image("logo2")
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(width: 16, height: 16)
+                                            .opacity(isSettingsHovered ? 0.98 : 0.82)
                                     }
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .onHover { hovering in
+                                isSettingsHovered = hovering
+                            }
                         }
                     }
                 }

@@ -50,7 +50,7 @@ struct ExpandedItem {
 class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
 
-    @Published var currentView: NotchViews = .home {
+    @Published var currentView: NotchViews = .music {
         didSet {
             lastNotchView = currentView.rawValue
         }
@@ -64,14 +64,14 @@ class BoringViewCoordinator: ObservableObject {
     @AppStorage("showWhatsNew") var showWhatsNew: Bool = true
     @AppStorage("musicLiveActivityEnabled") var musicLiveActivityEnabled: Bool = true
     @AppStorage("currentMicStatus") var currentMicStatus: Bool = true
-    @AppStorage("sevenIslandLastNotchView") private var lastNotchView: String = NotchViews.home.rawValue
+    @AppStorage("sevenIslandLastNotchView") private var lastNotchView: String = NotchViews.music.rawValue
 
     @AppStorage("alwaysShowTabs") var alwaysShowTabs: Bool = true {
         didSet {
             if !alwaysShowTabs {
                 openLastTabByDefault = false
                 if ShelfStateViewModel.shared.isEmpty || !Defaults[.openShelfByDefault] {
-                    currentView = .home
+                    currentView = .music
                 }
             }
         }
@@ -127,7 +127,7 @@ class BoringViewCoordinator: ObservableObject {
         }
         
         selectedScreenUUID = preferredScreenUUID ?? NSScreen.main?.displayUUID ?? ""
-        currentView = NotchViews(rawValue: lastNotchView) ?? .home
+        currentView = NotchViews(rawValue: lastNotchView) ?? .music
 
         // Observe changes to accessibility authorization and react accordingly
         accessibilityObserver = NotificationCenter.default.addObserver(
@@ -302,6 +302,6 @@ class BoringViewCoordinator: ObservableObject {
     }
     
     func showEmpty() {
-        currentView = NotchViews(rawValue: lastNotchView) ?? .home
+        currentView = NotchViews(rawValue: lastNotchView) ?? .music
     }
 }

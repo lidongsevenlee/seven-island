@@ -9,18 +9,15 @@
 /* Begin PBXBuildFile section */
 		7E1001010000000000000001 /* ClipboardHistoryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000010000000000000001 /* ClipboardHistoryItem.swift */; };
 		7E1001020000000000000002 /* VSCodeProjectItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000020000000000000002 /* VSCodeProjectItem.swift */; };
-		7E1001030000000000000003 /* CodexStatusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000030000000000000003 /* CodexStatusSnapshot.swift */; };
 		7E1001040000000000000004 /* ClipboardHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000040000000000000004 /* ClipboardHistoryStore.swift */; };
 		7E1001050000000000000005 /* VSCodeRecentProjectsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */; };
 		7E1001060000000000000006 /* AppLauncherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000060000000000000006 /* AppLauncherService.swift */; };
-		7E1001070000000000000007 /* CodexStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000070000000000000007 /* CodexStatusService.swift */; };
 		7E1001080000000000000008 /* ClipboardHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000080000000000000008 /* ClipboardHistoryView.swift */; };
 		7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000090000000000000009 /* VSCodeProjectsView.swift */; };
-		7E10010A000000000000000A /* CodexStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000A000000000000000A /* CodexStatusView.swift */; };
-		7E10010B000000000000000B /* SevenIslandSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000B000000000000000B /* SevenIslandSettingsView.swift */; };
-		7E10010C000000000000000C /* ClaudeStatusSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */; };
-		7E10010D000000000000000D /* ClaudeStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* ClaudeStatusService.swift */; };
-		7E10010E000000000000000E /* ClaudeStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000E000000000000000E /* ClaudeStatusView.swift */; };
+		7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000C000000000000000C /* ClipboardSettingsView.swift */; };
+		7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* VSCodeSettingsView.swift */; };
+		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
+
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
 		110029272E84FD4C00035A57 /* TemporaryFileStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */; };
 		1100292A2E8691B400035A57 /* FileShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110029292E8691B400035A57 /* FileShareView.swift */; };
@@ -129,7 +126,6 @@
 		9A0887352C7AFF8E00C160EA /* TabSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */; };
 		9A987A0D2C73CA66005CA465 /* ShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A987A032C73CA66005CA465 /* ShelfView.swift */; };
 		9A987A102C73CA8D005CA465 /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 9A987A0F2C73CA8D005CA465 /* Collections */; };
-		9AB0C6BD2C73C9CB00F7CD30 /* NotchHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */; };
 		B10348D92C74E56000475897 /* ConditionalModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10348D82C74E56000475897 /* ConditionalModifier.swift */; };
 		B10F84A32C6C9596009F3026 /* TestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10F84A22C6C9596009F3026 /* TestView.swift */; };
 		B141C2412CA5F53F00AC8CC8 /* SparkleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B141C2402CA5F53E00AC8CC8 /* SparkleView.swift */; };
@@ -198,18 +194,13 @@
 /* Begin PBXFileReference section */
 		7E1000010000000000000001 /* ClipboardHistoryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryItem.swift; sourceTree = "<group>"; };
 		7E1000020000000000000002 /* VSCodeProjectItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectItem.swift; sourceTree = "<group>"; };
-		7E1000030000000000000003 /* CodexStatusSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexStatusSnapshot.swift; sourceTree = "<group>"; };
 		7E1000040000000000000004 /* ClipboardHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryStore.swift; sourceTree = "<group>"; };
 		7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeRecentProjectsService.swift; sourceTree = "<group>"; };
 		7E1000060000000000000006 /* AppLauncherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherService.swift; sourceTree = "<group>"; };
-		7E1000070000000000000007 /* CodexStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexStatusService.swift; sourceTree = "<group>"; };
 		7E1000080000000000000008 /* ClipboardHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryView.swift; sourceTree = "<group>"; };
 		7E1000090000000000000009 /* VSCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectsView.swift; sourceTree = "<group>"; };
-		7E10000A000000000000000A /* CodexStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexStatusView.swift; sourceTree = "<group>"; };
-		7E10000B000000000000000B /* SevenIslandSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenIslandSettingsView.swift; sourceTree = "<group>"; };
-		7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusSnapshot.swift; sourceTree = "<group>"; };
-		7E10000D000000000000000D /* ClaudeStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusService.swift; sourceTree = "<group>"; };
-		7E10000E000000000000000E /* ClaudeStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusView.swift; sourceTree = "<group>"; };
+		7E10000C000000000000000C /* ClipboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardSettingsView.swift; sourceTree = "<group>"; };
+		7E10000D000000000000000D /* VSCodeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeSettingsView.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
 		110029292E8691B400035A57 /* FileShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShareView.swift; sourceTree = "<group>"; };
@@ -313,10 +304,11 @@
 		9A0887312C7A693000C160EA /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		9A987A032C73CA66005CA465 /* ShelfView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShelfView.swift; sourceTree = "<group>"; };
-		9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotchHomeView.swift; sourceTree = "<group>"; };
 		B10348D82C74E56000475897 /* ConditionalModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalModifier.swift; sourceTree = "<group>"; };
 		B10F84A22C6C9596009F3026 /* TestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestView.swift; sourceTree = "<group>"; };
 		B141C2402CA5F53E00AC8CC8 /* SparkleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SparkleView.swift; sourceTree = "<group>"; };
+		9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MusicHomeView.swift; sourceTree = "<group>"; };
+
 		B17266DE2C64DFA00031BA0D /* BundleInfos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleInfos.swift; sourceTree = "<group>"; };
 		B17266E02C6532560031BA0D /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		B17266E22C65F7FB0031BA0D /* WhatsNewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNewView.swift; sourceTree = "<group>"; };
@@ -553,8 +545,6 @@
 			children = (
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
-				7E1000030000000000000003 /* CodexStatusSnapshot.swift */,
-				7E10000C000000000000000C /* ClaudeStatusSnapshot.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -565,8 +555,6 @@
 				7E1000040000000000000004 /* ClipboardHistoryStore.swift */,
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
-				7E10000D000000000000000D /* ClaudeStatusService.swift */,
-				7E1000070000000000000007 /* CodexStatusService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -576,9 +564,8 @@
 			children = (
 				7E1000080000000000000008 /* ClipboardHistoryView.swift */,
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
-				7E10000A000000000000000A /* CodexStatusView.swift */,
-				7E10000E000000000000000E /* ClaudeStatusView.swift */,
-				7E10000B000000000000000B /* SevenIslandSettingsView.swift */,
+				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
+				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -782,11 +769,11 @@
 			children = (
 				1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */,
 				1160F8D72DD98230006FBB94 /* NotchShape.swift */,
-				9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */,
 				1194E9422EACC653009C82D6 /* LyricsDisplayText.swift */,
 				14D570C52C5F38210011E668 /* BoringHeader.swift */,
 				14D570D12C5F6C6A0011E668 /* BoringExtrasMenu.swift */,
 				1471A8582C6281BD0058408D /* BoringNotchWindow.swift */,
+				9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */,
 			);
 			path = Notch;
 			sourceTree = "<group>";
@@ -984,18 +971,14 @@
 			files = (
 				7E1001010000000000000001 /* ClipboardHistoryItem.swift in Sources */,
 				7E1001020000000000000002 /* VSCodeProjectItem.swift in Sources */,
-				7E1001030000000000000003 /* CodexStatusSnapshot.swift in Sources */,
 				7E1001040000000000000004 /* ClipboardHistoryStore.swift in Sources */,
 				7E1001050000000000000005 /* VSCodeRecentProjectsService.swift in Sources */,
 				7E1001060000000000000006 /* AppLauncherService.swift in Sources */,
-				7E1001070000000000000007 /* CodexStatusService.swift in Sources */,
 				7E1001080000000000000008 /* ClipboardHistoryView.swift in Sources */,
 				7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */,
-				7E10010A000000000000000A /* CodexStatusView.swift in Sources */,
-				7E10010B000000000000000B /* SevenIslandSettingsView.swift in Sources */,
-				7E10010C000000000000000C /* ClaudeStatusSnapshot.swift in Sources */,
-				7E10010D000000000000000D /* ClaudeStatusService.swift in Sources */,
-				7E10010E000000000000000E /* ClaudeStatusView.swift in Sources */,
+				7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */,
+				7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */,
+				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
@@ -1052,7 +1035,6 @@
 				14A7E5882C64A89C008C1BE9 /* HelloAnimation.swift in Sources */,
 				111BEA612ED09B1B0079DD4E /* NSScreen+UUID.swift in Sources */,
 				1153BD8F2D986B1F00979FB0 /* MediaControllerProtocol.swift in Sources */,
-				9AB0C6BD2C73C9CB00F7CD30 /* NotchHomeView.swift in Sources */,
 				B172AAC02C95DA0B001623F1 /* InlineHUD.swift in Sources */,
 				14E9FEAA2C70BF610062E83F /* DownloadView.swift in Sources */,
 				B1B112912C6A572100093D8F /* EditPanelView.swift in Sources */,
@@ -1326,7 +1308,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = boringNotch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Seven Island";
+				INFOPLIST_KEY_CFBundleDisplayName = "Seven Island Debug";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -1379,7 +1361,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = boringNotch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Seven Island";
+				INFOPLIST_KEY_CFBundleDisplayName = "Seven Island Release";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;

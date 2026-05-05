@@ -1,10 +1,19 @@
+import Defaults
 import SwiftUI
 
 struct VSCodeProjectsView: View {
     @ObservedObject private var service = VSCodeRecentProjectsService.shared
     @EnvironmentObject private var vm: BoringViewModel
+    @Default(.vscodeProjectsDirectory) private var vscodeProjectsDirectory
     @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
+
+    private var emptyMessage: String {
+        if vscodeProjectsDirectory.isEmpty {
+            return "No folders in ~/Projects"
+        }
+        return "No folders in \(vscodeProjectsDirectory)"
+    }
 
     private var filteredProjects: [VSCodeProjectItem] {
         guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -49,7 +58,7 @@ struct VSCodeProjectsView: View {
 
             if service.projects.isEmpty {
                 Spacer(minLength: 8)
-                EmptyStateView(message: "No folders in ~/Projects")
+                EmptyStateView(message: emptyMessage)
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 8)
             } else if filteredProjects.isEmpty {

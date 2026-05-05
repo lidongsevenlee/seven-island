@@ -7,8 +7,6 @@
 
 import AVFoundation
 import Defaults
-import EventKit
-import KeyboardShortcuts
 import LaunchAtLogin
 import Sparkle
 import SwiftUI
@@ -36,9 +34,6 @@ struct SettingsView: View {
                 NavigationLink(value: "Media") {
                     Label("Media", systemImage: "play.laptopcomputer")
                 }
-                NavigationLink(value: "Calendar") {
-                    Label("Calendar", systemImage: "calendar")
-                }
                 NavigationLink(value: "HUD") {
                     Label("HUDs", systemImage: "dial.medium.fill")
                 }
@@ -48,15 +43,11 @@ struct SettingsView: View {
                 NavigationLink(value: "Shelf") {
                     Label("Shelf", systemImage: "books.vertical")
                 }
-                NavigationLink(value: "Seven Island") {
-                    Label {
-                        Text("Seven Island")
-                    } icon: {
-                        CodexGlyphIcon(size: 15, foreground: .primary)
-                    }
+                NavigationLink(value: "Clipboard") {
+                    Label("Clipboard", systemImage: "clipboard")
                 }
-                NavigationLink(value: "Shortcuts") {
-                    Label("Shortcuts", systemImage: "keyboard")
+                NavigationLink(value: "VS Code") {
+                    Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
@@ -81,16 +72,14 @@ struct SettingsView: View {
                     Appearance()
                 case "Media":
                     Media()
-                case "Calendar":
-                    CalendarSettings()
                 case "HUD":
                     HUD()
                 case "Shelf":
                     Shelf()
-                case "Seven Island":
-                    SevenIslandSettingsView()
-                case "Shortcuts":
-                    Shortcuts()
+                case "Clipboard":
+                    ClipboardSettingsView()
+                case "VS Code":
+                    VSCodeSettingsView()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":
@@ -652,7 +641,7 @@ struct Media: View {
                 MusicSlotConfigurationView()
                 Defaults.Toggle(key: .enableLyrics) {
                     HStack {
-                        Text("Show lyrics on Home")
+                        Text("Show lyrics on Music")
                         customBadge(text: "Beta")
                     }
                 }
@@ -662,7 +651,7 @@ struct Media: View {
             } header: {
                 Text("Media controls")
             }  footer: {
-                Text("Customize which controls appear in the music player. Lyrics show as one line below the closed notch and multiple lines on Home.")
+                Text("Customize which controls appear in the music player. Lyrics appear in the expanded Music view.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -679,131 +668,6 @@ struct Media: View {
             return MediaControllerType.allCases
         }
     }
-}
-
-struct CalendarSettings: View {
-    @ObservedObject private var calendarManager = CalendarManager.shared
-    @Default(.showCalendar) var showCalendar: Bool
-    @Default(.hideCompletedReminders) var hideCompletedReminders
-    @Default(.hideAllDayEvents) var hideAllDayEvents
-    @Default(.autoScrollToNextEvent) var autoScrollToNextEvent
-
-    var body: some View {
-        Form {
-            Defaults.Toggle(key: .showCalendar) {
-                Text("Show calendar")
-            }
-            Defaults.Toggle(key: .hideCompletedReminders) {
-                Text("Hide completed reminders")
-            }
-            Defaults.Toggle(key: .hideAllDayEvents) {
-                Text("Hide all-day events")
-            }
-            Defaults.Toggle(key: .autoScrollToNextEvent) {
-                Text("Auto-scroll to next event")
-            }
-            Defaults.Toggle(key: .showFullEventTitles) {
-                Text("Always show full event titles")
-            }
-            Section(header: Text("Calendars")) {
-                if calendarManager.calendarAuthorizationStatus != .fullAccess {
-                    Text("Calendar access is denied. Please enable it in System Settings.")
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    Button("Open Calendar Settings") {
-                        if let settingsURL = URL(
-                            string:
-                                "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars"
-                        ) {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
-                    }
-                } else {
-                    List {
-                        ForEach(calendarManager.eventCalendars, id: \.id) { calendar in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { calendarManager.getCalendarSelected(calendar) },
-                                    set: { isSelected in
-                                        Task {
-                                            await calendarManager.setCalendarSelected(
-                                                calendar, isSelected: isSelected)
-                                        }
-                                    }
-                                )
-                            ) {
-                                Text(calendar.title)
-                            }
-                            .accentColor(lighterColor(from: calendar.color))
-                            .disabled(!showCalendar)
-                        }
-                    }
-                }
-            }
-            Section(header: Text("Reminders")) {
-                if calendarManager.reminderAuthorizationStatus != .fullAccess {
-                    Text("Reminder access is denied. Please enable it in System Settings.")
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    Button("Open Reminder Settings") {
-                        if let settingsURL = URL(
-                            string:
-                                "x-apple.systempreferences:com.apple.preference.security?Privacy_Reminders"
-                        ) {
-                            NSWorkspace.shared.open(settingsURL)
-                        }
-                    }
-                } else {
-                    List {
-                        ForEach(calendarManager.reminderLists, id: \.id) { calendar in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { calendarManager.getCalendarSelected(calendar) },
-                                    set: { isSelected in
-                                        Task {
-                                            await calendarManager.setCalendarSelected(
-                                                calendar, isSelected: isSelected)
-                                        }
-                                    }
-                                )
-                            ) {
-                                Text(calendar.title)
-                            }
-                            .accentColor(lighterColor(from: calendar.color))
-                            .disabled(!showCalendar)
-                        }
-                    }
-                }
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Calendar")
-        .onAppear {
-            Task {
-                await calendarManager.checkCalendarAuthorization()
-                await calendarManager.checkReminderAuthorization()
-            }
-        }
-    }
-}
-
-func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
-    let srgb = nsColor.usingColorSpace(.sRGB) ?? nsColor
-    var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0,0,0,0)
-    srgb.getRed(&r, green: &g, blue: &b, alpha: &a)
-
-    func lighten(_ c: CGFloat) -> CGFloat {
-        let increased = c + (1.0 - c) * amount
-        return min(max(increased, 0), 1)
-    }
-
-    let nr = lighten(r)
-    let ng = lighten(g)
-    let nb = lighten(b)
-
-    return Color(red: Double(nr), green: Double(ng), blue: Double(nb), opacity: Double(a))
 }
 
 struct About: View {
@@ -863,7 +727,7 @@ struct About: View {
             }
             VStack(spacing: 0) {
                 Divider()
-                Text("Made with 🫶🏻 by not so boring not.people")
+                Text("Made with 🫶🏻 by Seven Island Team")
                     .foregroundStyle(.secondary)
                     .padding(.top, 5)
                     .padding(.bottom, 7)
@@ -1352,7 +1216,7 @@ struct Appearance: View {
 
             Section {
                 Defaults.Toggle(key: .showMirror) {
-                    Text("Enable boring mirror")
+                    Text("Enable mirror")
                 }
                     .disabled(!checkVideoInput())
                 Picker("Mirror shape", selection: $mirrorShape) {
@@ -1392,9 +1256,7 @@ struct Advanced: View {
     
     @State private var customAccentColor: Color = .accentColor
     @State private var selectedPresetColor: PresetAccentColor? = nil
-    let icons: [String] = ["logo2"]
-    @State private var selectedIcon: String = "logo2"
-    
+
     // macOS accent colors
     enum PresetAccentColor: String, CaseIterable, Identifiable {
         case blue = "Blue"
@@ -1541,51 +1403,7 @@ struct Advanced: View {
             } header: {
                 Text("Window Appearance")
             }
-            
-            Section {
-                HStack {
-                    ForEach(icons, id: \.self) { icon in
-                        Spacer()
-                        VStack {
-                            Image(icon)
-                                .resizable()
-                                .frame(width: 80, height: 80)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20, style: .circular)
-                                        .strokeBorder(
-                                            icon == selectedIcon ? Color.effectiveAccent : .clear,
-                                            lineWidth: 2.5
-                                        )
-                                )
 
-                            Text("Default")
-                                .fontWeight(.medium)
-                                .font(.caption)
-                                .foregroundStyle(icon == selectedIcon ? .white : .secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Capsule()
-                                        .fill(icon == selectedIcon ? Color.effectiveAccent : .clear)
-                                )
-                        }
-                        .onTapGesture {
-                            withAnimation {
-                                selectedIcon = icon
-                            }
-                            NSApp.applicationIconImage = NSImage(named: icon)
-                        }
-                        Spacer()
-                    }
-                }
-                .disabled(true)
-            } header: {
-                HStack {
-                    Text("App icon")
-                    customBadge(text: "Coming soon")
-                }
-            }
-            
             Section {
                 Defaults.Toggle(key: .extendHoverArea) {
                     Text("Extend hover area")
@@ -1696,29 +1514,7 @@ struct AccentCircleButton: View {
     }
 }
 
-struct Shortcuts: View {
-    var body: some View {
-        Form {
-            Section {
-                KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
-            } header: {
-                Text("Media")
-            } footer: {
-                Text(
-                    "Sneak Peek shows the media title and artist under the notch for a few seconds."
-                )
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            }
-            Section {
-                KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Shortcuts")
-    }
-}
+
 
 func proFeatureBadge() -> some View {
     Text("Upgrade to Pro")

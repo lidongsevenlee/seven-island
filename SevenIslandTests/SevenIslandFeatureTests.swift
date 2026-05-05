@@ -218,6 +218,66 @@ func testCodexSnapshotShowsClosedLiveActivityWhenWorking() {
     expectEqual(snapshot.shouldShowClosedLiveActivity, true, "shows closed Codex activity while Codex is working")
 }
 
+func testCodexSnapshotFiltersActiveSessions() {
+    let active = CodexSessionSummary(
+        id: "active-thread",
+        title: "Active",
+        cwd: "/tmp/seven-island",
+        updatedAt: Date(timeIntervalSince1970: 1_777_189_700),
+        tokensUsed: 100,
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        rolloutPath: nil,
+        activity: CodexWorkActivity(
+            state: .working,
+            headline: "Running tests",
+            detail: "Codex is executing Shell",
+            lastToolName: "Shell",
+            updatedAt: Date(timeIntervalSince1970: 1_777_189_700),
+            primaryLimitUsedPercent: nil,
+            secondaryLimitUsedPercent: nil,
+            creditsBalance: nil,
+            hasCredits: nil,
+            planType: nil
+        ),
+        lastTurn: CodexConversationTurn(userText: "Please test it", assistantText: "Running tests now")
+    )
+    let idle = CodexSessionSummary(
+        id: "idle-thread",
+        title: "Idle",
+        cwd: "/tmp/seven-island",
+        updatedAt: Date(timeIntervalSince1970: 1_777_189_600),
+        tokensUsed: 50,
+        model: "gpt-5.5",
+        reasoningEffort: "medium",
+        rolloutPath: nil,
+        activity: CodexWorkActivity(
+            state: .idle,
+            headline: "Codex is idle",
+            detail: "Last update 10m ago",
+            lastToolName: nil,
+            updatedAt: Date(timeIntervalSince1970: 1_777_189_600),
+            primaryLimitUsedPercent: nil,
+            secondaryLimitUsedPercent: nil,
+            creditsBalance: nil,
+            hasCredits: nil,
+            planType: nil
+        ),
+        lastTurn: nil
+    )
+    let snapshot = CodexStatusSnapshot(
+        recentSessions: [idle, active],
+        totalThreads: 2,
+        totalTokensUsed: 150,
+        codexCLIStatus: "codex-cli",
+        codexAppVersion: nil,
+        isAuthFilePresent: true,
+        isDeviceBindingPresent: true
+    )
+
+    expectEqual(snapshot.activeSessions.map(\.id), ["active-thread"], "Codex panel shows only active working sessions")
+}
+
 func testLyricsDisplayTextBuildsSingleAndMultilineLyrics() {
     let plainLyrics = """
 
@@ -276,11 +336,10 @@ func testLyricsDisplayTextEstimatesActiveCharacter() {
     )
 }
 
-func testLyricsDisplayTextUsesKaraokeProgressCurve() {
-    let linearHalf = 0.5
+func testLyricsDisplayTextUsesLineTimingForKaraokeProgress() {
     let karaokeHalf = LyricsDisplayText.karaokeProgress(
         for: "我靜靜悄悄默默淡淡的止住呼吸",
-        rawProgress: linearHalf,
+        rawProgress: 0.5,
         duration: 4
     )
     let karaokeStart = LyricsDisplayText.karaokeProgress(
@@ -289,8 +348,86 @@ func testLyricsDisplayTextUsesKaraokeProgressCurve() {
         duration: 3
     )
 
-    expectEqual(karaokeHalf > 0.35 && karaokeHalf < 0.65, true, "keeps karaoke progress near the sung midpoint")
-    expectEqual(karaokeStart < 0.04, true, "holds the start briefly instead of rushing the first character")
+    expectEqual(karaokeHalf, 0.5, "keeps karaoke progress exactly on the line midpoint")
+    expectEqual(karaokeStart, 0.04, "does not hold the start ahead of the sung timing")
+}
+
+func testLyricsDisplayTextKeepsKaraokeProgressLockedToLineTiming() {
+    let lyric = "Strict rhythm matching"
+
+    let firstQuarter = LyricsDisplayText.karaokeProgress(
+        for: lyric,
+        rawProgress: 0.25,
+        duration: 4
+    )
+    let midpoint = LyricsDisplayText.karaokeProgress(
+        for: lyric,
+        rawProgress: 0.5,
+        duration: 4
+    )
+    let thirdQuarter = LyricsDisplayText.karaokeProgress(
+        for: lyric,
+        rawProgress: 0.75,
+        duration: 4
+    )
+
+    expectEqual(abs(firstQuarter - 0.25) < 0.03, true, "keeps first-quarter lyric progress locked to elapsed timing")
+    expectEqual(abs(midpoint - 0.5) < 0.03, true, "keeps midpoint lyric progress locked to elapsed timing")
+    expectEqual(abs(thirdQuarter - 0.75) < 0.03, true, "keeps third-quarter lyric progress locked to elapsed timing")
+}
+
+func testLyricsDisplayTextUsesPerCharacterTimestampsWhenAvailable() {
+    let syncedLyrics: [(time: Double, text: String)] = [
+        (10, "ABCD"),
+        (20, "Next")
+    ]
+    let characterTimes = [
+        [10.0, 11.0, 13.0, 16.0],
+        [20.0, 21.0, 22.0, 23.0]
+    ]
+
+    let atTwelve = LyricsDisplayText.activeLineProgress(
+        from: syncedLyrics,
+        characterTimes: characterTimes,
+        elapsed: 12
+    ) ?? 0
+    let atFifteen = LyricsDisplayText.activeLineProgress(
+        from: syncedLyrics,
+        characterTimes: characterTimes,
+        elapsed: 15
+    ) ?? 0
+
+    expectEqual(abs(atTwelve - 0.375) < 0.001, true, "uses the B-to-C timing interval instead of line-average timing")
+    expectEqual(abs(atFifteen - 0.6666666667) < 0.001, true, "uses the C-to-D timing interval instead of line-average timing")
+}
+
+func testLyricsDisplayTextDoesNotAnimateWithoutPerCharacterTimestamps() {
+    let syncedLyrics: [(time: Double, text: String)] = [
+        (10, "Line only"),
+        (20, "Next")
+    ]
+
+    expectEqual(
+        LyricsDisplayText.activeLineProgress(from: syncedLyrics, characterTimes: [[], []], elapsed: 15),
+        nil,
+        "does not synthesize progress animation from line-only lyrics"
+    )
+}
+
+func testLyricsDisplayTextParsesEnhancedLRCCharacterTimestamps() {
+    let parsed = LyricsDisplayText.parseSyncedLyrics(
+        "[00:10.00]<00:10.00>你<00:10.50>好<00:11.20>世<00:11.70>界"
+    )
+
+    expectEqual(parsed.lines.map(\.text), ["你好世界"], "removes enhanced LRC inline timestamps from display text")
+    expectEqual(parsed.characterTimes, [[10.0, 10.5, 11.2, 11.7]], "keeps one timestamp per displayed character")
+}
+
+func testLyricsDisplayTextParsesQRCCharacterTimestamps() {
+    let parsed = LyricsDisplayText.parseQQMusicQRC("[10000,3000](0,500)你(500,700)好(1200,600)世(1800,700)界")
+
+    expectEqual(parsed.lines.map(\.text), ["你好世界"], "removes QRC inline timestamps from display text")
+    expectEqual(parsed.characterTimes, [[10.0, 10.5, 11.2, 11.8]], "converts QRC word offsets into absolute character timestamps")
 }
 
 func testLyricsDisplayTextProvidesUnavailableFallback() {
@@ -326,10 +463,16 @@ enum SevenIslandFeatureTestRunner {
             testCodexRolloutParsesOpenLastConversationTurn()
             testCodexSnapshotFormatsQuotaFromActivity()
             testCodexSnapshotShowsClosedLiveActivityWhenWorking()
+            testCodexSnapshotFiltersActiveSessions()
             testLyricsDisplayTextBuildsSingleAndMultilineLyrics()
             testLyricsDisplayTextCentersCurrentSyncedLyricInWindow()
             testLyricsDisplayTextEstimatesActiveCharacter()
-            testLyricsDisplayTextUsesKaraokeProgressCurve()
+            testLyricsDisplayTextUsesLineTimingForKaraokeProgress()
+            testLyricsDisplayTextKeepsKaraokeProgressLockedToLineTiming()
+            testLyricsDisplayTextUsesPerCharacterTimestampsWhenAvailable()
+            testLyricsDisplayTextDoesNotAnimateWithoutPerCharacterTimestamps()
+            testLyricsDisplayTextParsesEnhancedLRCCharacterTimestamps()
+            testLyricsDisplayTextParsesQRCCharacterTimestamps()
             testLyricsDisplayTextProvidesUnavailableFallback()
             testCodexSessionURLUsesLocalConversationRoute()
             print("SevenIslandFeatureTests passed")
