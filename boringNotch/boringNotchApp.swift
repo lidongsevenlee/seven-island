@@ -48,6 +48,9 @@ struct DynamicNotchApp: App {
         } label: {
             Image("MenuBarIcon")
                 .renderingMode(.template)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 16, height: 16)
         }
     }
 }
