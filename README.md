@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/lidongsevenlee/seven-island"><img src="./app_logo.png" alt="Seven Island" width="150"></a>
+  <a href="https://github.com/lidongsevenlee/seven-island"><img src="./app-logo.png" alt="Seven Island" width="150"></a>
   <br>
   Seven Island
   <br>
