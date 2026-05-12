@@ -5,6 +5,7 @@
 //  Created by Richard Kunkli on 07/08/2024.
 //
 
+import ApplicationServices
 import AVFoundation
 import Defaults
 import LaunchAtLogin
@@ -130,7 +131,6 @@ struct GeneralSettings: View {
 
     @Default(.mirrorShape) var mirrorShape
     @Default(.showEmojis) var showEmojis
-    @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
     @Default(.nonNotchHeight) var nonNotchHeight
     @Default(.nonNotchHeightMode) var nonNotchHeightMode
@@ -138,7 +138,6 @@ struct GeneralSettings: View {
     @Default(.notchHeightMode) var notchHeightMode
     @Default(.showOnAllDisplays) var showOnAllDisplays
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
-    @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
     
 
@@ -253,8 +252,6 @@ struct GeneralSettings: View {
             }
 
             NotchBehaviour()
-
-            gestureControls()
         }
         .toolbar {
             Button("Quit app") {
@@ -264,51 +261,6 @@ struct GeneralSettings: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("General")
-        .onChange(of: openNotchOnHover) {
-            if !openNotchOnHover {
-                enableGestures = true
-            }
-        }
-    }
-
-    @ViewBuilder
-    func gestureControls() -> some View {
-        Section {
-            Defaults.Toggle(key: .enableGestures) {
-                Text("Enable gestures")
-            }
-                .disabled(!openNotchOnHover)
-            if enableGestures {
-                Toggle("Change media with horizontal gestures", isOn: .constant(false))
-                    .disabled(true)
-                Defaults.Toggle(key: .closeGestureEnabled) {
-                    Text("Close gesture")
-                }
-                Slider(value: $gestureSensitivity, in: 100...300, step: 100) {
-                    HStack {
-                        Text("Gesture sensitivity")
-                        Spacer()
-                        Text(
-                            Defaults[.gestureSensitivity] == 100
-                                ? "High" : Defaults[.gestureSensitivity] == 200 ? "Medium" : "Low"
-                        )
-                        .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        } header: {
-            HStack {
-                Text("Gesture control")
-                customBadge(text: "Beta")
-            }
-        } footer: {
-            Text(
-                "Two-finger swipe up on notch to close, two-finger swipe down on notch to open when **Open notch on hover** option is disabled"
-            )
-            .multilineTextAlignment(.trailing)
-            .foregroundStyle(.secondary)
-            .font(.caption)
-        }
     }
 
     @ViewBuilder
@@ -429,7 +381,8 @@ struct HUD: View {
     @Default(.optionKeyAction) var optionKeyAction
     @Default(.hudReplacement) var hudReplacement
     @ObservedObject var coordinator = BoringViewCoordinator.shared
-    @State private var accessibilityAuthorized = false
+    @State private var accessibilityAuthorized = AXIsProcessTrusted()
+    @State private var accessibilityPollTimer: Timer?
     
     var body: some View {
         Form {
@@ -534,19 +487,19 @@ struct HUD: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("HUDs")
-        .task {
-            accessibilityAuthorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
-        }
         .onAppear {
-            XPCHelperClient.shared.startMonitoringAccessibilityAuthorization()
+            accessibilityAuthorized = AXIsProcessTrusted()
+            accessibilityPollTimer?.invalidate()
+            accessibilityPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+                let current = AXIsProcessTrusted()
+                if current != accessibilityAuthorized {
+                    accessibilityAuthorized = current
+                }
+            }
         }
         .onDisappear {
-            XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .accessibilityAuthorizationChanged)) { notification in
-            if let granted = notification.userInfo?["granted"] as? Bool {
-                accessibilityAuthorized = granted
-            }
+            accessibilityPollTimer?.invalidate()
+            accessibilityPollTimer = nil
         }
     }
 }

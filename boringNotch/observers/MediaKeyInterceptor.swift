@@ -53,15 +53,13 @@ final class MediaKeyInterceptor {
             return
         }
         
-        // Check accessibility authorization
-        let authorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
-        if !authorized {
+        // Check accessibility authorization directly (not via XPC, which may not be trusted)
+        guard AXIsProcessTrusted() else {
             if promptIfNeeded {
-                let granted = await ensureAccessibilityAuthorization(promptIfNeeded: true)
-                guard granted else { return }
-            } else {
-                return
+                let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                AXIsProcessTrustedWithOptions(options)
             }
+            return
         }
         
         let mask = CGEventMask(1 << kSystemDefinedEventType.rawValue)

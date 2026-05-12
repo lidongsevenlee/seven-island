@@ -61,14 +61,16 @@ final class VSCodeRecentProjectsService: ObservableObject {
         guard FileManager.default.fileExists(atPath: dir.path) else { return [] }
         return (try? FileManager.default.contentsOfDirectory(
             at: dir,
-            includingPropertiesForKeys: [.isDirectoryKey],
+            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ))?.filter { url in
             var isDir: ObjCBool = false
             return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
         }
         .sorted { lhs, rhs in
-            lhs.lastPathComponent.localizedStandardCompare(rhs.lastPathComponent) == .orderedAscending
+            let lhDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let rhDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return lhDate > rhDate
         } ?? []
     }
 

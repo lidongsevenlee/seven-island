@@ -105,6 +105,7 @@ class BoringViewCoordinator: ObservableObject {
     @Published var optionKeyPressed: Bool = true
     private var accessibilityObserver: Any?
     private var hudReplacementCancellable: AnyCancellable?
+    private var accessibilityPollingTask: Task<Void, Never>?
 
     private init() {
         // Perform migration from name-based to UUID-based storage
@@ -153,17 +154,24 @@ class BoringViewCoordinator: ObservableObject {
 
                     if change.newValue {
                         self.hudEnableTask = Task { @MainActor in
-                            let granted = await XPCHelperClient.shared.ensureAccessibilityAuthorization(promptIfNeeded: true)
-                            if Task.isCancelled { return }
+                            // Prompt user for accessibility authorization via AX API
+                            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                            AXIsProcessTrustedWithOptions(options)
 
-                            if granted {
+                            // Check if already authorized directly
+                            if AXIsProcessTrusted() {
                                 await MediaKeyInterceptor.shared.start()
                             } else {
-                                Defaults[.hudReplacement] = false
+                                // Keep hudReplacement ON and poll for authorization directly.
+                                // AXIsProcessTrusted() checks the main app process, which is
+                                // what the user actually grants permission to.
+                                self.startDirectAccessibilityPolling()
                             }
                         }
                     } else {
                         MediaKeyInterceptor.shared.stop()
+                        self.accessibilityPollingTask?.cancel()
+                        self.accessibilityPollingTask = nil
                     }
                 }
             }
@@ -172,11 +180,13 @@ class BoringViewCoordinator: ObservableObject {
             helloAnimationRunning = firstLaunch
 
             if Defaults[.hudReplacement] {
-                let authorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
-                if !authorized {
-                    Defaults[.hudReplacement] = false
-                } else {
+                // Use AXIsProcessTrusted() directly instead of XPC, since
+                // accessibility is granted to the main app process, not the XPC helper.
+                if AXIsProcessTrusted() {
                     await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
+                } else {
+                    // Keep hudReplacement ON and poll directly (AXIsProcessTrusted)
+                    self.startDirectAccessibilityPolling()
                 }
             }
         }
@@ -303,5 +313,21 @@ class BoringViewCoordinator: ObservableObject {
     
     func showEmpty() {
         currentView = NotchViews(rawValue: lastNotchView) ?? .music
+    }
+
+    /// Polls AXIsProcessTrusted() directly every 2 seconds to detect when the
+    /// user grants accessibility authorization in System Settings.
+    /// Uses the main app process check (not XPC) since that's what the user authorizes.
+    private func startDirectAccessibilityPolling() {
+        accessibilityPollingTask?.cancel()
+        accessibilityPollingTask = Task { @MainActor in
+            while !Task.isCancelled {
+                if AXIsProcessTrusted() {
+                    await MediaKeyInterceptor.shared.start()
+                    return
+                }
+                try? await Task.sleep(for: .seconds(2))
+            }
+        }
     }
 }
