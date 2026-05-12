@@ -59,26 +59,15 @@ jobs:
 
       - name: Create DMG
         run: |
-          # Install dmgbuild: try brew first, fall back to pip
-          if ! command -v dmgbuild &>/dev/null; then
-            python3 -m venv build/dmg-venv
-            source build/dmg-venv/bin/activate
-            pip install -q dmgbuild ds-store mac-alias
-          fi
+          python3 -m venv build/dmg-venv
+          source build/dmg-venv/bin/activate
+          pip install -q dmgbuild ds-store mac-alias
           mkdir -p build/dist
           DMG_PATH="build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg"
-          if command -v dmgbuild &>/dev/null; then
-            bash Configuration/dmg/create_dmg.sh \
-              "build/DerivedData/Build/Products/Release/Seven Island.app" \
-              "$DMG_PATH" \
-              "Seven Island ${{ steps.version.outputs.version }}"
-          else
-            source build/dmg-venv/bin/activate
-            bash Configuration/dmg/create_dmg.sh \
-              "build/DerivedData/Build/Products/Release/Seven Island.app" \
-              "$DMG_PATH" \
-              "Seven Island ${{ steps.version.outputs.version }}"
-          fi
+          bash Configuration/dmg/create_dmg.sh \
+            "build/DerivedData/Build/Products/Release/Seven Island.app" \
+            "$DMG_PATH" \
+            "Seven Island ${{ steps.version.outputs.version }}"
 
       - name: Check Sparkle Signing Key
         id: check-key
