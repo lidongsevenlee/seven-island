@@ -50,7 +50,7 @@ jobs:
             -scheme boringNotch \
             -configuration Release \
             -derivedDataPath build/DerivedData \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-" \
             build
 
       - name: Read Version
