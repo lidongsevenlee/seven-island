@@ -36,6 +36,21 @@ xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration Deb
 
 Same sandbox caveat applies. Use `open boringNotch.xcodeproj` to build from Xcode instead — that avoids sandbox restrictions entirely.
 
+## Release flow ("提交发布")
+
+When the user says "提交发布", do the following:
+
+1. **Ask for the new version number** (e.g. "1.1.0"). If they don't specify, ask.
+2. **Run `script/release.sh <version>`** inside the sandbox — this updates MARKETING_VERSION and CURRENT_PROJECT_VERSION in project.pbxproj, commits, and tags.
+3. **Tell the user to run the push command** printed by the script (sandbox blocks git push):
+   ```
+   git push origin main --tags
+   ```
+
+The tag push triggers the GitHub Actions release workflow (`.github/workflows/release.yml`) which builds, DMG-packages, Sparkle-signs, and creates the GitHub Release.
+
+**One-time setup required:** `SPARKLE_PRIVATE_KEY` secret must exist in GitHub repository settings. If missing, the release workflow will fail at the signing step.
+
 ## Architecture
 
 ### Window management
