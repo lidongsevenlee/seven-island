@@ -95,7 +95,9 @@ jobs:
       - name: Sparkle Sign DMG & Update Appcast
         if: steps.check-key.outputs.available == 'true'
         run: |
-          pip3 install -q cryptography
+          python3 -m venv build/sign-venv
+          source build/sign-venv/bin/activate
+          pip install -q cryptography
           python3 .github/workflows/scripts/update-appcast.py \
             "updater/appcast.xml" \
             "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
