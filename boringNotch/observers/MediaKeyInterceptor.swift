@@ -82,6 +82,8 @@ final class MediaKeyInterceptor {
                 CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
             }
             CGEvent.tapEnable(tap: eventTap, enable: true)
+        } else {
+            print("[HUD] Event tap creation failed — process may need Accessibility or Input Monitoring permission")
         }
     }
     

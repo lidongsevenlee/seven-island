@@ -412,7 +412,10 @@ struct HUD: View {
 
                         HStack(spacing: 12) {
                             Button("请求辅助功能权限") {
-                                XPCHelperClient.shared.requestAccessibilityAuthorization()
+                                let options = [
+                                    kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true
+                                ] as CFDictionary
+                                AXIsProcessTrustedWithOptions(options)
                             }
                             .buttonStyle(.borderedProminent)
                         }
