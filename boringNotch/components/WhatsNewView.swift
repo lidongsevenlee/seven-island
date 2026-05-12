@@ -12,16 +12,16 @@ struct WhatsNewView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("What's New")
+            Text("新功能")
                 .font(.largeTitle)
-            
+
             VStack(alignment: .leading, spacing: 10) {
-                Text("• New feature 1")
-                Text("• Improved performance")
-                Text("• Bug fixes")
+                Text("• 新功能 1")
+                Text("• 性能改进")
+                Text("• 问题修复")
             }
-            
-            Button("Got it!") {
+
+            Button("知道了") {
                 isPresented = false
             }
         }

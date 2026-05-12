@@ -24,7 +24,7 @@ struct MusicSlotConfigurationView: View {
             // Reset button
             HStack {
                 Spacer()
-                Button("Reset to Defaults") {
+                Button("恢复默认") {
                     withAnimation {
                         musicControlSlots = MusicControlButton.defaultLayout
                     }
@@ -90,7 +90,7 @@ struct MusicSlotConfigurationView: View {
                     return handleDropOnTrash(providers)
                 }
 
-                Text("Clear slot")
+                Text("清空插槽")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -103,11 +103,11 @@ struct MusicSlotConfigurationView: View {
     private var slotConfigurationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Layout Preview")
+                Text("布局预览")
                     .font(.headline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("Drag items in the preview to reorder or drop from the palette")
+                Text("在预览中拖拽项目以重新排序，或从面板拖入")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -116,7 +116,7 @@ struct MusicSlotConfigurationView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Drag a control onto a slot")
+                Text("将控件拖拽到插槽上")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

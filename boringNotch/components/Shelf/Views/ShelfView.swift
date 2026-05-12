@@ -87,7 +87,7 @@ struct ShelfView: View {
                         .foregroundStyle(.white, .gray)
                         .imageScale(.large)
                     
-                    Text("Drop files here")
+                    Text("将文件拖放到此处")
                         .foregroundStyle(.gray)
                         .font(.system(.title3, design: .rounded))
                         .fontWeight(.medium)

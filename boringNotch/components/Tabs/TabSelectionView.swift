@@ -14,9 +14,9 @@ struct TabModel: Identifiable {
 }
 
 let tabs = [
-    TabModel(label: "Music", view: .music),
-    TabModel(label: "Shelf", view: .shelf),
-    TabModel(label: "Clipboard", view: .clipboard),
+    TabModel(label: "音乐", view: .music),
+    TabModel(label: "文件架", view: .shelf),
+    TabModel(label: "剪贴板", view: .clipboard),
     TabModel(label: "VS Code", view: .vscodeProjects)
 ]
 

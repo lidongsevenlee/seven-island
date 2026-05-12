@@ -11,13 +11,13 @@ class BoringStatusMenu: NSMenu {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "BoringNotch")
+            button.image = NSImage(systemSymbolName: "music.note", accessibilityDescription: "Seven Island")
             button.action = #selector(showMenu)
         }
         
         // Set up the menu
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quitAction), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "退出", action: #selector(quitAction), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 

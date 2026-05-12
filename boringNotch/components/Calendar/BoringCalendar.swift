@@ -253,10 +253,10 @@ struct EmptyEventsView: View {
             Image(systemName: "calendar.badge.checkmark")
                 .font(.title)
                 .foregroundColor(Color(white: 0.65))
-            Text(Calendar.current.isDateInToday(selectedDate) ? "No events today" : "No events")
+            Text(Calendar.current.isDateInToday(selectedDate) ? "今天没有活动" : "没有活动")
                 .font(.subheadline)
                 .foregroundColor(.white)
-            Text("Enjoy your free time!")
+            Text("享受空闲时光！")
                 .font(.caption)
                 .foregroundColor(Color(white: 0.65))
         }
@@ -373,7 +373,7 @@ struct EventListView: View {
                         Spacer(minLength: 0)
                         VStack(alignment: .trailing, spacing: 4) {
                             if event.isAllDay {
-                                Text("All-day")
+                                Text("全天")
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(.white)
@@ -419,7 +419,7 @@ struct EventListView: View {
                     Spacer(minLength: 0)
                     VStack(alignment: .trailing, spacing: 4) {
                         if event.isAllDay {
-                            Text("All-day")
+                            Text("全天")
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundColor(.white)

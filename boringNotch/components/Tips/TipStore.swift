@@ -10,44 +10,44 @@ import TipKit
 
 struct HUDsTip: Tip {
     var title: Text {
-        Text("Enhance your experience with HUDs")
+        Text("使用 HUD 提升体验")
     }
     
     
     var message: Text? {
-        Text("Unlock advanced features and improve your experience. Upgrade now for more customizations!")
+        Text("解锁高级功能，改善使用体验。立即升级以获得更多自定义选项！")
     }
     
     
     var image: Image? {
-        AppIcon(for: "theboringteam.boringNotch")
+        AppIcon(for: "com.local.seven-island")
     }
     
     var actions: [Action] {
         Action {
-            Text("More")
+            Text("了解更多")
         }
     }
 }
 
 struct CBTip: Tip {
     var title: Text {
-        Text("Boost your productivity with Clipboard Manager")
+        Text("使用剪贴板管理器提升效率")
     }
     
     
     var message: Text? {
-        Text("Easily copy, store, and manage your most-used content. Upgrade now for advanced features like multi-item storage and quick access!")
+        Text("轻松复制、存储和管理最常用的内容。立即升级以获得多项目存储和快速访问等高级功能！")
     }
     
     
     var image: Image? {
-        AppIcon(for: "theboringteam.boringNotch")
+        AppIcon(for: "com.local.seven-island")
     }
     
     var actions: [Action] {
         Action {
-            Text("More")
+            Text("了解更多")
         }
     }
 }

@@ -184,6 +184,7 @@ extension Defaults.Keys {
     // Show or hide the title bar
     static let hideTitleBar = Key<Bool>("hideTitleBar", default: true)
     static let vscodeProjectsDirectory = Key<String>("vscodeProjectsDirectory", default: "")
+    static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
     
     // Helper to determine the default media controller based on NowPlaying deprecation status
     static var defaultMediaController: MediaControllerType {

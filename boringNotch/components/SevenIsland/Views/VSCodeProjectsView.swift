@@ -10,9 +10,9 @@ struct VSCodeProjectsView: View {
 
     private var emptyMessage: String {
         if vscodeProjectsDirectory.isEmpty {
-            return "No folders in ~/Projects"
+            return "~/Projects 中没有文件夹"
         }
-        return "No folders in \(vscodeProjectsDirectory)"
+        return "\(vscodeProjectsDirectory) 中没有文件夹"
     }
 
     private var filteredProjects: [VSCodeProjectItem] {
@@ -36,11 +36,18 @@ struct VSCodeProjectsView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 12))
-                TextField("Search projects...", text: $searchText)
+                TextField("搜索项目...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(.white)
                     .focused($isSearchFocused)
+                    .onSubmit {
+                        guard let first = filteredProjects.first else { return }
+                        service.open(first)
+                        withAnimation(.smooth(duration: 0.2)) {
+                            vm.close()
+                        }
+                    }
                 if !searchText.isEmpty {
                     Button {
                         searchText = ""
@@ -63,7 +70,7 @@ struct VSCodeProjectsView: View {
                 Spacer(minLength: 8)
             } else if filteredProjects.isEmpty {
                 Spacer(minLength: 8)
-                EmptyStateView(message: "No matching projects")
+                EmptyStateView(message: "没有匹配的项目")
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 8)
             } else {
@@ -79,7 +86,7 @@ struct VSCodeProjectsView: View {
                                 VSCodeProjectRow(project: project)
                             }
                             .buttonStyle(.plain)
-                            .help("Open in a new VS Code window")
+                            .help("在新的 VS Code 窗口中打开")
                         }
                     }
                 }

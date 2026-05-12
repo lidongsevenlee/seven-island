@@ -7,22 +7,22 @@ struct ClipboardSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Enable clipboard history", isOn: $clipboardHistoryEnabled)
+                Toggle("启用剪贴板历史", isOn: $clipboardHistoryEnabled)
                     .tint(.effectiveAccent)
                 Stepper(value: $clipboardHistoryLimit, in: 10...100, step: 10) {
-                    Text("Clipboard items: \(clipboardHistoryLimit)")
+                    Text("剪贴板项目数：\(clipboardHistoryLimit)")
                 }
-                Button("Clear clipboard history") {
+                Button("清除剪贴板历史") {
                     ClipboardHistoryStore.shared.clear()
                 }
             } header: {
-                Text("Clipboard")
+                Text("剪贴板")
             } footer: {
-                Text("Seven Island stores only text and links copied while the app is running.")
+                Text("Seven Island 仅存储应用运行时复制的文本和链接。")
             }
         }
         .accentColor(.effectiveAccent)
-        .navigationTitle("Clipboard")
+        .navigationTitle("剪贴板")
         .onChange(of: clipboardHistoryLimit) {
             ClipboardHistoryStore.shared.reloadConfiguration()
         }

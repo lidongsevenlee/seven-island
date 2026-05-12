@@ -29,7 +29,7 @@ struct WelcomeView: View {
                     Text("Seven Island")
                         .font(.system(.largeTitle, design: .default))
                         .fontWeight(.semibold)
-                    Text("Welcome")
+                    Text("欢迎")
                         .font(.title)
                         .foregroundStyle(.secondary)
                         .padding(.bottom, 30)
@@ -53,7 +53,7 @@ struct WelcomeView: View {
                     Button {
                         onGetStarted?()
                     } label: {
-                        Text("Get started")
+                        Text("开始使用")
                             .padding(.horizontal, 20)
                             .padding(.vertical, 6)
                     }
@@ -62,14 +62,14 @@ struct WelcomeView: View {
                 .padding(.top)
             }
             
-            Image("theboringteam")
+            Image("logo2")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(height: 22)
+                .frame(height: 18)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 .padding()
                 .padding(.bottom, 36)
-                .blendMode(.overlay)
+                .opacity(0.5)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()

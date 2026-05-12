@@ -33,9 +33,9 @@ struct OnboardingView: View {
             case .accessibilityPermission:
                 PermissionRequestView(
                     icon: Image(systemName: "hand.raised.fill"),
-                    title: "Enable Accessibility Access",
-                    description: "Accessibility access is required to replace system notifications with the Seven Island HUD. This allows the app to intercept media and brightness events to display custom HUD overlays.",
-                    privacyNote: "Accessibility access is used only to improve media and brightness notifications. No data is collected or shared.",
+                    title: "启用辅助功能权限",
+                    description: "需要辅助功能权限才能用 Seven Island HUD 替换系统通知。这将允许应用拦截媒体和亮度事件以显示自定义 HUD 覆盖层。",
+                    privacyNote: "辅助功能权限仅用于改善媒体和亮度通知。不会收集或分享任何数据。",
                     onAllow: {
                         Task {
                             await requestAccessibilityPermission()

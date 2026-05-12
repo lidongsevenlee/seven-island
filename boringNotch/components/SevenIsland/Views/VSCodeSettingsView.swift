@@ -3,6 +3,7 @@ import SwiftUI
 
 struct VSCodeSettingsView: View {
     @Default(.vscodeProjectsDirectory) private var vscodeProjectsDirectory
+    @Default(.vscodeScanDepth) private var scanDepth
 
     private var displayPath: String {
         if vscodeProjectsDirectory.isEmpty {
@@ -23,13 +24,24 @@ struct VSCodeSettingsView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Button("Browse...") {
+                    Stepper(value: $scanDepth, in: 1...10) {
+                        HStack {
+                            Text("扫描深度")
+                            Spacer()
+                            Text("\(scanDepth)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Button("浏览...") {
                         browseForFolder()
                     }
                     .controlSize(.small)
 
                     if !vscodeProjectsDirectory.isEmpty {
-                        Button("Reset") {
+                        Button("重置") {
                             vscodeProjectsDirectory = ""
                             VSCodeRecentProjectsService.shared.refresh()
                         }
@@ -38,7 +50,7 @@ struct VSCodeSettingsView: View {
 
                     Spacer()
 
-                    Button("Refresh") {
+                    Button("刷新") {
                         VSCodeRecentProjectsService.shared.refresh()
                     }
                     .controlSize(.small)
@@ -46,7 +58,7 @@ struct VSCodeSettingsView: View {
             } header: {
                 Text("VS Code")
             } footer: {
-                Text("Seven Island lists first-level folders from the configured directory and opens them in a new VS Code window.")
+                Text("Seven Island 会列出配置目录中指定扫描深度内的文件夹，并在新窗口中打开。")
             }
         }
         .accentColor(.effectiveAccent)
@@ -58,7 +70,7 @@ struct VSCodeSettingsView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "Choose a directory of VS Code projects"
+        panel.message = "选择 VS Code 项目目录"
         panel.directoryURL = {
             if vscodeProjectsDirectory.isEmpty {
                 return VSCodeRecentProjectsService.defaultProjectsDirectoryURL()

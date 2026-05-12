@@ -58,20 +58,36 @@ final class VSCodeRecentProjectsService: ObservableObject {
     }
 
     private func localProjectsFromDirectory(_ dir: URL) -> [URL] {
-        guard FileManager.default.fileExists(atPath: dir.path) else { return [] }
-        return (try? FileManager.default.contentsOfDirectory(
-            at: dir,
+        let maxDepth = Defaults[.vscodeScanDepth]
+        return collectProjects(from: dir, maxDepth: maxDepth)
+            .sorted { lhs, rhs in
+                let lhDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let rhDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                return lhDate > rhDate
+            }
+    }
+
+    private func collectProjects(from directory: URL, maxDepth: Int, currentDepth: Int = 0) -> [URL] {
+        guard currentDepth < maxDepth else { return [] }
+
+        let contents = (try? FileManager.default.contentsOfDirectory(
+            at: directory,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
             options: [.skipsHiddenFiles]
-        ))?.filter { url in
+        )) ?? []
+
+        var result: [URL] = []
+        for url in contents {
             var isDir: ObjCBool = false
-            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            if currentDepth < maxDepth - 1 {
+                result.append(contentsOf: collectProjects(from: url, maxDepth: maxDepth, currentDepth: currentDepth + 1))
+            }
+
+            result.append(url)
         }
-        .sorted { lhs, rhs in
-            let lhDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            let rhDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            return lhDate > rhDate
-        } ?? []
+        return result
     }
 
     static func defaultStorageJSONURL() -> URL {

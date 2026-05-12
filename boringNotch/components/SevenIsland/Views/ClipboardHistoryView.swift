@@ -3,27 +3,62 @@ import SwiftUI
 struct ClipboardHistoryView: View {
     @ObservedObject private var store = ClipboardHistoryStore.shared
     @EnvironmentObject private var vm: BoringViewModel
+    @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
+
+    private var filteredItems: [ClipboardHistoryItem] {
+        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return store.items
+        }
+        let query = searchText.lowercased()
+        return store.items.filter { item in
+            if item.isImage {
+                return false
+            }
+            return item.content?.lowercased().contains(query) ?? false
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // HStack {
-            //     Spacer()
-            //     HoverButton(icon: "trash", iconColor: .gray, scale: .medium) {
-            //         store.clear()
-            //     }
-            //     .help("Clear clipboard history")
-            // }
-            // .frame(height: 18)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                TextField("搜索剪贴板历史...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white)
+                    .focused($isSearchFocused)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
 
             if store.items.isEmpty {
                 Spacer(minLength: 8)
-                EmptyStateView(message: "Copy text or images to build history")
+                EmptyStateView(message: "复制文本或图片以构建历史")
+                    .frame(maxWidth: .infinity)
+                Spacer(minLength: 8)
+            } else if filteredItems.isEmpty {
+                Spacer(minLength: 8)
+                EmptyStateView(message: "没有匹配的项目")
                     .frame(maxWidth: .infinity)
                 Spacer(minLength: 8)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(store.items) { item in
+                        ForEach(filteredItems) { item in
                             ClipboardItemRow(item: item) {
                                 store.copyToPasteboard(item)
                                 withAnimation(.smooth(duration: 0.2)) {
@@ -80,7 +115,7 @@ private struct ClipboardItemRow: View {
             )
         }
         .buttonStyle(.plain)
-        .help("Copy to clipboard")
+        .help("复制到剪贴板")
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering

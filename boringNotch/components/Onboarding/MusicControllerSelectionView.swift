@@ -26,12 +26,12 @@ struct MusicControllerSelectionView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Choose a Music Source")
+            Text("选择音乐源")
                 .font(.title)
                 .fontWeight(.bold)
                 .padding(.top, 24)
 
-            Text("Select the music source you want to use. You can change this later in the app settings.")
+            Text("选择您想要使用的音乐源。之后可以在应用设置中更改。")
                 .multilineTextAlignment(.center)
                 .font(.body)
                 .foregroundColor(.secondary)
@@ -56,7 +56,7 @@ struct MusicControllerSelectionView: View {
 
 //            Spacer()
 
-            Button("Continue", action: {
+            Button("继续", action: {
                 self.mediaController = self.selectedMediaController
                 NotificationCenter.default.post(
                     name: Notification.Name.mediaControllerChanged,
@@ -97,7 +97,7 @@ struct ControllerOptionView: View {
                     .foregroundColor(.secondary)
                 
                 if controller == .youtubeMusic, let url = URL(string: "https://github.com/pear-devs/pear-desktop") {
-                    Link("View on GitHub: pear-devs/pear-desktop", destination: url)
+                    Link("在 GitHub 上查看：pear-devs/pear-desktop", destination: url)
                         .font(.subheadline)
                         .padding(.top, 2)
                 }
@@ -123,13 +123,13 @@ extension MediaControllerType {
     var description: String {
         switch self {
         case .nowPlaying:
-            return "Works with most media apps, including browsers, to detect what's playing. Note: This may be removed in a future macOS version."
+            return "与大多数媒体应用（包括浏览器）配合使用，检测正在播放的内容。注意：此功能可能在未来的 macOS 版本中被移除。"
         case .spotify:
-            return "Connects directly to the Spotify app."
+            return "直接连接到 Spotify 应用。"
         case .appleMusic:
-            return "Connects directly to the Apple Music app."
+            return "直接连接到 Apple Music 应用。"
         case .youtubeMusic:
-            return "Requires a third-party client with API plugin enabled."
+            return "需要启用 API 插件的第三方客户端。"
         }
     }
 }
