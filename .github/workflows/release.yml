@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag to release (e.g., v2.8.0). The tag must already exist.'
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Tag Ref
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ref=refs/tags/${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build App
+        run: |
+          xcodebuild \
+            -project boringNotch.xcodeproj \
+            -scheme boringNotch \
+            -configuration Release \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Read Version
+        id: version
+        run: |
+          INFO_PLIST="build/DerivedData/Build/Products/Release/Seven Island.app/Contents/Info.plist"
+          VERSION=$(defaults read "$(pwd)/$INFO_PLIST" CFBundleShortVersionString 2>/dev/null || echo "${{ steps.tag.outputs.tag }}" | sed 's/^v//')
+          BUILD=$(defaults read "$(pwd)/$INFO_PLIST" CFBundleVersion 2>/dev/null || echo "0")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Python for DMG
+        run: |
+          python3 -m venv build/dmg-venv
+          source build/dmg-venv/bin/activate
+          pip install --require-hashes -r Configuration/dmg/requirements.txt
+
+      - name: Create DMG
+        run: |
+          mkdir -p build/dist
+          source build/dmg-venv/bin/activate
+          bash Configuration/dmg/create_dmg.sh \
+            "build/DerivedData/Build/Products/Release/Seven Island.app" \
+            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
+            "Seven Island ${{ steps.version.outputs.version }}"
+
+      - name: Generate Sparkle Signature & Update Appcast
+        run: |
+          pip3 install cryptography
+          python3 .github/workflows/scripts/update-appcast.py \
+            "updater/appcast.xml" \
+            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.build }}" \
+            "${{ steps.tag.outputs.tag }}" \
+            "${{ github.repository }}"
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/dist/*.dmg
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Commit Updated Appcast
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add updater/appcast.xml
+          git commit -m "Update appcast for ${{ steps.tag.outputs.tag }}" || echo "No changes to commit"
+          git push

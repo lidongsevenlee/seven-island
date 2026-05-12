@@ -12,9 +12,9 @@
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/lidongsevenlee/seven-island/releases/download/appcast.xml</string>
+	<string>https://github.com/lidongsevenlee/seven-island/raw/main/updater/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>B1Y47t8C/v8ImurYA+9arEsuCrpxwJSviekiflMElbI=</string>
+	<string>qcS+kLQGcg9vRioR9oX3g4TfAPEmhLfbcEgDJiUEL9A=</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict/>
