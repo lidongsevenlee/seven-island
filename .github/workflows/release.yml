@@ -29,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve Tag Ref
         id: tag
@@ -111,6 +113,8 @@ jobs:
       - name: Commit Updated Appcast
         if: steps.check-key.outputs.available == 'true'
         run: |
+          git fetch origin main
+          git checkout main
           git config user.name "$GIT_USER"
           git config user.email "$GIT_EMAIL"
           git add updater/appcast.xml
