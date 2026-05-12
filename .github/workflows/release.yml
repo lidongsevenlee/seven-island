@@ -10,6 +10,9 @@ on:
         description: 'Git tag to release (e.g., v2.8.0). The tag must already exist.'
         required: true
 
+permissions:
+  contents: write
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
