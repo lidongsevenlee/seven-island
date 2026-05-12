@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-**Boring Notch** (bundled as "Seven Island") is a macOS notch enhancement app — it turns the MacBook notch into a dynamic hub: music controls, calendar, clipboard history, file shelf with AirDrop, HUD replacement (volume/brightness), and developer tool monitoring (Codex/Claude Code sessions). Written in SwiftUI for macOS 14+.
+**Seven Island** is a macOS notch enhancement app — it turns the MacBook notch into a dynamic hub: music controls, calendar, clipboard history, file shelf with AirDrop, HUD replacement (volume/brightness), and developer tool monitoring (Codex/Claude Code sessions). Written in SwiftUI for macOS 14+.
 
 The app uses a borderless, floating panel window positioned at the top-center of the screen, mimicking the notch. It has two visual states: **closed** (compact, lives in the notch area) and **open** (expanded, shows a tabbed interface).
 
