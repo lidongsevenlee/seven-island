@@ -14,6 +14,10 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  GIT_USER: "github-actions[bot]"
+  GIT_EMAIL: "github-actions[bot]@users.noreply.github.com"
+
 jobs:
   release:
     name: Build & Release
@@ -53,24 +57,53 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Python for DMG
-        run: |
-          python3 -m venv build/dmg-venv
-          source build/dmg-venv/bin/activate
-          pip install --require-hashes -r Configuration/dmg/requirements.txt
-
       - name: Create DMG
         run: |
+          # Install dmgbuild: try brew first, fall back to pip
+          if ! command -v dmgbuild &>/dev/null; then
+            python3 -m venv build/dmg-venv
+            source build/dmg-venv/bin/activate
+            pip install -q dmgbuild ds-store mac-alias
+          fi
           mkdir -p build/dist
-          source build/dmg-venv/bin/activate
-          bash Configuration/dmg/create_dmg.sh \
-            "build/DerivedData/Build/Products/Release/Seven Island.app" \
-            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
-            "Seven Island ${{ steps.version.outputs.version }}"
+          DMG_PATH="build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg"
+          if command -v dmgbuild &>/dev/null; then
+            bash Configuration/dmg/create_dmg.sh \
+              "build/DerivedData/Build/Products/Release/Seven Island.app" \
+              "$DMG_PATH" \
+              "Seven Island ${{ steps.version.outputs.version }}"
+          else
+            source build/dmg-venv/bin/activate
+            bash Configuration/dmg/create_dmg.sh \
+              "build/DerivedData/Build/Products/Release/Seven Island.app" \
+              "$DMG_PATH" \
+              "Seven Island ${{ steps.version.outputs.version }}"
+          fi
 
-      - name: Generate Sparkle Signature & Update Appcast
+      - name: Check Sparkle Signing Key
+        id: check-key
         run: |
-          pip3 install cryptography
+          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Warning: SPARKLE_PRIVATE_KEY not set, skipping Sparkle signing" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+
+      - name: Create GitHub Release with DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/dist/*.dmg
+          tag_name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+
+      - name: Sparkle Sign DMG & Update Appcast
+        if: steps.check-key.outputs.available == 'true'
+        run: |
+          pip3 install -q cryptography
           python3 .github/workflows/scripts/update-appcast.py \
             "updater/appcast.xml" \
             "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
@@ -81,18 +114,11 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/dist/*.dmg
-          tag_name: ${{ steps.tag.outputs.tag }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-
       - name: Commit Updated Appcast
+        if: steps.check-key.outputs.available == 'true'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "$GIT_USER"
+          git config user.email "$GIT_EMAIL"
           git add updater/appcast.xml
           git commit -m "Update appcast for ${{ steps.tag.outputs.tag }}" || echo "No changes to commit"
           git push
