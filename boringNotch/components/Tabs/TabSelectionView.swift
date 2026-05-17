@@ -17,7 +17,8 @@ let tabs = [
     TabModel(label: "音乐", view: .music),
     TabModel(label: "文件架", view: .shelf),
     TabModel(label: "剪贴板", view: .clipboard),
-    TabModel(label: "VS Code", view: .vscodeProjects)
+    TabModel(label: "VS Code", view: .vscodeProjects),
+    TabModel(label: "菜单栏", view: .menuBarItems)
 ]
 
 struct TabSelectionView: View {
@@ -87,6 +88,9 @@ struct TabSelectionView: View {
                 .frame(width: 15, height: 15)
                 .opacity(isSelected ? 0.98 : 0.82)
                 .offset(y: -0.15)
+        case .menuBarItems:
+            Image(systemName: "menubar.rectangle")
+                .foregroundStyle(color)
         }
     }
 }

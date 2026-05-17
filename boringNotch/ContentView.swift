@@ -356,6 +356,8 @@ struct ContentView: View {
                         ClipboardHistoryView()
                     case .vscodeProjects:
                         VSCodeProjectsView()
+                    case .menuBarItems:
+                        MenuBarItemsView()
                     }
                 }
                 .transition(

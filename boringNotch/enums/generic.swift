@@ -29,6 +29,7 @@ public enum NotchViews: String {
     case shelf
     case clipboard
     case vscodeProjects
+    case menuBarItems
 }
 
 enum SettingsEnum {

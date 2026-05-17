@@ -16,6 +16,9 @@
 		7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000090000000000000009 /* VSCodeProjectsView.swift */; };
 		7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000C000000000000000C /* ClipboardSettingsView.swift */; };
 		7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* VSCodeSettingsView.swift */; };
+		7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000E000000000000000E /* MenuBarProxyItem.swift */; };
+		7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000F000000000000000F /* MenuBarItemMonitor.swift */; };
+		7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MenuBarItemsView.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
@@ -200,6 +203,9 @@
 		7E1000090000000000000009 /* VSCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectsView.swift; sourceTree = "<group>"; };
 		7E10000C000000000000000C /* ClipboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardSettingsView.swift; sourceTree = "<group>"; };
 		7E10000D000000000000000D /* VSCodeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeSettingsView.swift; sourceTree = "<group>"; };
+		7E10000E000000000000000E /* MenuBarProxyItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProxyItem.swift; sourceTree = "<group>"; };
+		7E10000F000000000000000F /* MenuBarItemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemMonitor.swift; sourceTree = "<group>"; };
+		7E1000100000000000000010 /* MenuBarItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemsView.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
 		110029292E8691B400035A57 /* FileShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShareView.swift; sourceTree = "<group>"; };
@@ -543,6 +549,7 @@
 			children = (
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
+				7E10000E000000000000000E /* MenuBarProxyItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -553,6 +560,7 @@
 				7E1000040000000000000004 /* ClipboardHistoryStore.swift */,
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
+				7E10000F000000000000000F /* MenuBarItemMonitor.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -562,6 +570,7 @@
 			children = (
 				7E1000080000000000000008 /* ClipboardHistoryView.swift */,
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
+				7E1000100000000000000010 /* MenuBarItemsView.swift */,
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 			);
@@ -975,6 +984,9 @@
 				7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */,
 				7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */,
 				7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */,
+				7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */,
+				7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */,
+				7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,

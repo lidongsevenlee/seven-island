@@ -55,6 +55,59 @@ struct DynamicNotchApp: App {
     }
 }
 
+@MainActor
+enum SevenIslandStatusMenuPresenter {
+    static func showMenu(at screenPoint: CGPoint = NSEvent.mouseLocation) {
+        let menu = NSMenu()
+        let target = SevenIslandStatusMenuActionTarget.shared
+
+        let settingsItem = NSMenuItem(
+            title: "Settings",
+            action: #selector(SevenIslandStatusMenuActionTarget.openSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = target
+        menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+
+        let restartItem = NSMenuItem(
+            title: "Restart Seven Island",
+            action: #selector(SevenIslandStatusMenuActionTarget.restart),
+            keyEquivalent: ""
+        )
+        restartItem.target = target
+        menu.addItem(restartItem)
+
+        let quitItem = NSMenuItem(
+            title: "Quit",
+            action: #selector(SevenIslandStatusMenuActionTarget.quit),
+            keyEquivalent: "q"
+        )
+        quitItem.target = target
+        menu.addItem(quitItem)
+
+        menu.popUp(positioning: nil, at: screenPoint, in: nil)
+    }
+}
+
+@MainActor
+private final class SevenIslandStatusMenuActionTarget: NSObject {
+    static let shared = SevenIslandStatusMenuActionTarget()
+
+    @objc func openSettings() {
+        SettingsWindowController.shared.showWindow()
+    }
+
+    @objc func restart() {
+        ApplicationRelauncher.restart()
+    }
+
+    @objc func quit() {
+        NSApplication.shared.terminate(nil)
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var windows: [String: NSWindow] = [:] // UUID -> NSWindow
