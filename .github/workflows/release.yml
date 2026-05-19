@@ -114,7 +114,12 @@ jobs:
         if: steps.check-key.outputs.available == 'true'
         run: |
           git fetch origin main
+          # Stash appcast changes before switching branches — the file was
+          # modified by the Sparkle step above while checked out at the tag
+          # (detached HEAD), so a plain `git checkout main` would fail.
+          git stash push -- updater/appcast.xml
           git checkout main
+          git stash pop
           git config user.name "$GIT_USER"
           git config user.email "$GIT_EMAIL"
           git add updater/appcast.xml
