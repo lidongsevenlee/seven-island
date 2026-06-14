@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import os.log
 
 @MainActor
 final class AgentSocketServer: ObservableObject {
@@ -120,7 +121,28 @@ final class AgentSocketServer: ObservableObject {
                 responseFD:  fd
             )
             Task { @MainActor in
+                // If a previous request is still pending, close its fd and deny it
+                // so the old agent doesn't hang forever.
+                if let old = self.pendingPermission {
+                    os_log(.error, "[AgentSocket] Overwriting pending permission fd=%d session=%@ — old agent will be denied", old.responseFD, old.sessionId)
+                    let oldFD = old.responseFD
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        var on: Int32 = 1
+                        setsockopt(oldFD, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+                        _ = send(oldFD, "deny\n", 5, 0)
+                        close(oldFD)
+                    }
+                }
                 self.pendingPermission = req
+                // Show the notch banner — socket-only requests don't have a
+                // corresponding JSONL entry, so onNotifiableStatusChange won't fire.
+                ClaudeHookNotificationState.shared.label = "\(req.cwdBasename) 需要授权"
+                ClaudeHookNotificationState.shared.isBlocked = true
+                BoringViewCoordinator.shared.toggleExpandingView(
+                    status: true,
+                    type: .claudeHook,
+                    value: 1
+                )
             }
             // fd stays open — will be closed by respond()
 
@@ -148,16 +170,26 @@ final class AgentSocketServer: ObservableObject {
     }
 
     private func respond(_ message: String) {
-        guard let req = pendingPermission else { return }
+        guard let req = pendingPermission else {
+            os_log(.error, "[AgentSocket] respond called but pendingPermission is nil — agent may hang")
+            return
+        }
         let fd = req.responseFD
+        let sessionId = req.sessionId
         pendingPermission = nil
+        os_log(.info, "[AgentSocket] Sending response to fd=%d session=%@ message=%@", fd, sessionId, message.trimmingCharacters(in: .newlines))
         // Use a dedicated thread — the server queue is occupied by accept() loop
         DispatchQueue.global(qos: .userInitiated).async {
-            // MSG_NOSIGNAL not available on macOS; set SO_NOSIGPIPE to suppress SIGPIPE
+            // SO_NOSIGPIPE already set at accept() time; set again defensively
             var on: Int32 = 1
             setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
             let bytes = Array(message.utf8)
-            _ = send(fd, bytes, bytes.count, 0)
+            let sent = send(fd, bytes, bytes.count, 0)
+            if sent < 0 {
+                os_log(.error, "[AgentSocket] send() failed fd=%d errno=%d — agent may hang", fd, errno)
+            } else {
+                os_log(.info, "[AgentSocket] Sent %d bytes to fd=%d", sent, fd)
+            }
             close(fd)
         }
     }
