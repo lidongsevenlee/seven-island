@@ -18,6 +18,7 @@ enum SneakContentType {
     case mic
     case battery
     case download
+    case claudeHook  // Claude Code session state notification (blocked / stop)
 }
 
 struct sneakPeek {
@@ -282,13 +283,15 @@ class BoringViewCoordinator: ObservableObject {
         value: CGFloat = 0,
         browser: BrowserType = .chromium
     ) {
-        Task { @MainActor in
-            withAnimation(.smooth) {
-                self.expandingView.show = status
-                self.expandingView.type = type
-                self.expandingView.value = value
-                self.expandingView.browser = browser
-            }
+        // Assign a whole new struct so didSet fires exactly once with the
+        // correct (show, type) pair — no intermediate stale-type window.
+        var item = self.expandingView
+        item.show = status
+        item.type = type
+        item.value = value
+        item.browser = browser
+        withAnimation(.smooth) {
+            self.expandingView = item
         }
     }
 
@@ -298,12 +301,17 @@ class BoringViewCoordinator: ObservableObject {
         didSet {
             if expandingView.show {
                 expandingViewTask?.cancel()
-                let duration: TimeInterval = (expandingView.type == .download ? 2 : 3)
-                let currentType = expandingView.type
-                expandingViewTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(duration))
-                    guard let self = self, !Task.isCancelled else { return }
-                    self.toggleExpandingView(status: false, type: currentType)
+                // Permission requests stay until the user explicitly responds
+                let isBlockedPermission = expandingView.type == .claudeHook
+                    && ClaudeHookNotificationState.shared.isBlocked
+                if !isBlockedPermission {
+                    let duration: TimeInterval = (expandingView.type == .download ? 2 : expandingView.type == .claudeHook ? 5 : 3)
+                    let currentType = expandingView.type
+                    expandingViewTask = Task { [weak self] in
+                        try? await Task.sleep(for: .seconds(duration))
+                        guard let self = self, !Task.isCancelled else { return }
+                        self.toggleExpandingView(status: false, type: currentType)
+                    }
                 }
             } else {
                 expandingViewTask?.cancel()

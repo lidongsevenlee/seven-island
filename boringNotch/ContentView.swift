@@ -59,7 +59,11 @@ struct ContentView: View {
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
-        if coordinator.expandingView.type == .battery && coordinator.expandingView.show
+        if coordinator.expandingView.type == .claudeHook && coordinator.expandingView.show
+            && vm.notchState == .closed
+        {
+            chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
+        } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
@@ -129,9 +133,13 @@ struct ContentView: View {
                     .gesture(
                         TapGesture()
                             .onEnded { _ in
-                                if vm.notchState == .closed {
-                                    doOpen()
-                                }
+                                guard vm.notchState == .closed else { return }
+                                // Block tap while a claude permission banner is visible
+                                let isPermissionBanner = coordinator.expandingView.show
+                                    && coordinator.expandingView.type == .claudeHook
+                                    && ClaudeHookNotificationState.shared.isBlocked
+                                guard !isPermissionBanner else { return }
+                                doOpen()
                             }
                     )
                     .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
@@ -157,6 +165,8 @@ struct ContentView: View {
                         if newState == .open {
                             let targetHeight: CGFloat = {
                                 switch coordinator.currentView {
+                                case .hooksActivity:
+                                    return sevenIslandFeatureNotchHeight
                                 default:
                                     return openNotchSize.height
                                 }
@@ -169,6 +179,8 @@ struct ContentView: View {
                     .onChange(of: coordinator.currentView) { _, newView in
                         let targetHeight: CGFloat = {
                             switch newView {
+                            case .hooksActivity:
+                                return sevenIslandFeatureNotchHeight
                             default:
                                 return openNotchSize.height
                             }
@@ -261,7 +273,15 @@ struct ContentView: View {
                     .padding(.top, 40)
                     Spacer()
                 } else {
-                    if coordinator.expandingView.type == .battery && coordinator.expandingView.show
+                    if coordinator.expandingView.type == .claudeHook && coordinator.expandingView.show
+                        && vm.notchState == .closed
+                    {
+                        ClaudeHookNotificationView()
+                            .frame(height: ClaudeHookNotificationState.shared.isBlocked
+                                   ? claudeHookBlockedHeight
+                                   : claudeHookIdleHeight,
+                                   alignment: .center)
+                    } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
                         && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
                     {
                         HStack(spacing: 0) {
@@ -358,6 +378,8 @@ struct ContentView: View {
                         VSCodeProjectsView()
                     case .menuBarItems:
                         MenuBarItemsView()
+                    case .hooksActivity:
+                        HooksActivityView()
                     }
                 }
                 .transition(
@@ -528,9 +550,13 @@ struct ContentView: View {
                 haptics.toggle()
             }
             
+            let isPermissionBanner = coordinator.expandingView.show
+                && coordinator.expandingView.type == .claudeHook
+                && ClaudeHookNotificationState.shared.isBlocked
             guard vm.notchState == .closed,
                   !coordinator.sneakPeek.show,
-                  Defaults[.openNotchOnHover] else { return }
+                  Defaults[.openNotchOnHover],
+                  !isPermissionBanner else { return }
             
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
