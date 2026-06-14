@@ -279,8 +279,7 @@ struct ContentView: View {
                         ClaudeHookNotificationView()
                             .frame(height: ClaudeHookNotificationState.shared.isBlocked
                                    ? claudeHookBlockedHeight
-                                   : claudeHookIdleHeight,
-                                   alignment: .center)
+                                   : vm.effectiveClosedNotchHeight)
                     } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
                         && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
                     {

@@ -278,6 +278,15 @@ final class HooksActivityService: ObservableObject {
             lastEventTs[e.sessionId] = max(lastEventTs[e.sessionId] ?? 0, e.ts)
         }
 
+        // If no pending permission request in socket server, downgrade stale blocked → idle
+        // in sessionMap *before* bestPerCwd so all downstream consumers see the real status.
+        let hasRealPending = AgentSocketServer.shared.pendingPermission != nil
+        if !hasRealPending {
+            for key in sessionMap.keys where sessionMap[key]!.status == .blocked {
+                sessionMap[key]!.status = .idle
+            }
+        }
+
         var bestPerCwd: [String: HookSession] = [:]
         for session in sessionMap.values {
             let key = session.cwd
@@ -314,17 +323,8 @@ final class HooksActivityService: ObservableObject {
             }
         }
 
-        // If no pending permission request in socket server, downgrade stale blocked → idle.
-        // This prevents old PermissionRequest JSONL entries from permanently showing blocked.
-        let hasRealPending = AgentSocketServer.shared.pendingPermission != nil
-        var finalSessions = bestPerCwd.values.map { s -> HookSession in
-            var s = s
-            if s.status == .blocked && !hasRealPending { s.status = .idle }
-            return s
-        }
-
-        filteredSessions = finalSessions
-            .filter { $0.status.isLive }   // hide ended sessions
+        filteredSessions = bestPerCwd.values
+            .filter { $0.status.isLive }
             .sorted { $0.startTs > $1.startTs }
             .prefix(20)
             .map { $0 }
