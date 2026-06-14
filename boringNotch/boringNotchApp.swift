@@ -340,6 +340,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = ClipboardHistoryStore.shared
+        AgentSocketServer.shared.start()
+        setupHooksNotifications()
 
         NotificationCenter.default.addObserver(
             self,
@@ -616,6 +618,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func quitAction() {
         NSApplication.shared.terminate(self)
+    }
+
+    // MARK: - Hooks notifications
+
+    private func setupHooksNotifications() {
+        HooksActivityService.shared.onNotifiableStatusChange = { [weak self] _, _, status, cwdBasename in
+            guard let self else { return }
+            let coordinator = BoringViewCoordinator.shared
+            // value: 1 = blocked, 0 = stop/idle; label stored in shared singleton
+            let isBlocked = status == .blocked
+            ClaudeHookNotificationState.shared.label = isBlocked
+                ? "\(cwdBasename) 需要授权"
+                : "\(cwdBasename) 已完成"
+            ClaudeHookNotificationState.shared.isBlocked = isBlocked
+            coordinator.toggleExpandingView(
+                status: true,
+                type: .claudeHook,
+                value: isBlocked ? 1 : 0
+            )
+        }
     }
 
     private func showOnboardingWindow(step: OnboardingStep = .welcome) {

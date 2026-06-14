@@ -19,6 +19,10 @@
 		7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000E000000000000000E /* MenuBarProxyItem.swift */; };
 		7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000F000000000000000F /* MenuBarItemMonitor.swift */; };
 		7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MenuBarItemsView.swift */; };
+		7E1001110000000000000011 /* HooksActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000110000000000000011 /* HooksActivityModels.swift */; };
+		7E1001120000000000000012 /* HooksActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000120000000000000012 /* HooksActivityService.swift */; };
+		7E1001150000000000000015 /* AgentSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000150000000000000015 /* AgentSocketServer.swift */; };
+		7E1001130000000000000013 /* HooksActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* HooksActivityView.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
@@ -152,6 +156,7 @@
 		B1CE8CFE2C6F659400DD9871 /* KeyboardShortcutsHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1CE8CFD2C6F659400DD9871 /* KeyboardShortcutsHelper.swift */; };
 		B1D365CE2C6A979C0047BDBC /* LiveActivityModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D365CD2C6A979C0047BDBC /* LiveActivityModifier.swift */; };
 		B1D365D02C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D365CF2C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift */; };
+		7E1001140000000000000014 /* ClaudeHookNotificationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000140000000000000014 /* ClaudeHookNotificationView.swift */; };
 		B1D6FD432C6603730015F173 /* SoftwareUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D6FD422C6603730015F173 /* SoftwareUpdater.swift */; };
 		B1F0A0022E60000100000001 /* BrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F0A0012E60000100000001 /* BrightnessManager.swift */; };
 		B1F747F92EC7E94000F841DB /* LottieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F747F82EC7E94000F841DB /* LottieView.swift */; };
@@ -206,6 +211,10 @@
 		7E10000E000000000000000E /* MenuBarProxyItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProxyItem.swift; sourceTree = "<group>"; };
 		7E10000F000000000000000F /* MenuBarItemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemMonitor.swift; sourceTree = "<group>"; };
 		7E1000100000000000000010 /* MenuBarItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemsView.swift; sourceTree = "<group>"; };
+		7E1000110000000000000011 /* HooksActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityModels.swift; sourceTree = "<group>"; };
+		7E1000120000000000000012 /* HooksActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityService.swift; sourceTree = "<group>"; };
+		7E1000150000000000000015 /* AgentSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSocketServer.swift; sourceTree = "<group>"; };
+		7E1000130000000000000013 /* HooksActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityView.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
 		110029292E8691B400035A57 /* FileShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShareView.swift; sourceTree = "<group>"; };
@@ -331,6 +340,7 @@
 		B1CE8CFD2C6F659400DD9871 /* KeyboardShortcutsHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcutsHelper.swift; sourceTree = "<group>"; };
 		B1D365CD2C6A979C0047BDBC /* LiveActivityModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityModifier.swift; sourceTree = "<group>"; };
 		B1D365CF2C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemEventIndicatorModifier.swift; sourceTree = "<group>"; };
+		7E1000140000000000000014 /* ClaudeHookNotificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookNotificationView.swift; sourceTree = "<group>"; };
 		B1D6FD422C6603730015F173 /* SoftwareUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoftwareUpdater.swift; sourceTree = "<group>"; };
 		B1F0A0012E60000100000001 /* BrightnessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightnessManager.swift; sourceTree = "<group>"; };
 		B1F747F82EC7E94000F841DB /* LottieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieView.swift; sourceTree = "<group>"; };
@@ -550,6 +560,7 @@
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
 				7E10000E000000000000000E /* MenuBarProxyItem.swift */,
+				7E1000110000000000000011 /* HooksActivityModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -561,6 +572,8 @@
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
 				7E10000F000000000000000F /* MenuBarItemMonitor.swift */,
+				7E1000120000000000000012 /* HooksActivityService.swift */,
+				7E1000150000000000000015 /* AgentSocketServer.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -573,6 +586,7 @@
 				7E1000100000000000000010 /* MenuBarItemsView.swift */,
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
+				7E1000130000000000000013 /* HooksActivityView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -805,6 +819,7 @@
 				B1C974332C642B6D0000E707 /* MarqueeTextView.swift */,
 				B1D365CD2C6A979C0047BDBC /* LiveActivityModifier.swift */,
 				B1D365CF2C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift */,
+				7E1000140000000000000014 /* ClaudeHookNotificationView.swift */,
 				14E9FEA92C70BF610062E83F /* DownloadView.swift */,
 				B172AABF2C95DA0B001623F1 /* InlineHUD.swift */,
 			);
@@ -987,6 +1002,10 @@
 				7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */,
 				7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */,
 				7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */,
+				7E1001110000000000000011 /* HooksActivityModels.swift in Sources */,
+				7E1001120000000000000012 /* HooksActivityService.swift in Sources */,
+				7E1001150000000000000015 /* AgentSocketServer.swift in Sources */,
+				7E1001130000000000000013 /* HooksActivityView.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
@@ -1003,6 +1022,7 @@
 				B1D6FD432C6603730015F173 /* SoftwareUpdater.swift in Sources */,
 				111BE9952ECF2DF40079DD4E /* DragDetector.swift in Sources */,
 				B1D365D02C6A9A6C0047BDBC /* SystemEventIndicatorModifier.swift in Sources */,
+				7E1001140000000000000014 /* ClaudeHookNotificationView.swift in Sources */,
 				1194E87C2EA19E09009C82D6 /* ImageProcessingService.swift in Sources */,
 				1194E8872EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift in Sources */,
 				1194E9412EACC653009C82D6 /* LyricsDisplayText.swift in Sources */,
