@@ -13,6 +13,7 @@ struct BoringHeader: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @StateObject var tvm = ShelfStateViewModel.shared
     @State private var isSettingsHovered = false
+    @State private var isClaudeHovered = false
     var body: some View {
         HStack(spacing: 0) {
             HStack {
@@ -58,6 +59,29 @@ struct BoringHeader: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
+                        // Claude Code tab
+                        Button(action: {
+                            coordinator.currentView = .hooksActivity
+                        }) {
+                            Capsule()
+                                .fill(Color(nsColor: .secondarySystemFill).opacity(isClaudeHovered || coordinator.currentView == .hooksActivity ? 1 : 0))
+                                .frame(width: 24, height: 24)
+                                .overlay {
+                                    ClaudeStarLogo()
+                                        .fill(
+                                            coordinator.currentView == .hooksActivity
+                                            ? .white
+                                            : .gray.opacity(isClaudeHovered ? 0.98 : 0.82)
+                                        )
+                                        .frame(width: 12, height: 12)
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .help("Claude")
+                        .onHover { hovering in
+                            isClaudeHovered = hovering
+                        }
+
                         if Defaults[.settingsIconInNotch] {
                             Button(action: {
                                 DispatchQueue.main.async {

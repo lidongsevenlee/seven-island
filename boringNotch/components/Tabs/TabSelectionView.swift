@@ -18,8 +18,7 @@ let tabs = [
     TabModel(label: "文件架", view: .shelf),
     TabModel(label: "剪贴板", view: .clipboard),
     TabModel(label: "VS Code", view: .vscodeProjects),
-    TabModel(label: "菜单栏", view: .menuBarItems),
-    TabModel(label: "Hooks", view: .hooksActivity)
+    TabModel(label: "菜单栏", view: .menuBarItems)
 ]
 
 struct TabSelectionView: View {
@@ -93,8 +92,8 @@ struct TabSelectionView: View {
             Image(systemName: "menubar.rectangle")
                 .foregroundStyle(color)
         case .hooksActivity:
-            Image(systemName: "bell.badge")
-                .foregroundStyle(color)
+            // Rendered in BoringHeader right side
+            EmptyView()
         }
     }
 }

@@ -166,7 +166,7 @@ struct ContentView: View {
                             let targetHeight: CGFloat = {
                                 switch coordinator.currentView {
                                 case .hooksActivity:
-                                    return sevenIslandFeatureNotchHeight
+                                    return openNotchSize.height
                                 default:
                                     return openNotchSize.height
                                 }

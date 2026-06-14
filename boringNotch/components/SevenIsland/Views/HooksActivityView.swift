@@ -16,9 +16,9 @@ struct HooksActivityView: View {
         VStack(alignment: .leading, spacing: 6) {
             // ── Header ──────────────────────────────────────────────────────
             HStack(spacing: 5) {
-                Image(systemName: "bell.badge")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                ClaudeStarLogo()
+                    .fill(.secondary)
+                    .frame(width: 10, height: 10)
                 Text("Claude Code 会话")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
@@ -51,7 +51,7 @@ struct HooksActivityView: View {
                     .padding(.horizontal, 8)
                     .padding(.bottom, 6)
                 }
-                .frame(maxHeight: 290)
+                .frame(maxHeight: 180)
             }
         }
         .padding(.bottom, 4)
@@ -124,9 +124,9 @@ private struct SessionCard: View {
 
             // Row 3: AI reply
             HStack(spacing: 4) {
-                Image(systemName: "brain")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                ClaudeStarLogo()
+                    .fill(.secondary)
+                    .frame(width: 9, height: 9)
                 Text(session.lastAssistantMessage ?? "—")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.8))
