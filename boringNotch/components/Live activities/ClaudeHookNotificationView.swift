@@ -60,15 +60,10 @@ struct ClaudeHookNotificationView: View {
 
             Rectangle().fill(.black).frame(width: 130)
 
-            HStack(spacing: 5) {
-                ClaudeStarLogo()
-                    .fill(.secondary)
-                    .frame(width: 11, height: 11)
-                Text("Claude Code")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            ClaudeStarLogo()
+                .fill(.secondary)
+                .frame(width: 11, height: 11)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 12)
     }
