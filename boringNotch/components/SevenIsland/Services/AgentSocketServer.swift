@@ -21,6 +21,11 @@ final class AgentSocketServer: ObservableObject {
     nonisolated let socketPath = NSHomeDirectory() + "/.seven-island/agent.sock"
     private let queue = DispatchQueue(label: "com.local.seven-island.socket-server", qos: .utility)
 
+    /// Permission requests "approved for this session" — keyed by
+    /// `PermissionTarget.sessionAllowKey`. Process-only memory: cleared when
+    /// the app restarts, matching the user's mental model of "this session".
+    private var sessionAllowCache: Set<String> = []
+
     private init() {}
 
     // MARK: - Lifecycle
@@ -108,19 +113,59 @@ final class AgentSocketServer: ObservableObject {
             // Fire-and-forget: update JSONL-based service
             close(fd)
             // DispatchSource in HooksActivityService already handles file changes;
-            // socket path is just a real-time nudge — nothing extra needed here.
+            // socket path is just a real-time nudge — except we hijack PostToolUse
+            // to dismiss any pending banner whose corresponding hook fd is dangling
+            // because the user approved/denied via Claude Code's terminal UI.
+            // PostToolUse fires immediately after the tool runs, so this is the
+            // first reliable signal that the permission for that session is resolved.
+            let payload = json["payload"] as? [String: Any] ?? [:]
+            let event = payload["event"] as? String ?? ""
+            let sessionId = payload["session_id"] as? String ?? ""
+            if event == "PostToolUse", !sessionId.isEmpty {
+                Task { @MainActor in
+                    if let pending = self.pendingPermission, pending.sessionId == sessionId {
+                        self.dismissForExternalDecision()
+                        ClaudeHookNotificationState.shared.isBlocked = false
+                        BoringViewCoordinator.shared.toggleExpandingView(
+                            status: false,
+                            type: .claudeHook,
+                            value: 0
+                        )
+                        // The next rebuild will see pendingPermission == nil and snap this
+                        // session's stale blocked → idle, which would normally fire a
+                        // misleading "<cwd> 已完成" banner. Tell the service to ignore
+                        // that one specific transition.
+                        HooksActivityService.shared.suppressNextIdleNotification(forSessionId: sessionId)
+                    }
+                }
+            }
 
         case "permission":
             // Blocking: store request, wait for user to reply, then send response
             let payload = json["payload"] as? [String: Any] ?? [:]
+            let target = PermissionTarget(
+                toolName:  payload["tool_name"] as? String ?? "",
+                toolInput: payload["tool_input"] as? [String: Any] ?? [:]
+            )
             let req = PermissionRequest(
                 sessionId:   payload["session_id"] as? String ?? "",
                 cwd:         payload["cwd"] as? String ?? "",
-                toolName:    payload["tool_name"] as? String ?? "",
+                toolName:    target.toolName,
                 description: payload["description"] as? String ?? "",
+                target:      target,
                 responseFD:  fd
             )
+            // Session-allow fast path: if the user previously chose "allow for
+            // this session" for this exact target, silently allow without
+            // surfacing a banner.
+            let sessionKey = target.sessionAllowKey(sessionId: req.sessionId)
             Task { @MainActor in
+                if !req.sessionId.isEmpty, self.sessionAllowCache.contains(sessionKey) {
+                    os_log(.info, "[AgentSocket] Session-cached allow fd=%d session=%@ pattern=%@",
+                           fd, req.sessionId, target.persistentAllowPattern())
+                    self.sendRaw("allow\n", fd: fd)
+                    return
+                }
                 // If a previous request is still pending, close its fd and deny it
                 // so the old agent doesn't hang forever.
                 if let old = self.pendingPermission {
@@ -144,7 +189,7 @@ final class AgentSocketServer: ObservableObject {
                     value: 1
                 )
             }
-            // fd stays open — will be closed by respond()
+            // fd stays open — will be closed by respond() or sendRaw()
 
         default:
             close(fd)
@@ -153,8 +198,35 @@ final class AgentSocketServer: ObservableObject {
 
     // MARK: - User responses
 
-    /// User tapped "Allow"
+    /// User tapped "Allow once"
     func allow() {
+        respond("allow\n")
+    }
+
+    /// User tapped "Allow for this session" — caches the (session, pattern)
+    /// key so future identical PermissionRequests are auto-approved on the
+    /// fast path inside `handleConnection`.
+    func allowForSession() {
+        if let req = pendingPermission, !req.sessionId.isEmpty {
+            sessionAllowCache.insert(req.target.sessionAllowKey(sessionId: req.sessionId))
+        }
+        respond("allow\n")
+    }
+
+    /// User tapped "Allow permanently". Append the pattern to the project's
+    /// `.claude/settings.local.json`. If the write fails (no permission, IO
+    /// error), fall back to session-scoped allow so the user is never stuck.
+    func allowPersistently() {
+        guard let req = pendingPermission else {
+            os_log(.error, "[AgentSocket] allowPersistently called but pendingPermission is nil")
+            return
+        }
+        let pattern = req.target.persistentAllowPattern()
+        let ok = PermissionPolicyStore.shared.appendPersistentAllow(pattern: pattern, cwd: req.cwd)
+        if !ok {
+            os_log(.error, "[AgentSocket] Persistent allow write failed — falling back to session allow pattern=%@", pattern)
+            sessionAllowCache.insert(req.target.sessionAllowKey(sessionId: req.sessionId))
+        }
         respond("allow\n")
     }
 
@@ -175,12 +247,16 @@ final class AgentSocketServer: ObservableObject {
             return
         }
         let fd = req.responseFD
-        let sessionId = req.sessionId
         pendingPermission = nil
-        os_log(.info, "[AgentSocket] Sending response to fd=%d session=%@ message=%@", fd, sessionId, message.trimmingCharacters(in: .newlines))
-        // Use a dedicated thread — the server queue is occupied by accept() loop
+        sendRaw(message, fd: fd)
+    }
+
+    /// Write a response message to a specific fd and close it. Used by both
+    /// `respond()` (with the pending request's fd) and the session-allow fast
+    /// path (with the just-accepted fd, before any banner is shown).
+    fileprivate func sendRaw(_ message: String, fd: Int32) {
+        os_log(.info, "[AgentSocket] Sending response to fd=%d message=%@", fd, message.trimmingCharacters(in: .newlines))
         DispatchQueue.global(qos: .userInitiated).async {
-            // SO_NOSIGPIPE already set at accept() time; set again defensively
             var on: Int32 = 1
             setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
             let bytes = Array(message.utf8)
@@ -190,6 +266,22 @@ final class AgentSocketServer: ObservableObject {
             } else {
                 os_log(.info, "[AgentSocket] Sent %d bytes to fd=%d", sent, fd)
             }
+            close(fd)
+        }
+    }
+
+    /// Drop the pending request without sending allow/deny — used when the user
+    /// approved/denied via an external surface (e.g. Claude Code's terminal UI)
+    /// and Claude has already acted on it. Closing the fd lets the hook helper
+    /// recv() return 0 and exit; its stdout decision JSON is irrelevant because
+    /// Claude has stopped reading it.
+    func dismissForExternalDecision() {
+        guard let req = pendingPermission else { return }
+        let fd = req.responseFD
+        let sessionId = req.sessionId
+        pendingPermission = nil
+        os_log(.info, "[AgentSocket] External decision detected — closing fd=%d session=%@ without response", fd, sessionId)
+        DispatchQueue.global(qos: .userInitiated).async {
             close(fd)
         }
     }
@@ -203,6 +295,7 @@ struct PermissionRequest: Identifiable {
     let cwd: String
     let toolName: String
     let description: String
+    let target: PermissionTarget
     let responseFD: Int32  // kept open until user responds or timeout
 
     var cwdBasename: String {

@@ -25,6 +25,21 @@ final class HooksActivityService: ObservableObject {
     /// Track previous statuses to detect transitions
     private var previousStatuses: [String: SessionStatus] = [:]
 
+    /// Sessions whose next blocked → idle transition must NOT fire a "completion"
+    /// notification. Set by the socket server after PostToolUse dismisses an
+    /// external-decision banner — without this, the subsequent rebuild snaps
+    /// blocked → idle and misleads the user with a "<cwd> 已完成" pop after
+    /// every approved permission.
+    private var suppressNextIdleNotice: Set<String> = []
+
+    /// Called from AgentSocketServer when an external decision (terminal UI)
+    /// dismisses the banner. The next blocked → idle transition for `sessionId`
+    /// is treated as a continuation, not a completion.
+    func suppressNextIdleNotification(forSessionId sessionId: String) {
+        guard !sessionId.isEmpty else { return }
+        suppressNextIdleNotice.insert(sessionId)
+    }
+
     // MARK: - Private state
 
     private let logPath: String = NSHomeDirectory() + "/.seven-island/hooks-log.jsonl"
@@ -334,12 +349,23 @@ final class HooksActivityService: ObservableObject {
             let prev = previousStatuses[session.id]
             let curr = session.status
             if prev != curr {
-                // Notify on: any → blocked, working/blocked → idle (= Stop after work)
-                let shouldNotify: Bool = {
+                // Notify on: any → blocked, working/blocked → idle (= Stop after work).
+                // External-decision dismiss is handled by the socket server's PostToolUse
+                // hijack instead — relying on this status transition is unreliable when
+                // a session fires another PermissionRequest immediately after the first
+                // (rebuild snaps prev=blocked, curr=blocked and skips the working pulse).
+                var shouldNotify: Bool = {
                     if curr == .blocked { return true }
                     if curr == .idle, let p = prev, p == .working || p == .blocked { return true }
                     return false
                 }()
+                // Suppress the spurious "completion" pop that fires when a PostToolUse
+                // hijack drops pendingPermission to nil — the subsequent stale-blocked
+                // downgrade snaps the session to idle, which would otherwise look like
+                // the session finished.
+                if shouldNotify, curr == .idle, suppressNextIdleNotice.remove(session.id) != nil {
+                    shouldNotify = false
+                }
                 if shouldNotify {
                     onNotifiableStatusChange?(session.id, session.cwd, curr, session.cwdBasename)
                 }

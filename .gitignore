@@ -55,3 +55,8 @@ dist/
 *.ipa
 *.xcarchive
 *.dSYM
+
+# Claude Code / meridian local state — per-machine, not project artifacts
+.claude/
+.state-log.jsonl
+.subagent-dispatch-state.jsonl
