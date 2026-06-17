@@ -625,17 +625,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHooksNotifications() {
         HooksActivityService.shared.onNotifiableStatusChange = { [weak self] _, _, status, cwdBasename in
             guard let self else { return }
+            // Only surface PermissionRequest banners. Stop / idle transitions are too
+            // noisy: every assistant turn ends with a Stop, so the active session you
+            // are watching would pop "<cwd> 已完成" after every reply. The user is
+            // already looking at the terminal that produced the Stop — they don't need
+            // a notch banner on top of it.
+            guard status == .blocked else { return }
             let coordinator = BoringViewCoordinator.shared
-            // value: 1 = blocked, 0 = stop/idle; label stored in shared singleton
-            let isBlocked = status == .blocked
-            ClaudeHookNotificationState.shared.label = isBlocked
-                ? "\(cwdBasename) 需要授权"
-                : "\(cwdBasename) 已完成"
-            ClaudeHookNotificationState.shared.isBlocked = isBlocked
+            ClaudeHookNotificationState.shared.label = "\(cwdBasename) 需要授权"
+            ClaudeHookNotificationState.shared.isBlocked = true
             coordinator.toggleExpandingView(
                 status: true,
                 type: .claudeHook,
-                value: isBlocked ? 1 : 0
+                value: 1
             )
         }
     }

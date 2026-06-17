@@ -20,6 +20,8 @@
 		7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000F000000000000000F /* MenuBarItemMonitor.swift */; };
 		7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MenuBarItemsView.swift */; };
 		7E1001110000000000000011 /* HooksActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000110000000000000011 /* HooksActivityModels.swift */; };
+		7E1001170000000000070 /* PermissionPolicyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000170000000000070 /* PermissionPolicyStore.swift */; };
+		7E1001160000000000060 /* PermissionTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000160000000000060 /* PermissionTarget.swift */; };
 		7E1001120000000000000012 /* HooksActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000120000000000000012 /* HooksActivityService.swift */; };
 		7E1001150000000000000015 /* AgentSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000150000000000000015 /* AgentSocketServer.swift */; };
 		7E1001130000000000000013 /* HooksActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* HooksActivityView.swift */; };
@@ -212,6 +214,8 @@
 		7E10000F000000000000000F /* MenuBarItemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemMonitor.swift; sourceTree = "<group>"; };
 		7E1000100000000000000010 /* MenuBarItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemsView.swift; sourceTree = "<group>"; };
 		7E1000110000000000000011 /* HooksActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityModels.swift; sourceTree = "<group>"; };
+		7E1000170000000000070 /* PermissionPolicyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionPolicyStore.swift; sourceTree = "<group>"; };
+		7E1000160000000000060 /* PermissionTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionTarget.swift; sourceTree = "<group>"; };
 		7E1000120000000000000012 /* HooksActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityService.swift; sourceTree = "<group>"; };
 		7E1000150000000000000015 /* AgentSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSocketServer.swift; sourceTree = "<group>"; };
 		7E1000130000000000000013 /* HooksActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityView.swift; sourceTree = "<group>"; };
@@ -561,6 +565,7 @@
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
 				7E10000E000000000000000E /* MenuBarProxyItem.swift */,
 				7E1000110000000000000011 /* HooksActivityModels.swift */,
+				7E1000160000000000060 /* PermissionTarget.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -573,6 +578,7 @@
 				7E1000060000000000000006 /* AppLauncherService.swift */,
 				7E10000F000000000000000F /* MenuBarItemMonitor.swift */,
 				7E1000120000000000000012 /* HooksActivityService.swift */,
+				7E1000170000000000070 /* PermissionPolicyStore.swift */,
 				7E1000150000000000000015 /* AgentSocketServer.swift */,
 			);
 			path = Services;
@@ -1003,6 +1009,8 @@
 				7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */,
 				7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */,
 				7E1001110000000000000011 /* HooksActivityModels.swift in Sources */,
+				7E1001170000000000070 /* PermissionPolicyStore.swift in Sources */,
+				7E1001160000000000060 /* PermissionTarget.swift in Sources */,
 				7E1001120000000000000012 /* HooksActivityService.swift in Sources */,
 				7E1001150000000000000015 /* AgentSocketServer.swift in Sources */,
 				7E1001130000000000000013 /* HooksActivityView.swift in Sources */,
