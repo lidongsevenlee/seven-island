@@ -11,6 +11,10 @@ final class ClipboardHistoryStore: ObservableObject {
     private let persistenceURL: URL
     private var timer: Timer?
     private var lastChangeCount: Int
+    /// Serial queue for all disk I/O and image transcoding so the main runloop
+    /// never hitches on copy events.
+    private let ioQueue = DispatchQueue(label: "com.local.seven-island.clipboard-io", qos: .utility)
+    private var saveDebounce: DispatchWorkItem?
 
     init(
         pasteboard: NSPasteboard = .general,
@@ -39,7 +43,7 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func clear() {
         items = []
-        save()
+        scheduleSave()
     }
 
     func copyToPasteboard(_ item: ClipboardHistoryItem) {
@@ -54,21 +58,27 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func record(_ content: String) {
         items = Self.nextItems(inserting: content, into: items, limit: maxItemCount)
-        save()
+        scheduleSave()
     }
 
     func recordImage(from tiffData: Data) {
-        guard let bitmap = NSBitmapImageRep(data: tiffData),
-              let pngData = bitmap.representation(using: .png, properties: [.compressionFactor: 0.8]) else {
-            return
+        // Transcoding PNG with NSBitmapImageRep is expensive — push it off the
+        // main thread so a copied screenshot doesn't stutter the UI.
+        ioQueue.async { [weak self] in
+            guard let self,
+                  let bitmap = NSBitmapImageRep(data: tiffData),
+                  let pngData = bitmap.representation(using: .png, properties: [.compressionFactor: 0.8])
+            else { return }
+            DispatchQueue.main.async {
+                self.items = Self.nextItems(insertingImageData: pngData, into: self.items, limit: self.maxItemCount)
+                self.scheduleSave()
+            }
         }
-        items = Self.nextItems(insertingImageData: pngData, into: items, limit: maxItemCount)
-        save()
     }
 
     func reloadConfiguration() {
         items = Array(items.prefix(maxItemCount))
-        save()
+        scheduleSave()
     }
 
     static func nextItems(
@@ -151,17 +161,26 @@ final class ClipboardHistoryStore: ObservableObject {
         return min(max(stored == 0 ? 100 : stored, 1), 100)
     }
 
-    private func save() {
-        do {
-            try FileManager.default.createDirectory(
-                at: persistenceURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let data = try JSONEncoder().encode(items)
-            try data.write(to: persistenceURL, options: .atomic)
-        } catch {
-            NSLog("Failed to save clipboard history: \(error.localizedDescription)")
+    /// Coalesce rapid mutations (e.g. consecutive copies) and write on the
+    /// utility queue so the main thread never blocks on disk.
+    private func scheduleSave() {
+        saveDebounce?.cancel()
+        let snapshot = items
+        let url = persistenceURL
+        let work = DispatchWorkItem {
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                let data = try JSONEncoder().encode(snapshot)
+                try data.write(to: url, options: .atomic)
+            } catch {
+                NSLog("Failed to save clipboard history: \(error.localizedDescription)")
+            }
         }
+        saveDebounce = work
+        ioQueue.asyncAfter(deadline: .now() + 0.25, execute: work)
     }
 
     private static func loadItems(from url: URL) -> [ClipboardHistoryItem] {

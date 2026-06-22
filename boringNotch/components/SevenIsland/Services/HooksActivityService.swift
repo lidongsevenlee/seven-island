@@ -134,11 +134,27 @@ final class HooksActivityService: ObservableObject {
     // MARK: - DispatchSource
 
     private func startWatching() {
+        let parentDir = (logPath as NSString).deletingLastPathComponent
+        do {
+            try FileManager.default.createDirectory(
+                atPath: parentDir,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            NSLog("[HooksActivity] Failed to create parent directory \(parentDir): \(error.localizedDescription)")
+            return
+        }
         if !FileManager.default.fileExists(atPath: logPath) {
-            FileManager.default.createFile(atPath: logPath, contents: nil)
+            if !FileManager.default.createFile(atPath: logPath, contents: nil) {
+                NSLog("[HooksActivity] Failed to create log file at \(logPath)")
+                return
+            }
         }
         let fd = open(logPath, O_EVTONLY)
-        guard fd >= 0 else { return }
+        guard fd >= 0 else {
+            NSLog("[HooksActivity] open() failed for \(logPath) errno=\(errno)")
+            return
+        }
         fileDescriptor = fd
 
         let src = DispatchSource.makeFileSystemObjectSource(

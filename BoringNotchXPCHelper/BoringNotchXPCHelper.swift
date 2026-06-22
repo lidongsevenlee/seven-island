@@ -103,7 +103,18 @@ class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
 
     @objc func isScreenBrightnessAvailable(with reply: @escaping (Bool) -> Void) {
         var b: Float = 0
-        reply(displayServicesGetBrightness(displayID: CGMainDisplayID(), out: &b) || ioServiceFor(displayID: CGMainDisplayID()) != nil)
+        if displayServicesGetBrightness(displayID: CGMainDisplayID(), out: &b) {
+            reply(true)
+            return
+        }
+        if let io = ioServiceFor(displayID: CGMainDisplayID()) {
+            // Release the IOKit object we just retained while probing — otherwise
+            // every availability check leaks an io_service_t.
+            IOObjectRelease(io)
+            reply(true)
+            return
+        }
+        reply(false)
     }
 
     @objc func currentScreenBrightness(with reply: @escaping (NSNumber?) -> Void) {

@@ -82,6 +82,8 @@ private struct ClipboardItemRow: View {
     let onCopy: () -> Void
 
     @State private var isHovering = false
+    @State private var didPushCursor = false
+    @State private var cachedImage: NSImage?
 
     var body: some View {
         Button(action: onCopy) {
@@ -91,7 +93,7 @@ private struct ClipboardItemRow: View {
                     .frame(width: 18)
 
                 if item.isImage {
-                    if let data = item.imageData, let nsImage = NSImage(data: data) {
+                    if let nsImage = cachedImage {
                         Image(nsImage: nsImage)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
@@ -116,11 +118,35 @@ private struct ClipboardItemRow: View {
         }
         .buttonStyle(.plain)
         .help("复制到剪贴板")
+        .task(id: item.id) {
+            // Decode PNG only once per row appearance, not on every body eval.
+            guard item.isImage, let data = item.imageData else { return }
+            let decoded = NSImage(data: data)
+            await MainActor.run { cachedImage = decoded }
+        }
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
-            hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
+            // Pair NSCursor.push() with exactly one pop() per row. SwiftUI may
+            // deliver an unbalanced trailing `false` during scroll / view
+            // teardown — without the guard the cursor stack drifts and the
+            // pointing hand cursor gets stuck system-wide.
+            if hovering {
+                if !didPushCursor {
+                    NSCursor.pointingHand.push()
+                    didPushCursor = true
+                }
+            } else if didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
+        }
+        .onDisappear {
+            if didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
         }
     }
 }

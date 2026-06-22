@@ -1,5 +1,6 @@
 import Foundation
 import Cocoa
+import ApplicationServices
 import AsyncXPCConnection
 
 final class XPCHelperClient: NSObject {
@@ -96,54 +97,40 @@ final class XPCHelperClient: NSObject {
     }
     
     // MARK: - Accessibility
-    
+    //
+    // NOTE: Accessibility authorization is granted by the user to the *host
+    // app* process, not to the XPC helper. `AXIsProcessTrusted()` inside the
+    // helper reports the helper's status, which silently disagrees with what
+    // the user sees in System Settings. We therefore answer these calls
+    // directly from the main app process using the AX C API.
+
     nonisolated func requestAccessibilityAuthorization() {
-        Task {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            try? await service.withService { service in
-                service.requestAccessibilityAuthorization()
-            }
-        }
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
-    
+
     nonisolated func isAccessibilityAuthorized() async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.isAccessibilityAuthorized { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
-            await MainActor.run {
-                notifyAuthorizationChange(result)
-            }
-            return result
-        } catch {
-            return false
+        let result = AXIsProcessTrusted()
+        await MainActor.run {
+            notifyAuthorizationChange(result)
         }
+        return result
     }
-    
+
     nonisolated func ensureAccessibilityAuthorization(promptIfNeeded: Bool) async -> Bool {
-        do {
-            let service = await MainActor.run {
-                ensureRemoteService()
-            }
-            let result: Bool = try await service.withContinuation { service, continuation in
-                service.ensureAccessibilityAuthorization(promptIfNeeded) { authorized in
-                    continuation.resume(returning: authorized)
-                }
-            }
-            await MainActor.run {
-                notifyAuthorizationChange(result)
-            }
-            return result
-        } catch {
-            return false
+        if AXIsProcessTrusted() {
+            await MainActor.run { notifyAuthorizationChange(true) }
+            return true
         }
+        if promptIfNeeded {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
+        // Re-check shortly so callers don't always see false right after a prompt.
+        try? await Task.sleep(for: .milliseconds(500))
+        let result = AXIsProcessTrusted()
+        await MainActor.run { notifyAuthorizationChange(result) }
+        return result
     }
     
     // MARK: - Keyboard Brightness

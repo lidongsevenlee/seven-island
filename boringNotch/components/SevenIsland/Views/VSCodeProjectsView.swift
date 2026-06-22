@@ -109,6 +109,7 @@ private struct VSCodeProjectRow: View {
     let project: VSCodeProjectItem
 
     @State private var isHovering = false
+    @State private var didPushCursor = false
 
     private var iconName: String {
         project.exists ? "folder" : "folder.badge.questionmark"
@@ -145,7 +146,22 @@ private struct VSCodeProjectRow: View {
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
             }
-            hovering ? NSCursor.pointingHand.push() : NSCursor.pop()
+            // Balanced NSCursor.push/pop — see ClipboardItemRow for rationale.
+            if hovering {
+                if !didPushCursor {
+                    NSCursor.pointingHand.push()
+                    didPushCursor = true
+                }
+            } else if didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
+        }
+        .onDisappear {
+            if didPushCursor {
+                NSCursor.pop()
+                didPushCursor = false
+            }
         }
     }
 }
