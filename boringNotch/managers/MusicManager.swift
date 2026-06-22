@@ -79,6 +79,17 @@ class MusicManager: ObservableObject {
         let plain: String
         let synced: String
         let parsed: (lines: [LyricsDisplayText.SyncedLine], characterTimes: [[Double]])
+        /// Duration reported by LRCLIB for this entry (seconds). Used to rank candidates
+        /// when multiple results match the same title/artist — the entry whose duration
+        /// is closest to the actual track duration wins.
+        let lrclibDuration: Double
+
+        init(plain: String, synced: String, parsed: (lines: [LyricsDisplayText.SyncedLine], characterTimes: [[Double]]), lrclibDuration: Double = 0) {
+            self.plain = plain
+            self.synced = synced
+            self.parsed = parsed
+            self.lrclibDuration = lrclibDuration
+        }
 
         var hasText: Bool {
             !plain.isEmpty || !synced.isEmpty || !parsed.lines.isEmpty
@@ -280,7 +291,7 @@ class MusicManager: ObservableObject {
             }
 
             // Fetch lyrics on content change
-            self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist, album: state.album)
+            self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist, album: state.album, duration: state.duration)
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
@@ -389,7 +400,7 @@ class MusicManager: ObservableObject {
 
     // MARK: - Lyrics
     func refreshLyricsForCurrentTrack() {
-        fetchLyricsIfAvailable(bundleIdentifier: bundleIdentifier, title: songTitle, artist: artistName, album: album, force: true)
+        fetchLyricsIfAvailable(bundleIdentifier: bundleIdentifier, title: songTitle, artist: artistName, album: album, duration: songDuration, force: true)
     }
 
     private func lyricsTrackKey(bundleIdentifier: String?, title: String, artist: String, album: String) -> LyricsTrackKey {
@@ -401,7 +412,7 @@ class MusicManager: ObservableObject {
         )
     }
 
-    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String, album: String, force: Bool = false) {
+    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String, album: String, duration: Double = 0, force: Bool = false) {
         guard Defaults[.enableLyrics], !title.isEmpty else {
             lyricsFetchTask?.cancel()
             activeLyricsFetchKey = nil
@@ -438,7 +449,7 @@ class MusicManager: ObservableObject {
                   !didLoadLyrics,
                   (self.lyricsFetchAttempts[key] ?? 0) < self.maxLyricsFetchAttempts {
                 self.lyricsFetchAttempts[key, default: 0] += 1
-                didLoadLyrics = await self.fetchLyricsOnce(bundleIdentifier: bundleIdentifier, title: title, artist: artist)
+                didLoadLyrics = await self.fetchLyricsOnce(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album, duration: duration)
                 if !didLoadLyrics, (self.lyricsFetchAttempts[key] ?? 0) < self.maxLyricsFetchAttempts {
                     try? await Task.sleep(for: .milliseconds(450))
                 }
@@ -461,7 +472,7 @@ class MusicManager: ObservableObject {
     }
 
     @MainActor
-    private func fetchLyricsOnce(bundleIdentifier: String?, title: String, artist: String) async -> Bool {
+    private func fetchLyricsOnce(bundleIdentifier: String?, title: String, artist: String, album: String, duration: Double) async -> Bool {
         if let bundleIdentifier = bundleIdentifier, bundleIdentifier.contains("com.apple.Music") {
             let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Music")
             if !runningApps.isEmpty {
@@ -479,7 +490,7 @@ class MusicManager: ObservableObject {
             }
         }
 
-        return await fetchLyricsFromWeb(title: title, artist: artist)
+        return await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration)
     }
 
     @MainActor
@@ -542,29 +553,71 @@ class MusicManager: ObservableObject {
         return components?.url
     }
 
+    /// LRCLIB /api/get — exact lookup with duration for tiebreaking.
+    /// Returns nil on 404 or network error.
+    private func lyricExactURL(title: String, artist: String, album: String, duration: Double) -> URL? {
+        guard !title.isEmpty, !artist.isEmpty else { return nil }
+        var components = URLComponents(string: "https://lrclib.net/api/get")
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "track_name", value: title),
+            URLQueryItem(name: "artist_name", value: artist),
+        ]
+        if !album.isEmpty {
+            items.append(URLQueryItem(name: "album_name", value: album))
+        }
+        if duration > 0 {
+            items.append(URLQueryItem(name: "duration", value: String(Int(duration.rounded()))))
+        }
+        components?.queryItems = items
+        return components?.url
+    }
+
     @MainActor
-    private func fetchLyricsFromWeb(title: String, artist: String) async -> Bool {
+    private func fetchLyricsFromWeb(title: String, artist: String, album: String = "", duration: Double = 0) async -> Bool {
         let cleanArtist = normalizedQuery(artist)
+        let cleanAlbum = normalizedQuery(album)
         var fallbackCandidate: WebLyricsCandidate?
 
-        // LRCLIB simple search (no auth): https://lrclib.net/api/search?track_name=...&artist_name=...
+        // ── Step 1: LRCLIB /api/get — exact match (title + artist + album + duration) ──
+        // This endpoint returns a single result and matches on duration when provided,
+        // giving accurate version selection without needing to sort a search result list.
+        if let exactURL = lyricExactURL(title: normalizedQuery(title), artist: cleanArtist, album: cleanAlbum, duration: duration) {
+            if let candidate = try? await fetchLrclibSingle(url: exactURL), candidate.hasText {
+                applyWebLyricsCandidate(candidate)
+                return true
+            }
+        }
+
+        // ── Step 2: LRCLIB /api/search — ranked by duration proximity ──
+        // Falls back here when the exact endpoint returns 404 (album name mismatch,
+        // simplified/traditional Chinese differences, etc.).
         for titleQuery in lyricTitleQueries(from: title) {
             guard let url = lyricSearchURL(title: titleQuery, artist: cleanArtist) else { continue }
             do {
                 let (data, response) = try await URLSession.shared.data(from: url)
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    continue
-                }
-                guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-                    continue
-                }
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { continue }
+                guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { continue }
 
-                let candidates = jsonArray.compactMap { result -> WebLyricsCandidate? in
+                var candidates = jsonArray.compactMap { result -> WebLyricsCandidate? in
                     let plain = (result["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let synced = (result["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                     let parsed = synced.isEmpty ? (lines: [], characterTimes: []) : LyricsDisplayText.parseSyncedLyrics(synced)
-                    let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed)
+                    let lrclibDuration = result["duration"] as? Double ?? 0
+                    let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed, lrclibDuration: lrclibDuration)
                     return candidate.hasText ? candidate : nil
+                }
+
+                // Sort by duration proximity when we have actual track duration.
+                // Candidates within 2 s are considered equally good; outside that,
+                // prefer closer ones to avoid picking live/demo/remix variants.
+                if duration > 0 {
+                    candidates.sort {
+                        let da = abs($0.lrclibDuration - duration)
+                        let db = abs($1.lrclibDuration - duration)
+                        // Prefer character-timed entries when both are close enough.
+                        if max(da, db) < 2 { return $0.hasCharacterTiming && !$1.hasCharacterTiming }
+                        return da < db
+                    }
                 }
 
                 if let enhanced = candidates.first(where: \.hasCharacterTiming) {
@@ -595,6 +648,19 @@ class MusicManager: ObservableObject {
         self.syncedLyricCharacterTimes = []
         self.lyricsSource = .none
         return false
+    }
+
+    /// Fetch a single LRCLIB result from the given URL (used for /api/get exact endpoint).
+    private func fetchLrclibSingle(url: URL) async throws -> WebLyricsCandidate? {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
+        guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let plain = (result["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let synced = (result["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let parsed = synced.isEmpty ? (lines: [], characterTimes: []) : LyricsDisplayText.parseSyncedLyrics(synced)
+        let lrclibDuration = result["duration"] as? Double ?? 0
+        let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed, lrclibDuration: lrclibDuration)
+        return candidate.hasText ? candidate : nil
     }
 
     @MainActor

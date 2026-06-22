@@ -398,26 +398,94 @@ struct VolumeControlView: View {
     }
 }
 
+// MARK: - Lyrics Display (outer dispatcher)
+
 struct MusicLyricsDisplayView: View {
     @ObservedObject var musicManager = MusicManager.shared
-    private let maxLines = 5
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.25)) { timeline in
-            let elapsed = estimatedElapsed(at: timeline.date)
-            let lines = expandedLyricLines(at: elapsed)
-            if !lines.isEmpty {
-                expandedLyrics(lines)
+        Group {
+            if musicManager.isFetchingLyrics {
+                statusLabel("Loading lyrics...")
+            } else if !musicManager.syncedLyrics.isEmpty {
+                SyncedLyricsScrollView()
+            } else {
+                let plainLines = LyricsDisplayText.lines(
+                    fromPlainLyrics: musicManager.currentLyrics)
+                if plainLines.isEmpty {
+                    statusLabel("无歌词")
+                } else {
+                    PlainLyricsScrollView(lines: plainLines)
+                }
             }
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
-    private func lyricFont(for text: String) -> Font {
-        if LyricsDisplayText.containsPersianScript(text) {
-            return .custom("Vazirmatn-Regular", size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
+    private func statusLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
+// MARK: - Synced lyrics: auto-scroll + karaoke progress
+
+private struct SyncedLyricsScrollView: View {
+    @ObservedObject private var musicManager = MusicManager.shared
+    @State private var scrollTarget: Int? = nil
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: false) {
+                TimelineView(.animation(minimumInterval: 0.05)) { timeline in
+                    let elapsed = estimatedElapsed(at: timeline.date)
+                    let currentIdx = LyricsDisplayText.currentSyncedIndex(
+                        from: musicManager.syncedLyrics, elapsed: elapsed) ?? 0
+                    let highlightColor = karaokeHighlightColor
+
+                    LazyVStack(alignment: .center, spacing: 8) {
+                        ForEach(
+                            Array(musicManager.syncedLyrics.enumerated()),
+                            id: \.offset
+                        ) { index, line in
+                            KaraokeLineView(
+                                text: line.text,
+                                index: index,
+                                currentIndex: currentIdx,
+                                elapsed: elapsed,
+                                syncedLyrics: musicManager.syncedLyrics,
+                                characterTimes: musicManager.syncedLyricCharacterTimes,
+                                highlightColor: highlightColor
+                            )
+                            .id(index)
+                        }
+                    }
+                    // Vertical padding so the first/last lines can scroll to the
+                    // anchor position instead of being pinned to the edge.
+                    .padding(.vertical, 36)
+                    .frame(maxWidth: .infinity)
+                    .onChange(of: currentIdx) { _, newIdx in
+                        scrollTarget = newIdx
+                    }
+                }
+            }
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                // Keep current line at ~35 % from the top so upcoming lines
+                // are visible below.
+                withAnimation(.spring(response: 0.48, dampingFraction: 0.82)) {
+                    proxy.scrollTo(target, anchor: UnitPoint(x: 0.5, y: 0.35))
+                }
+            }
         }
-        return .subheadline
+    }
+
+    private var karaokeHighlightColor: Color {
+        Defaults[.playerColorTinting]
+            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
+            : .white
     }
 
     private func estimatedElapsed(at date: Date) -> Double {
@@ -426,72 +494,107 @@ struct MusicLyricsDisplayView: View {
         let progressed = musicManager.elapsedTime + (delta * musicManager.playbackRate)
         return min(max(progressed, 0), musicManager.songDuration)
     }
+}
 
-    private func expandedLyricLines(at elapsed: Double) -> [LyricsDisplayText.Line] {
-        if musicManager.isFetchingLyrics {
-            return [LyricsDisplayText.Line(text: LyricsDisplayText.displayFallback(isFetching: true), isCurrent: true)]
-        }
+// MARK: - Karaoke line: dim base + bright progress mask
 
-        if !musicManager.syncedLyrics.isEmpty {
-            return LyricsDisplayText.syncedWindow(from: musicManager.syncedLyrics, elapsed: elapsed, limit: maxLines)
-        }
+private struct KaraokeLineView: View {
+    let text: String
+    let index: Int
+    let currentIndex: Int
+    let elapsed: Double
+    let syncedLyrics: [(time: Double, text: String)]
+    let characterTimes: [[Double]]
+    let highlightColor: Color
 
-        let lyrics = musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lines = Array(LyricsDisplayText.lines(fromPlainLyrics: lyrics).prefix(maxLines))
-        if lines.isEmpty {
-            return [LyricsDisplayText.Line(text: LyricsDisplayText.displayFallback(isFetching: false), isCurrent: true)]
-        }
+    private var isCurrent: Bool { index == currentIndex }
+    private var isPast: Bool    { index < currentIndex }
 
-        return lines.enumerated().map { index, text in
-            LyricsDisplayText.Line(text: text, isCurrent: index == min(1, lines.count - 1))
+    /// 0…1 progress of the current line (0 for non-current lines).
+    private var progress: Double {
+        guard isCurrent else { return 0 }
+        // Use per-character timing when available for smoother animation.
+        if characterTimes.indices.contains(index), !characterTimes[index].isEmpty {
+            return LyricsDisplayText.activeLineProgress(
+                from: syncedLyrics,
+                characterTimes: characterTimes,
+                elapsed: elapsed
+            ) ?? 0
         }
+        return LyricsDisplayText.activeLineProgress(
+            from: syncedLyrics, elapsed: elapsed) ?? 0
     }
 
-    private func expandedLyrics(_ lines: [LyricsDisplayText.Line]) -> some View {
-        let signature = lines.map { $0.text }.joined(separator: "|")
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // ── Base layer: always-visible dim text ──────────────────────────
+            Text(text.isEmpty ? " " : text)
+                .foregroundStyle(baseColor)
+                .opacity(text.isEmpty ? 0 : 1)
 
-        return ZStack {
-            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                Text(line.text.isEmpty ? " " : line.text)
-                    .font(lyricFont(for: line.text))
-                    .fontWeight(line.isCurrent ? .semibold : .regular)
-                    .foregroundStyle(line.isCurrent ? activeLyricColor : inactiveLyricColor)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.82)
-                    .frame(maxWidth: .infinity, minHeight: 18, alignment: .center)
-                    .scaleEffect(line.isCurrent ? 1.03 : 0.94)
-                    .opacity(line.text.isEmpty ? 0 : (line.isCurrent ? 1 : 0.34))
-                    .offset(y: lyricYOffset(for: index, count: lines.count))
-                    .id("\(index)-\(line.text)")
-                    .transition(.asymmetric(
-                        insertion: .offset(y: 18).combined(with: .opacity),
-                        removal: .offset(y: -18).combined(with: .opacity)
-                    ))
-                    .animation(
-                        .easeInOut(duration: 0.32).delay(Double(index) * 0.035),
-                        value: signature
-                    )
+            // ── Highlight layer: revealed left-to-right as the line plays ────
+            // Past lines are fully revealed; the current line uses `progress`.
+            if isCurrent || isPast {
+                Text(text.isEmpty ? " " : text)
+                    .foregroundStyle(highlightColor)
+                    .mask(alignment: .leading) {
+                        GeometryReader { geo in
+                            Rectangle()
+                                .frame(
+                                    width: isPast
+                                        ? geo.size.width
+                                        : max(0, geo.size.width * progress)
+                                )
+                        }
+                    }
+                    .opacity(text.isEmpty ? 0 : 1)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-        .clipped()
-        .animation(.easeInOut(duration: 0.34), value: signature)
+        .font(lyricFont)
+        .fontWeight(isCurrent ? .semibold : .regular)
+        .lineLimit(2)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, alignment: .center)
+        // Grow current line slightly; shrink future ones more than past ones.
+        .scaleEffect(isCurrent ? 1.0 : (isPast ? 0.90 : 0.85), anchor: .center)
+        .animation(.easeInOut(duration: 0.28), value: isCurrent)
+        .animation(.easeInOut(duration: 0.28), value: isPast)
     }
 
-    private func lyricYOffset(for index: Int, count: Int) -> CGFloat {
-        let center = CGFloat(max(count - 1, 0)) / 2
-        return (CGFloat(index) - center) * 20
+    private var baseColor: Color {
+        if isCurrent { return .white.opacity(0.22) }
+        if isPast    { return .clear }
+        return .white.opacity(0.18)
     }
 
-    private var activeLyricColor: Color {
-        Defaults[.playerColorTinting]
-            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.78)
-            : .white
+    private var lyricFont: Font {
+        LyricsDisplayText.containsPersianScript(text)
+            ? .custom(
+                "Vazirmatn-Regular",
+                size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
+            : .subheadline
     }
+}
 
-    private var inactiveLyricColor: Color {
-        .gray.opacity(0.72)
+// MARK: - Plain lyrics (no timestamps): static scroll
+
+private struct PlainLyricsScrollView: View {
+    let lines: [String]
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .center, spacing: 6) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.65))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+        }
     }
 }
 
@@ -605,10 +708,10 @@ struct MusicHomeView: View {
                 .frame(height: expandedLyricsHeight, alignment: .center)
         } else {
             MusicLyricsDisplayView()
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(width: 190, alignment: .center)
+                .frame(width: 200, alignment: .center)
                 .frame(height: expandedLyricsHeight, alignment: .center)
+                // Clip so lyrics don't overflow into the album art or calendar
+                .clipped()
         }
     }
 
