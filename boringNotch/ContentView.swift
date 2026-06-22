@@ -163,30 +163,18 @@ struct ContentView: View {
                             }
                         }
                         if newState == .open {
-                            let targetHeight: CGFloat = {
-                                switch coordinator.currentView {
-                                case .hooksActivity:
-                                    return openNotchSize.height
-                                default:
-                                    return openNotchSize.height
-                                }
-                            }()
                             withAnimation(.smooth(duration: 0.35)) {
-                                vm.setOpenNotchHeight(targetHeight)
+                                vm.setOpenNotchHeight(openNotchSize.height)
                             }
                         }
                     }
-                    .onChange(of: coordinator.currentView) { _, newView in
-                        let targetHeight: CGFloat = {
-                            switch newView {
-                            case .hooksActivity:
-                                return sevenIslandFeatureNotchHeight
-                            default:
-                                return openNotchSize.height
-                            }
-                        }()
+                    .onChange(of: coordinator.currentView) { _, _ in
+                        // All tabs share the same default open height.
+                        // Previously, hooksActivity used sevenIslandFeatureNotchHeight (360)
+                        // which caused the notch to randomly jump tall when switching to the
+                        // Claude tab while the notch was already open.
                         withAnimation(.smooth(duration: 0.35)) {
-                            vm.setOpenNotchHeight(targetHeight)
+                            vm.setOpenNotchHeight(openNotchSize.height)
                         }
                     }
                     .onChange(of: vm.isBatteryPopoverActive) {
@@ -381,6 +369,11 @@ struct ContentView: View {
                         HooksActivityView()
                     }
                 }
+                // .id() makes SwiftUI treat each tab as a distinct view identity,
+                // so insert/remove fires on every tab switch and triggers the transition.
+                // Without this the VStack is never removed — only its content changes
+                // in-place — so .transition() is never invoked.
+                .id(coordinator.currentView)
                 .transition(
                     .scale(scale: 0.8, anchor: .top)
                     .combined(with: .opacity)
