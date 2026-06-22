@@ -59,15 +59,14 @@ The tag push triggers the GitHub Actions release workflow (`.github/workflows/re
 - The window is positioned using `NSScreen.frame` and `auxiliaryTopLeftArea`/`auxiliaryTopRightArea` for accurate notch alignment
 
 ### State: BoringViewModel + BoringViewCoordinator
-- **`BoringViewModel`** (`models/BoringViewModel.swift`) — per-window state: `notchState` (`.open`/`.closed`), `notchSize`, `setOpenNotchHeight(CGFloat)` (clamped to `openNotchSize.height ... codexExpandedNotchHeight`), `close()`, `open()`
+- **`BoringViewModel`** (`models/BoringViewModel.swift`) — per-window state: `notchState` (`.open`/`.closed`), `notchSize`, `setOpenNotchHeight(CGFloat)` (clamped to `openNotchSize.height ... sevenIslandFeatureNotchHeight`), `close()`, `open()`
 - **`BoringViewCoordinator`** (`BoringViewCoordinator.swift`) — app-global singleton: `currentView: NotchViews`, `sneakPeek`, `expandingView`, display preferences. `currentView` persists via `@AppStorage("sevenIslandLastNotchView")`
 
 ### Sizing constants (`sizing/matters.swift`)
 | Constant | Value | Use |
 |---|---|---|
 | `openNotchSize` | 640×240 | Default open notch dimensions |
-| `sevenIslandFeatureNotchHeight` | 360 (1.5×) | Clipboard, VS Code views |
-| `codexExpandedNotchHeight` | 480 (2×) | Codex detail expanded |
+| `sevenIslandFeatureNotchHeight` | 360 (1.5×) | Clipboard, VS Code, Codex/Claude views (max open height) |
 | `windowSize` | 640×500 | Window frame (covers max height + shadow) |
 
 ### ContentView structure (`ContentView.swift`)
