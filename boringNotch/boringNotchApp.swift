@@ -124,7 +124,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenLockedObserver: Any?
     private var screenUnlockedObserver: Any?
     private var isScreenLocked: Bool = false
-    private var windowScreenDidChangeObserver: Any?
+    /// One token per window — observers are scoped to a specific NSWindow object.
+    /// Keyed by display UUID; the single-window mode uses the special key "main".
+    private var windowScreenDidChangeObservers: [String: NSObjectProtocol] = [:]
     private var dragDetectors: [String: DragDetector] = [:] // UUID -> DragDetector
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -213,12 +215,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             windows.removeAll()
             viewModels.removeAll()
+            // Drop all per-window screen observers along with their windows.
+            windowScreenDidChangeObservers.values.forEach {
+                NotificationCenter.default.removeObserver($0)
+            }
+            windowScreenDidChangeObservers.removeAll()
         } else if let window = window {
             window.close()
             NotchSpaceManager.shared.notchSpace.windows.remove(window)
-            if let obs = windowScreenDidChangeObserver {
+            if let obs = windowScreenDidChangeObservers.removeValue(forKey: "main") {
                 NotificationCenter.default.removeObserver(obs)
-                windowScreenDidChangeObserver = nil
             }
             self.window = nil
         }
@@ -311,8 +317,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
 
-        // Observe when the window's screen changes so we can update drag detectors
-        windowScreenDidChangeObserver = NotificationCenter.default.addObserver(
+        // Observe when this window's screen changes so we can update drag detectors.
+        // Tokens are stored per-window so cleanupWindows() can remove the right one
+        // instead of orphaning observers across multiple displays.
+        let observerKey = screen.displayUUID ?? "main"
+        if let old = windowScreenDidChangeObservers.removeValue(forKey: observerKey) {
+            NotificationCenter.default.removeObserver(old)
+        }
+        let token = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeScreenNotification,
             object: window,
             queue: .main) { [weak self] _ in
@@ -320,6 +332,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self?.setupDragDetectors()
                 }
         }
+        windowScreenDidChangeObservers[observerKey] = token
         return window
     }
 
@@ -342,6 +355,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = ClipboardHistoryStore.shared
         AgentSocketServer.shared.start()
         setupHooksNotifications()
+        setupGatewayLifecycle()
 
         NotificationCenter.default.addObserver(
             self,
@@ -473,11 +487,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if !Defaults[.showOnAllDisplays] {
-            let viewModel = self.vm
-            let window = createBoringNotchWindow(
-                for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
-            self.window = window
-            adjustWindowPosition(changeAlpha: true)
+            if let screen = NSScreen.main ?? NSScreen.screens.first {
+                let viewModel = self.vm
+                let window = createBoringNotchWindow(for: screen, with: viewModel)
+                self.window = window
+                adjustWindowPosition(changeAlpha: true)
+            } else {
+                // No screens available at launch (lid closed / headless). The
+                // didChangeScreenParametersNotification observer above will retry
+                // window creation when a display reconnects.
+                NSLog("⚠️ No NSScreen available at launch — deferring window creation")
+            }
         } else {
             adjustWindowPosition(changeAlpha: true)
         }
@@ -547,6 +567,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     NotchSpaceManager.shared.notchSpace.windows.remove(window)
                     windows.removeValue(forKey: uuid)
                     viewModels.removeValue(forKey: uuid)
+                    if let obs = windowScreenDidChangeObservers.removeValue(forKey: uuid) {
+                        NotificationCenter.default.removeObserver(obs)
+                    }
                 }
             }
 
@@ -618,6 +641,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func quitAction() {
         NSApplication.shared.terminate(self)
+    }
+
+    // MARK: - Gateway lifecycle
+
+    /// 启动时按 Defaults[.gatewayEnabled] 拉起 gateway；订阅 toggle 变化即时启停。
+    /// 阶段 B：仅启动 /health endpoint，阶段 C 后才支持真正的转发。
+    private func setupGatewayLifecycle() {
+        if Defaults[.gatewayEnabled] {
+            ClaudeGatewayService.shared.start()
+        }
+        // 监听用户在 Settings 里拨 toggle 的变化。Defaults.observe 在 MainActor 上回调。
+        Defaults.observe(.gatewayEnabled) { change in
+            Task { @MainActor in
+                if change.newValue {
+                    ClaudeGatewayService.shared.start()
+                } else {
+                    ClaudeGatewayService.shared.stop()
+                }
+            }
+        }.tieToLifetime(of: self)
+        // 端口变化时如果在跑，重启
+        Defaults.observe(.gatewayPort) { _ in
+            Task { @MainActor in
+                if ClaudeGatewayService.shared.status.isRunning {
+                    ClaudeGatewayService.shared.restart()
+                }
+            }
+        }.tieToLifetime(of: self)
     }
 
     // MARK: - Hooks notifications

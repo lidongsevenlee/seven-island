@@ -27,7 +27,17 @@ final class VSCodeRecentProjectsService: ObservableObject {
     }
 
     func refresh(includeMissing: Bool = false) {
-        projects = loadProjects(from: Self.effectiveProjectsDirectoryURL(), includeMissing: includeMissing, limit: .max)
+        // Recursive filesystem walk + mtime sort can stall the main thread on
+        // large home directories. Run it on a userInitiated queue and publish
+        // the result back to main when ready.
+        let directory = Self.effectiveProjectsDirectoryURL()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { return }
+            let loaded = self.loadProjects(from: directory, includeMissing: includeMissing, limit: .max)
+            DispatchQueue.main.async {
+                self.projects = loaded
+            }
+        }
     }
 
     func loadProjects(from directory: URL, includeMissing: Bool, limit: Int) -> [VSCodeProjectItem] {

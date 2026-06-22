@@ -37,12 +37,28 @@ final class AgentSocketServer: ObservableObject {
     }
 
     private nonisolated func runServer(socketPath: String) {
+        // Ensure parent directory exists (~/.seven-island/) — bind() will fail
+        // with ENOENT otherwise and the server silently never starts.
+        let parentDir = (socketPath as NSString).deletingLastPathComponent
+        do {
+            try FileManager.default.createDirectory(
+                atPath: parentDir,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            os_log(.error, "[AgentSocket] Failed to create parent dir %@: %@", parentDir, error.localizedDescription)
+            return
+        }
+
         // Remove stale socket file
         unlink(socketPath)
 
         // Create socket
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return }
+        guard fd >= 0 else {
+            os_log(.error, "[AgentSocket] socket() failed errno=%d", errno)
+            return
+        }
 
         // Bind
         var addr = sockaddr_un()
@@ -57,12 +73,22 @@ final class AgentSocketServer: ObservableObject {
                 bind(fd, saddr, socklen_t(MemoryLayout<sockaddr_un>.size))
             }
         }
-        guard bindResult == 0 else { close(fd); return }
+        guard bindResult == 0 else {
+            os_log(.error, "[AgentSocket] bind() failed errno=%d path=%@", errno, socketPath)
+            close(fd)
+            return
+        }
 
         // Listen
-        guard listen(fd, 16) == 0 else { close(fd); unlink(socketPath); return }
+        guard listen(fd, 16) == 0 else {
+            os_log(.error, "[AgentSocket] listen() failed errno=%d", errno)
+            close(fd)
+            unlink(socketPath)
+            return
+        }
 
-        // Accept loop
+        // Accept loop — recover from transient errors so the server doesn't
+        // silently die after the first EINTR/EAGAIN.
         while true {
             var clientAddr = sockaddr_un()
             var addrLen = socklen_t(MemoryLayout<sockaddr_un>.size)
@@ -72,30 +98,57 @@ final class AgentSocketServer: ObservableObject {
                 }
             }
             guard clientFD >= 0 else {
-                // Server was closed
+                let err = errno
+                if err == EINTR || err == EAGAIN || err == EWOULDBLOCK || err == ECONNABORTED {
+                    // Transient — retry
+                    os_log(.info, "[AgentSocket] accept() transient errno=%d, retrying", err)
+                    continue
+                }
+                if err == EMFILE || err == ENFILE {
+                    // Out of file descriptors — back off briefly and retry
+                    os_log(.error, "[AgentSocket] accept() out of fds errno=%d, backing off", err)
+                    Thread.sleep(forTimeInterval: 0.5)
+                    continue
+                }
+                // EBADF / EINVAL / ENOTSOCK → server socket is gone, exit
+                os_log(.error, "[AgentSocket] accept() fatal errno=%d, server stopping", err)
                 break
             }
             // Suppress SIGPIPE immediately — if the client disconnects before we respond,
             // send() returns EPIPE instead of killing the process.
             var on: Int32 = 1
             setsockopt(clientFD, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
+            // Apply 10s recv timeout so a stuck client can't keep the fd open forever.
+            var tv = timeval(tv_sec: 10, tv_usec: 0)
+            setsockopt(clientFD, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
             // Handle each connection on a separate thread so accept() loop keeps running
             DispatchQueue.global(qos: .userInitiated).async {
                 self.handleConnection(clientFD)
             }
         }
+        close(fd)
+        unlink(socketPath)
     }
 
     // MARK: - Connection handler
 
+    /// Hard cap on a single message — agents send a JSON line per request.
+    /// Anything larger is malformed or malicious; drop the connection.
+    private static let maxMessageBytes = 64 * 1024
+
     private nonisolated func handleConnection(_ fd: Int32) {
-        // Read all data until EOF
+        // Read all data until newline / EOF, with size cap and timeout safety.
         var data = Data()
         var buf = [UInt8](repeating: 0, count: 4096)
         while true {
             let n = recv(fd, &buf, buf.count, 0)
             if n <= 0 { break }
             data.append(contentsOf: buf[..<n])
+            if data.count > Self.maxMessageBytes {
+                os_log(.error, "[AgentSocket] Message exceeds cap (%d bytes), closing fd=%d", data.count, fd)
+                close(fd)
+                return
+            }
             if data.contains(0x0A) { break } // newline = end of message
         }
 

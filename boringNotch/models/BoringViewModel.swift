@@ -9,9 +9,13 @@ import Combine
 import Defaults
 import SwiftUI
 
+@MainActor
 class BoringViewModel: NSObject, ObservableObject {
-    @ObservedObject var coordinator = BoringViewCoordinator.shared
-    @ObservedObject var detector = FullscreenMediaDetector.shared
+    // Plain references — `@ObservedObject` only triggers SwiftUI invalidation
+    // inside a `View` and silently does nothing on an NSObject. These are kept
+    // as bare `let`s so the intent is clear.
+    let coordinator = BoringViewCoordinator.shared
+    let detector = FullscreenMediaDetector.shared
 
     let animationLibrary: BoringAnimations = .init()
     let animation: Animation?
@@ -41,9 +45,9 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var isCameraExpanded: Bool = false
     @Published var isRequestingAuthorization: Bool = false
     
-    deinit {
-        destroy()
-    }
+    // No deinit needed — each AnyCancellable cancels itself when deallocated.
+    // `destroy()` is available for callers that want to force teardown earlier
+    // (e.g. when the associated window closes before the VM is released).
 
     func destroy() {
         cancellables.forEach { $0.cancel() }
