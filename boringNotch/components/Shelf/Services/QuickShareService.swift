@@ -171,6 +171,11 @@ private class SharingServiceDelegate: NSObject {}
                 await shareFilesOrText([text], using: shareProvider, from: view)
             } else {
                 if let tempTextURL = await TemporaryFileStorageService.shared.createTempFile(for: .text(text)) {
+                    // Keep temp file alive until shareFilesOrText returns — the
+                    // sharing picker/service reads the file before this awaits
+                    // (NSSharingService loads data synchronously from a URL
+                    // before showing the animation), so it is safe to clean up
+                    // as soon as the async call resolves (success or cancel).
                     await shareFilesOrText([tempTextURL], using: shareProvider, from: view)
                     TemporaryFileStorageService.shared.removeTemporaryFileIfNeeded(at: tempTextURL)
                 } else {

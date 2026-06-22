@@ -17,6 +17,8 @@ final class ShelfPersistenceService {
     private let fileURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let ioQueue = DispatchQueue(label: "com.local.seven-island.shelf-io", qos: .utility)
+    private var saveDebounce: DispatchWorkItem?
 
     private init() {
         let fm = FileManager.default
@@ -71,11 +73,24 @@ final class ShelfPersistenceService {
     }
 
     func save(_ items: [ShelfItem]) {
-        do {
-            let data = try encoder.encode(items)
-            try data.write(to: fileURL, options: Data.WritingOptions.atomic)
-        } catch {
-            print("Failed to save shelf items: \(error.localizedDescription)")
+        // Debounce: a drag-reorder or burst of edits can call `save` many times
+        // in a row. Coalesce them and write off the main thread. Use a fresh
+        // encoder per write — JSONEncoder is not safe for concurrent use.
+        saveDebounce?.cancel()
+        let snapshot = items
+        let url = fileURL
+        let work = DispatchWorkItem {
+            let enc = JSONEncoder()
+            enc.outputFormatting = [.prettyPrinted]
+            enc.dateEncodingStrategy = .iso8601
+            do {
+                let data = try enc.encode(snapshot)
+                try data.write(to: url, options: Data.WritingOptions.atomic)
+            } catch {
+                print("Failed to save shelf items: \(error.localizedDescription)")
+            }
         }
+        saveDebounce = work
+        ioQueue.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 }
