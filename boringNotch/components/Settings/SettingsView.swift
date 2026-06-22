@@ -50,6 +50,9 @@ struct SettingsView: View {
                 NavigationLink(value: "VS Code") {
                     Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
+                NavigationLink(value: "Claude Gateway") {
+                    Label("Claude 网关", systemImage: "network")
+                }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
                 // }
@@ -81,6 +84,8 @@ struct SettingsView: View {
                     ClipboardSettingsView()
                 case "VS Code":
                     VSCodeSettingsView()
+                case "Claude Gateway":
+                    GatewaySettingsView()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":

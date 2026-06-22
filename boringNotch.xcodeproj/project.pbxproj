@@ -20,10 +20,16 @@
 		7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000F000000000000000F /* MenuBarItemMonitor.swift */; };
 		7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MenuBarItemsView.swift */; };
 		7E1001110000000000000011 /* HooksActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000110000000000000011 /* HooksActivityModels.swift */; };
+		7ECDA1010000000000000001 /* GatewayProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDA0010000000000000001 /* GatewayProvider.swift */; };
+		7ECDA1020000000000000002 /* GatewayProviderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDA0020000000000000002 /* GatewayProviderService.swift */; };
+		7ECDA1030000000000000003 /* GatewaySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECDA0030000000000000003 /* GatewaySettingsView.swift */; };
 		7E1001170000000000070 /* PermissionPolicyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000170000000000070 /* PermissionPolicyStore.swift */; };
 		7E1001160000000000060 /* PermissionTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000160000000000060 /* PermissionTarget.swift */; };
 		7E1001120000000000000012 /* HooksActivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000120000000000000012 /* HooksActivityService.swift */; };
 		7E1001150000000000000015 /* AgentSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000150000000000000015 /* AgentSocketServer.swift */; };
+		7EFE0001000000000000DEAD /* ClaudeGatewayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFE0001000000000000DEAE /* ClaudeGatewayService.swift */; };
+		7EFE0002000000000000DEAD /* GatewayMessagesHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFE0002000000000000DEAE /* GatewayMessagesHandler.swift */; };
+		7EFE0003000000000000DEAD /* ClaudeDesktopExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFE0003000000000000DEAE /* ClaudeDesktopExporter.swift */; };
 		7E1001130000000000000013 /* HooksActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* HooksActivityView.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
@@ -146,6 +152,7 @@
 		B18654392C6F4990000B926A /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = B18654382C6F4990000B926A /* KeyboardShortcuts */; };
 		B186543C2C6F49AE000B926A /* ShortcutConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B186543B2C6F49AE000B926A /* ShortcutConstants.swift */; };
 		B19016222CC15B3D00E3F12E /* Defaults in Frameworks */ = {isa = PBXBuildFile; productRef = B19016212CC15B3D00E3F12E /* Defaults */; };
+		7EFB000100000000000000DD /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = 7EFB000300000000000000DD /* Hummingbird */; };
 		B19016242CC15B5000E3F12E /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19016232CC15B4D00E3F12E /* Constants.swift */; };
 		B19424092CD0FF01003E5DC2 /* LottieAnimationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B19424082CD0FEFE003E5DC2 /* LottieAnimationView.swift */; };
 		B1A78C822C8BA08100BD51B0 /* FullscreenMediaDetection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A78C812C8BA08100BD51B0 /* FullscreenMediaDetection.swift */; };
@@ -214,10 +221,16 @@
 		7E10000F000000000000000F /* MenuBarItemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemMonitor.swift; sourceTree = "<group>"; };
 		7E1000100000000000000010 /* MenuBarItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemsView.swift; sourceTree = "<group>"; };
 		7E1000110000000000000011 /* HooksActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityModels.swift; sourceTree = "<group>"; };
+		7ECDA0010000000000000001 /* GatewayProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProvider.swift; sourceTree = "<group>"; };
+		7ECDA0020000000000000002 /* GatewayProviderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProviderService.swift; sourceTree = "<group>"; };
+		7ECDA0030000000000000003 /* GatewaySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySettingsView.swift; sourceTree = "<group>"; };
 		7E1000170000000000070 /* PermissionPolicyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionPolicyStore.swift; sourceTree = "<group>"; };
 		7E1000160000000000060 /* PermissionTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionTarget.swift; sourceTree = "<group>"; };
 		7E1000120000000000000012 /* HooksActivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityService.swift; sourceTree = "<group>"; };
 		7E1000150000000000000015 /* AgentSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSocketServer.swift; sourceTree = "<group>"; };
+		7EFE0001000000000000DEAE /* ClaudeGatewayService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeGatewayService.swift; sourceTree = "<group>"; };
+		7EFE0002000000000000DEAE /* GatewayMessagesHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayMessagesHandler.swift; sourceTree = "<group>"; };
+		7EFE0003000000000000DEAE /* ClaudeDesktopExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeDesktopExporter.swift; sourceTree = "<group>"; };
 		7E1000130000000000000013 /* HooksActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityView.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
@@ -391,6 +404,7 @@
 				B19016222CC15B3D00E3F12E /* Defaults in Frameworks */,
 				111BE95D2ECD71E10079DD4E /* AsyncXPCConnection in Frameworks */,
 				B1628B922CC260C0003D8DF3 /* SwiftUIIntrospect in Frameworks */,
+				7EFB000100000000000000DD /* Hummingbird in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -565,6 +579,7 @@
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
 				7E10000E000000000000000E /* MenuBarProxyItem.swift */,
 				7E1000110000000000000011 /* HooksActivityModels.swift */,
+				7ECDA0010000000000000001 /* GatewayProvider.swift */,
 				7E1000160000000000060 /* PermissionTarget.swift */,
 			);
 			path = Models;
@@ -580,6 +595,10 @@
 				7E1000120000000000000012 /* HooksActivityService.swift */,
 				7E1000170000000000070 /* PermissionPolicyStore.swift */,
 				7E1000150000000000000015 /* AgentSocketServer.swift */,
+				7ECDA0020000000000000002 /* GatewayProviderService.swift */,
+				7EFE0001000000000000DEAE /* ClaudeGatewayService.swift */,
+				7EFE0002000000000000DEAE /* GatewayMessagesHandler.swift */,
+				7EFE0003000000000000DEAE /* ClaudeDesktopExporter.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -593,6 +612,7 @@
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 				7E1000130000000000000013 /* HooksActivityView.swift */,
+				7ECDA0030000000000000003 /* GatewaySettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -905,6 +925,7 @@
 				111BEA502ECFBF7F0079DD4E /* MacroVisionKit */,
 				111BEA5E2ED07A340079DD4E /* MacroVisionKit */,
 				111BEA6E2ED166E20079DD4E /* MacroVisionKit */,
+				7EFB000300000000000000DD /* Hummingbird */,
 			);
 			productName = dynamicNotch;
 			productReference = 14CEF4122C5CAED300855D72 /* boringNotch.app */;
@@ -950,6 +971,7 @@
 				11F748712EC9DA9300F841DB /* XCRemoteSwiftPackageReference "lottie-spm" */,
 				111BE95B2ECD71E10079DD4E /* XCRemoteSwiftPackageReference "AsyncXPCConnection" */,
 				111BEA6D2ED166E20079DD4E /* XCRemoteSwiftPackageReference "MacroVisionKit" */,
+				7EFB000200000000000000DD /* XCRemoteSwiftPackageReference "hummingbird" */,
 			);
 			productRefGroup = 14CEF4132C5CAED300855D72 /* Products */;
 			projectDirPath = "";
@@ -1013,7 +1035,13 @@
 				7E1001160000000000060 /* PermissionTarget.swift in Sources */,
 				7E1001120000000000000012 /* HooksActivityService.swift in Sources */,
 				7E1001150000000000000015 /* AgentSocketServer.swift in Sources */,
+				7EFE0001000000000000DEAD /* ClaudeGatewayService.swift in Sources */,
+				7EFE0002000000000000DEAD /* GatewayMessagesHandler.swift in Sources */,
+				7EFE0003000000000000DEAD /* ClaudeDesktopExporter.swift in Sources */,
 				7E1001130000000000000013 /* HooksActivityView.swift in Sources */,
+				7ECDA1010000000000000001 /* GatewayProvider.swift in Sources */,
+				7ECDA1020000000000000002 /* GatewayProviderService.swift in Sources */,
+				7ECDA1030000000000000003 /* GatewaySettingsView.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
@@ -1546,6 +1574,14 @@
 				minimumVersion = 9.0.2;
 			};
 		};
+		7EFB000200000000000000DD /* XCRemoteSwiftPackageReference "hummingbird" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hummingbird-project/hummingbird";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1606,6 +1642,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B19016202CC15B3D00E3F12E /* XCRemoteSwiftPackageReference "Defaults" */;
 			productName = Defaults;
+		};
+		7EFB000300000000000000DD /* Hummingbird */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7EFB000200000000000000DD /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = Hummingbird;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
