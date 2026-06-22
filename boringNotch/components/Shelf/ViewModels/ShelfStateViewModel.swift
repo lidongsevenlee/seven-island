@@ -90,23 +90,32 @@ final class ShelfStateViewModel: ObservableObject {
     }
 
     func cleanupInvalidItems() {
-        Task { [weak self] in
-            guard let self else { return }
-            var keep: [ShelfItem] = []
-            for item in self.items {
-                switch item.kind {
-                case .file(let data):
-                    let bookmark = Bookmark(data: data)
-                    if await bookmark.validate() {
-                        keep.append(item)
-                    } else {
-                        item.cleanupStoredData()
-                    }
-                default:
-                    keep.append(item)
+        // Walk the bookmarks off the main actor — accessSecurityScopedResource +
+        // FileManager.fileExists on every shelf item can stall the UI for a long
+        // shelf. Snapshot (id, bookmarkData) pairs on main, validate on a
+        // background task, then publish the filtered result back to main.
+        struct FileEntry: Sendable { let id: ShelfItem.ID; let data: Data }
+        let fileEntries: [FileEntry] = items.compactMap { item in
+            if case .file(let data) = item.kind { return FileEntry(id: item.id, data: data) }
+            return nil
+        }
+        Task.detached(priority: .utility) { [weak self] in
+            var droppedIDs: [ShelfItem.ID] = []
+            for entry in fileEntries {
+                let bookmark = Bookmark(data: entry.data)
+                if await !bookmark.validate() {
+                    droppedIDs.append(entry.id)
                 }
             }
-            await MainActor.run { self.items = keep }
+            guard !droppedIDs.isEmpty else { return }
+            await MainActor.run {
+                guard let self else { return }
+                let removed = Set(droppedIDs)
+                for item in self.items where removed.contains(item.id) {
+                    item.cleanupStoredData()
+                }
+                self.items = self.items.filter { !removed.contains($0.id) }
+            }
         }
     }
 

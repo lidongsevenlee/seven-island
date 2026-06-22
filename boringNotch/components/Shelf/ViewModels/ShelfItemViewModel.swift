@@ -19,6 +19,13 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
+    /// Cached derived properties so SwiftUI body re-evaluations don't keep
+    /// resolving bookmarks / hitting disk for every redraw of the shelf.
+    /// `ShelfItem.displayName` and `.icon` both perform synchronous I/O
+    /// (bookmark resolve + NSWorkspace.icon(forFile:) / Data(contentsOf:));
+    /// resolving them once per ViewModel lifetime is enough.
+    @Published private(set) var displayName: String
+    @Published private(set) var fallbackIcon: NSImage
     private var sharingLifecycle: SharingLifecycleDelegate?
     private var quickShareLifecycle: SharingLifecycleDelegate?
     private var sharingAccessingURLs: [URL] = []
@@ -28,8 +35,19 @@ final class ShelfItemViewModel: ObservableObject {
 
     init(item: ShelfItem) {
         self.item = item
+        self.displayName = item.displayName
+        self.fallbackIcon = item.icon
         self.draftTitle = item.displayName
         Task { await loadThumbnail() }
+    }
+
+    /// Recompute the cached display name + icon after an external mutation
+    /// (e.g. bookmark refresh, rename). Cheap to call but still synchronous
+    /// I/O — callers shouldn't trigger this on every frame.
+    func refreshCachedMetadata() {
+        displayName = item.displayName
+        fallbackIcon = item.icon
+        draftTitle = item.displayName
     }
 
     var isSelected: Bool { selection.isSelected(item.id) }

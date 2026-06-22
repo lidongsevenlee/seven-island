@@ -219,10 +219,11 @@ private extension ShelfItemKind {
 
 private extension ShelfItem {
     func resolvedContext(for bookmarkData: Data) -> (url: URL, bookmark: Data)? {
+        // Resolve once — `bookmark.refreshedData` would re-invoke `resolve()`
+        // and pay the cost of `URL(resolvingBookmarkData:)` twice per call.
         let bookmark = Bookmark(data: bookmarkData)
-        if let url = bookmark.resolveURL() {
-            return (url, bookmark.refreshedData ?? bookmarkData)
-        }
-        return nil
+        let result = bookmark.resolve()
+        guard let url = result.url else { return nil }
+        return (url, result.refreshedData ?? bookmarkData)
     }
 }
