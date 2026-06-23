@@ -26,6 +26,27 @@ private let osLogger = os.Logger(
 )
 
 enum GatewayMessagesHandler {
+    // MARK: - Upstream URLSession
+    //
+    // 转发不能用 URLSession.shared —— 它的默认 timeoutIntervalForRequest 是 60s，
+    // 语义是"两段数据之间最多等多久"。Claude 复杂请求（长 thinking + 长输出）
+    // 首字节经常 >60s 才到，shared session 会主动抛 NSURLErrorTimedOut，被下面的
+    // catch 转成 502「下游请求失败」—— 这就是 cc-switch（reqwest 默认无请求超时）
+    // 不超时、本网关超时的根因。
+    //
+    // 这里建一个专用 session 把超时放宽到对齐 reqwest 的"基本不限"：
+    //   - timeoutIntervalForRequest  = 600s：容忍下游长时间 thinking 不吐数据
+    //   - timeoutIntervalForResource = 3600s：单个请求的硬上限兜底（防永久挂起）
+    //   - waitsForConnectivity = true：临时断网时等待而非立刻失败
+    private static let upstreamSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 600
+        config.timeoutIntervalForResource = 3600
+        config.waitsForConnectivity = true
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
+
     /// 入口：注册到 router.post("/v1/messages")
     static func handle(_ request: Request, context: some RequestContext) async throws -> Response {
         // 1. 取激活 provider（跨 actor 调用 —— MainActor）
@@ -161,7 +182,7 @@ enum GatewayMessagesHandler {
     private static func bufferResponse(upstream: URLRequest) async throws -> Response {
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await URLSession.shared.data(for: upstream)
+            (data, response) = try await upstreamSession.data(for: upstream)
         } catch {
             osLogger.error("upstream network error: \(error.localizedDescription, privacy: .public)")
             return errorResponse(
@@ -195,7 +216,7 @@ enum GatewayMessagesHandler {
     private static func streamResponse(upstream: URLRequest) async throws -> Response {
         let (asyncBytes, response): (URLSession.AsyncBytes, URLResponse)
         do {
-            (asyncBytes, response) = try await URLSession.shared.bytes(for: upstream)
+            (asyncBytes, response) = try await upstreamSession.bytes(for: upstream)
         } catch {
             osLogger.error("upstream stream error: \(error.localizedDescription, privacy: .public)")
             return errorResponse(

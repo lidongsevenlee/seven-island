@@ -11,7 +11,10 @@ APP_NAME="Seven Island"
 BUNDLE_ID="com.local.seven-island"
 APP_BUNDLE="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
 
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+# 旧版 pkill -x "$APP_NAME" 有两个问题：进程名 "Seven Island" 含空格匹配不到，
+# 且 GUI 进程会忽略默认的 SIGTERM。改用 -f 匹配完整 bundle 路径（覆盖主程序 +
+# XPCServices/BoringNotchXPCHelper），并用 -9 (SIGKILL) 确保旧实例真正退出。
+pkill -9 -f "$APP_BUNDLE" >/dev/null 2>&1 || true
 
 xcodebuild \
   -project "$PROJECT_PATH" \
