@@ -114,14 +114,26 @@ jobs:
         if: steps.check-key.outputs.available == 'true'
         run: |
           git fetch origin main
-          # Stash appcast changes before switching branches — the file was
-          # modified by the Sparkle step above while checked out at the tag
-          # (detached HEAD), so a plain `git checkout main` would fail.
-          git stash push -- updater/appcast.xml
-          git checkout main
-          git stash pop
+          # Branch from origin/main — not from the tag — so the commit lands
+          # cleanly on top of whatever previous release cycles may have appended.
+          git checkout -B appcast-update origin/main
+          # Re-run the signing script against origin/main's appcast so all
+          # prior entries are preserved (stash-pop was conflict-prone when a
+          # previous release had already appended entries not present locally).
+          python3 -m venv build/sign-venv
+          source build/sign-venv/bin/activate
+          pip install -q cryptography
+          python3 .github/workflows/scripts/update-appcast.py \
+            "updater/appcast.xml" \
+            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.build }}" \
+            "${{ steps.tag.outputs.tag }}" \
+            "${{ github.repository }}"
           git config user.name "$GIT_USER"
           git config user.email "$GIT_EMAIL"
           git add updater/appcast.xml
           git commit -m "Update appcast for ${{ steps.tag.outputs.tag }}" || echo "No changes to commit"
-          git push
+          git push origin appcast-update:main
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
