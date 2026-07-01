@@ -31,9 +31,29 @@ final class VSCodeRecentProjectsService: ObservableObject {
         // large home directories. Run it on a userInitiated queue and publish
         // the result back to main when ready.
         let directory = Self.effectiveProjectsDirectoryURL()
+        let pinned = Defaults[.vscodePinnedFolders]
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
-            let loaded = self.loadProjects(from: directory, includeMissing: includeMissing, limit: .max)
+            var loaded = self.loadProjects(from: directory, includeMissing: includeMissing, limit: .max)
+            var seen = Set(loaded.map { $0.id })
+
+            // 独立文件夹：直接作为项目列入，不参与深度扫描
+            for url in pinned {
+                let standardized = url.standardizedFileURL
+                guard seen.insert(standardized.path).inserted else { continue }
+                var isDirectory: ObjCBool = false
+                let exists = FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory) && isDirectory.boolValue
+                guard includeMissing || exists else { continue }
+                loaded.append(VSCodeProjectItem(url: standardized, exists: exists))
+            }
+
+            loaded.sort { lhs, rhs in
+                let lhDate = lhs.lastSeenAt
+                    ?? ((try? lhs.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+                let rhDate = rhs.lastSeenAt
+                    ?? ((try? rhs.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+                return lhDate > rhDate
+            }
             DispatchQueue.main.async {
                 self.projects = loaded
             }
@@ -80,10 +100,15 @@ final class VSCodeRecentProjectsService: ObservableObject {
     private func collectProjects(from directory: URL, maxDepth: Int, currentDepth: Int = 0) -> [URL] {
         guard currentDepth < maxDepth else { return [] }
 
+        var options: FileManager.DirectoryEnumerationOptions = []
+        if !Defaults[.vscodeIncludeHidden] {
+            options.insert(.skipsHiddenFiles)
+        }
+
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
+            options: options
         )) ?? []
 
         var result: [URL] = []

@@ -2,10 +2,11 @@ import Defaults
 import SwiftUI
 
 struct VSCodeProjectsView: View {
-    @ObservedObject private var service = VSCodeRecentProjectsService.shared
+@ObservedObject private var service = VSCodeRecentProjectsService.shared
     @EnvironmentObject private var vm: BoringViewModel
     @Default(.vscodeProjectsDirectory) private var vscodeProjectsDirectory
     @State private var searchText = ""
+
     @FocusState private var isSearchFocused: Bool
 
     private var emptyMessage: String {
@@ -14,7 +15,6 @@ struct VSCodeProjectsView: View {
         }
         return "\(vscodeProjectsDirectory) 中没有文件夹"
     }
-
     private var filteredProjects: [VSCodeProjectItem] {
         guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
             return service.projects
