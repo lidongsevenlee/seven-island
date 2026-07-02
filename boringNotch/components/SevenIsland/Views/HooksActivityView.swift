@@ -2,7 +2,7 @@
 //  HooksActivityView.swift
 //  boringNotch
 //
-//  Claude Code session list — shows sessions in the current project directory,
+//  Claude Code / Codex session list — shows sessions grouped by agent,
 //  with live status (idle / working / blocked / ended).
 //
 
@@ -12,39 +12,73 @@ struct HooksActivityView: View {
     @ObservedObject private var service = HooksActivityService.shared
     @EnvironmentObject private var vm: BoringViewModel
 
+    @State private var activeFilter: SessionFilter = .all
+
+    private enum SessionFilter: String, CaseIterable, Identifiable {
+        case all, claude, codex, opencode
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all:      return "全部"
+            case .claude:   return "Claude"
+            case .codex:    return "Codex"
+            case .opencode: return "OpenCode"
+            }
+        }
+    }
+
+    private var filteredSessions: [HookSession] {
+        switch activeFilter {
+        case .all:      return service.filteredSessions
+        case .claude:   return service.filteredSessions.filter { $0.platform == .claude }
+        case .codex:    return service.filteredSessions.filter { $0.platform == .codex }
+        case .opencode: return service.filteredSessions.filter { $0.platform == .opencode }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // ── Header ──────────────────────────────────────────────────────
             HStack(spacing: 5) {
-                ClaudeStarLogo()
-                    .fill(.secondary)
-                    .frame(width: 10, height: 10)
-                Text("Claude Code 会话")
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Text("Agent 会话")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                 Spacer()
-                Text("\(service.filteredSessions.count) 个项目")
+                Text("\(filteredSessions.count) 个")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                 Button {
                     service.clearLog()
                 } label: {
-                    Text("清除")
+                    Image(systemName: "trash")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .help("清除日志")
             }
             .padding(.horizontal, 12)
             .padding(.top, 2)
 
+            // ── Filter pills ───────────────────────────────────────────────
+            HStack(spacing: 6) {
+                ForEach(SessionFilter.allCases) { filter in
+                    filterPill(filter)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+
             // ── Content ─────────────────────────────────────────────────────
-            if service.filteredSessions.isEmpty {
+            if filteredSessions.isEmpty {
                 emptyState
             } else {
                 ScrollView {
                     LazyVStack(spacing: 5) {
-                        ForEach(service.filteredSessions) { session in
+                        ForEach(filteredSessions) { session in
                             SessionCard(session: session)
                         }
                     }
@@ -58,13 +92,49 @@ struct HooksActivityView: View {
         .preferredColorScheme(.dark)
     }
 
+    // MARK: - Filter pill
+
+    @ViewBuilder
+    private func filterPill(_ filter: SessionFilter) -> some View {
+        let isActive = activeFilter == filter
+        let count: Int = {
+            switch filter {
+            case .all:      return service.filteredSessions.count
+            case .claude:   return service.filteredSessions.filter { $0.platform == .claude }.count
+            case .codex:    return service.filteredSessions.filter { $0.platform == .codex }.count
+            case .opencode: return service.filteredSessions.filter { $0.platform == .opencode }.count
+            }
+        }()
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { activeFilter = filter }
+        } label: {
+            HStack(spacing: 3) {
+                Text(filter.label)
+                    .font(.system(size: 10, weight: .medium))
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 9))
+                        .foregroundStyle(isActive ? Color.white.opacity(0.8) : .secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                isActive ? Color.white.opacity(0.18) : Color.white.opacity(0.06),
+                in: Capsule()
+            )
+            .foregroundStyle(isActive ? Color.white : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
     private var emptyState: some View {
         VStack(spacing: 6) {
             Spacer(minLength: 10)
             Image(systemName: "person.slash")
                 .font(.system(size: 22))
                 .foregroundStyle(.tertiary)
-            Text("当前项目暂无 Claude Code 会话")
+            Text("当前项目暂无 Agent 会话")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             if let cwd = service.currentProjectCwd {
@@ -87,11 +157,13 @@ private struct SessionCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            // Row 1: cwd name + status dot + status label | duration + model
+            // Row 1: platform brand Shape + cwd name + status dot + status label | duration + model
             HStack(spacing: 5) {
-                Image(systemName: "folder.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                // Platform brand glyph in its accent color
+                session.platform.brandIconShape
+                    .fill(platformAccent)
+                    .frame(width: 11, height: 11)
+                    .frame(width: 12, alignment: .center)
                 Text(session.cwdBasename)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
@@ -122,11 +194,12 @@ private struct SessionCard: View {
                     .truncationMode(.tail)
             }
 
-            // Row 3: AI reply
+            // Row 3: AI reply — platform brand Shape variant with darker fill
             HStack(spacing: 4) {
-                ClaudeStarLogo()
-                    .fill(.secondary)
+                session.platform.brandIconShape
+                    .fill(platformAccent.opacity(0.7))
                     .frame(width: 9, height: 9)
+                    .frame(width: 12, alignment: .center)
                 Text(session.lastAssistantMessage ?? "—")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.8))
@@ -156,6 +229,16 @@ private struct SessionCard: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(platformAccent.opacity(0.18), lineWidth: 0.6)
+        )
+    }
+
+    // Brand-derived accent for each platform
+    private var platformAccent: Color {
+        let rgb = session.platform.brandColorRGB
+        return Color(red: rgb.0, green: rgb.1, blue: rgb.2)
     }
 
     private var statusTextColor: Color {
@@ -170,7 +253,7 @@ private struct SessionCard: View {
     private var cardBackground: Color {
         switch session.status {
         case .idle:    return Color.white.opacity(0.07)
-        case .working: return Color.blue.opacity(0.08)
+        case .working: return platformAccent.opacity(0.10)
         case .blocked: return Color.orange.opacity(0.08)
         case .ended:   return Color.white.opacity(0.04)
         }

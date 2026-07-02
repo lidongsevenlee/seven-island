@@ -187,6 +187,16 @@ extension Defaults.Keys {
     static let vscodePinnedFolders = Key<[URL]>("vscodePinnedFolders", default: [])
     static let vscodeIncludeHidden = Key<Bool>("vscodeIncludeHidden", default: false)
     static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
+
+    // Agent (Claude Code / Codex / OpenCode) hooks integration
+    static let agentHookClaudeEnabled        = Key<Bool>("agentHookClaudeEnabled", default: false)
+    static let agentHookCodexEnabled         = Key<Bool>("agentHookCodexEnabled", default: false)
+    static let agentHookOpenCodeEnabled      = Key<Bool>("agentHookOpenCodeEnabled", default: false)
+    static let agentHookPermissionIntercept  = Key<Bool>("agentHookPermissionIntercept", default: true)
+    static let agentHookPermissionTimeout    = Key<Int>("agentHookPermissionTimeout", default: 60)
+    static let agentHookDidPromptClaude      = Key<Bool>("agentHookDidPromptClaude", default: false)
+    static let agentHookDidPromptCodex       = Key<Bool>("agentHookDidPromptCodex", default: false)
+    static let agentHookDidPromptOpenCode    = Key<Bool>("agentHookDidPromptOpenCode", default: false)
     
     // Helper to determine the default media controller based on NowPlaying deprecation status
     static var defaultMediaController: MediaControllerType {

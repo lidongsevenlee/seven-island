@@ -59,7 +59,7 @@ struct BoringHeader: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        // Claude Code tab
+                        // Agent (Claude / Codex / OpenCode) tab
                         Button(action: {
                             coordinator.currentView = .hooksActivity
                         }) {
@@ -67,17 +67,18 @@ struct BoringHeader: View {
                                 .fill(Color(nsColor: .secondarySystemFill).opacity(isClaudeHovered || coordinator.currentView == .hooksActivity ? 1 : 0))
                                 .frame(width: 24, height: 24)
                                 .overlay {
-                                    ClaudeStarLogo()
-                                        .fill(
+                                    Image(systemName: "antenna.radiowaves.left.and.right")
+                                        .symbolRenderingMode(.hierarchical)
+                                        .foregroundStyle(
                                             coordinator.currentView == .hooksActivity
                                             ? .white
                                             : .gray.opacity(isClaudeHovered ? 0.98 : 0.82)
                                         )
-                                        .frame(width: 12, height: 12)
+                                        .font(.system(size: 12, weight: .medium))
                                 }
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .help("Claude")
+                        .help("Agent 会话")
                         .onHover { hovering in
                             isClaudeHovered = hovering
                         }

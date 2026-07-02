@@ -20,6 +20,7 @@ struct HookEvent: Identifiable, Codable {
     let summary: String?
     let model: String?           // populated on SessionStart
     let parentSessionId: String? // non-nil means this is a sub-agent session
+    let platform: String?         // "claude" or "codex"
 
     enum CodingKeys: String, CodingKey {
         case ts, event
@@ -28,6 +29,15 @@ struct HookEvent: Identifiable, Codable {
         case toolName = "tool_name"
         case summary, model
         case parentSessionId = "parent_session_id"
+        case platform
+    }
+
+    var agentPlatform: AgentPlatform {
+        switch platform?.lowercased() {
+        case "codex":    return .codex
+        case "opencode": return .opencode
+        default:         return .claude
+        }
     }
 }
 
@@ -68,6 +78,7 @@ struct HookSession: Identifiable {
     var lastUserPrompt: String?        // most recent UserPromptSubmit.summary
     var lastAssistantMessage: String?  // most recent Stop.summary
     var notableEvents: [HookEvent]     // PermissionRequest / Notification / StopFailure
+    var platform: AgentPlatform         // source agent
 
     // MARK: Computed
 
@@ -86,12 +97,26 @@ struct HookSession: Identifiable {
     }
 
     var modelShort: String {
-        guard let m = model else { return "—" }
-        // Strip common prefixes for display: "claude-opus-4-8" → "Opus 4.8"
-        let cleaned = m
-            .replacingOccurrences(of: "claude-", with: "")
-            .replacingOccurrences(of: "auto-std", with: "Auto")
-            .replacingOccurrences(of: "auto-", with: "")
-        return cleaned.isEmpty ? m : cleaned
+        switch platform {
+        case .codex:
+            guard let m = model, !m.isEmpty else { return "Codex" }
+            return m.uppercased()
+        case .opencode:
+            guard let m = model, !m.isEmpty else { return "OpenCode" }
+            return m
+        case .claude:
+            guard let m = model else { return "—" }
+            let cleaned = m
+                .replacingOccurrences(of: "claude-", with: "")
+                .replacingOccurrences(of: "auto-std", with: "Auto")
+                .replacingOccurrences(of: "auto-", with: "")
+            return cleaned.isEmpty ? m : cleaned
+        }
     }
+
+    /// Short display name for the platform ("Claude" / "Codex" / "OpenCode")
+    var platformLabel: String { platform.displayName }
+
+    /// SF Symbol identifier used as the brand glyph
+    var platformIconName: String { platform.iconName }
 }

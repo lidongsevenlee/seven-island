@@ -31,6 +31,11 @@
 		7EFE0002000000000000DEAD /* GatewayMessagesHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFE0002000000000000DEAE /* GatewayMessagesHandler.swift */; };
 		7EFE0003000000000000DEAD /* ClaudeDesktopExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EFE0003000000000000DEAE /* ClaudeDesktopExporter.swift */; };
 		7E1001130000000000000013 /* HooksActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* HooksActivityView.swift */; };
+		7EAA1B002000000000000001 /* seven-island-hook.sh in Resources */ = {isa = PBXBuildFile; fileRef = 7EAA10020000000000000001 /* seven-island-hook.sh */; };
+		7EAA1B002100000000000002 /* HookRegistrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EAA100201000000000000002 /* HookRegistrationManager.swift */; };
+		7EAA1B002200000000000003 /* AgentIntegrationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EAA100202000000000000003 /* AgentIntegrationSettingsView.swift */; };
+		7EAA1B002300000000000004 /* seven-island-opencode.js in Resources */ = {isa = PBXBuildFile; fileRef = 7EAA100203000000000000004 /* seven-island-opencode.js */; };
+		7EAA1B002400000000000005 /* AgentBrandLogos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EAA100204000000000000005 /* AgentBrandLogos.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
 		1100290C2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */; };
@@ -232,6 +237,11 @@
 		7EFE0002000000000000DEAE /* GatewayMessagesHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayMessagesHandler.swift; sourceTree = "<group>"; };
 		7EFE0003000000000000DEAE /* ClaudeDesktopExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeDesktopExporter.swift; sourceTree = "<group>"; };
 		7E1000130000000000000013 /* HooksActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HooksActivityView.swift; sourceTree = "<group>"; };
+		7EAA10020000000000000001 /* seven-island-hook.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = seven-island-hook.sh; sourceTree = "<group>"; };
+		7EAA100201000000000000002 /* HookRegistrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookRegistrationManager.swift; sourceTree = "<group>"; };
+		7EAA100202000000000000003 /* AgentIntegrationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentIntegrationSettingsView.swift; sourceTree = "<group>"; };
+		7EAA100203000000000000004 /* seven-island-opencode.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = seven-island-opencode.js; sourceTree = "<group>"; };
+		7EAA100204000000000000005 /* AgentBrandLogos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBrandLogos.swift; sourceTree = "<group>"; };
 		1100290B2E847E2800035A57 /* NSItemProvider+LoadHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSItemProvider+LoadHelpers.swift"; sourceTree = "<group>"; };
 		110029262E84FD4C00035A57 /* TemporaryFileStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileStorageService.swift; sourceTree = "<group>"; };
 		110029292E8691B400035A57 /* FileShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileShareView.swift; sourceTree = "<group>"; };
@@ -594,6 +604,7 @@
 				7E10000F000000000000000F /* MenuBarItemMonitor.swift */,
 				7E1000120000000000000012 /* HooksActivityService.swift */,
 				7E1000170000000000070 /* PermissionPolicyStore.swift */,
+				7EAA100201000000000000002 /* HookRegistrationManager.swift */,
 				7E1000150000000000000015 /* AgentSocketServer.swift */,
 				7ECDA0020000000000000002 /* GatewayProviderService.swift */,
 				7EFE0001000000000000DEAE /* ClaudeGatewayService.swift */,
@@ -612,6 +623,8 @@
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 				7E1000130000000000000013 /* HooksActivityView.swift */,
+				7EAA100202000000000000003 /* AgentIntegrationSettingsView.swift */,
+				7EAA100204000000000000005 /* AgentBrandLogos.swift */,
 				7ECDA0030000000000000003 /* GatewaySettingsView.swift */,
 			);
 			path = Views;
@@ -689,6 +702,8 @@
 				B17266E02C6532560031BA0D /* Localizable.xcstrings */,
 				14CEF4192C5CAED400855D72 /* Assets.xcassets */,
 				14A7E5962C65FD31008C1BE9 /* boring.m4a */,
+				7EAA10020000000000000001 /* seven-island-hook.sh */,
+				7EAA100203000000000000004 /* seven-island-opencode.js */,
 				1443E7F42C609E650027C1FC /* Info.plist */,
 				14CEF41E2C5CAED400855D72 /* boringNotch.entitlements */,
 				14CEF41B2C5CAED400855D72 /* Preview Content */,
@@ -1001,6 +1016,8 @@
 				112B0EB92E30DD0F00562D6C /* mediaremote-adapter.pl in Resources */,
 				B17266E12C6532560031BA0D /* Localizable.xcstrings in Resources */,
 				14A7E5972C65FD31008C1BE9 /* boring.m4a in Resources */,
+				7EAA1B002000000000000001 /* seven-island-hook.sh in Resources */,
+				7EAA1B002300000000000004 /* seven-island-opencode.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1039,6 +1056,9 @@
 				7EFE0002000000000000DEAD /* GatewayMessagesHandler.swift in Sources */,
 				7EFE0003000000000000DEAD /* ClaudeDesktopExporter.swift in Sources */,
 				7E1001130000000000000013 /* HooksActivityView.swift in Sources */,
+				7EAA1B002100000000000002 /* HookRegistrationManager.swift in Sources */,
+				7EAA1B002200000000000003 /* AgentIntegrationSettingsView.swift in Sources */,
+				7EAA1B002400000000000005 /* AgentBrandLogos.swift in Sources */,
 				7ECDA1010000000000000001 /* GatewayProvider.swift in Sources */,
 				7ECDA1020000000000000002 /* GatewayProviderService.swift in Sources */,
 				7ECDA1030000000000000003 /* GatewaySettingsView.swift in Sources */,

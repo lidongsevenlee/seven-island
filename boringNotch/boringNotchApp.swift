@@ -357,6 +357,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupHooksNotifications()
         setupGatewayLifecycle()
 
+        // Repair stale hook paths (app moved/updated) and prompt first-launch
+        // integration for Claude Code / Codex if detected.
+        DispatchQueue.global(qos: .utility).async {
+            HookRegistrationManager.repairStalePathsIfNeeded()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.promptAgentHookFirstLaunchIfNeeded()
+        }
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenConfigurationDidChange),
@@ -690,6 +699,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 type: .claudeHook,
                 value: 1
             )
+        }
+    }
+
+    // MARK: - Agent Hook first-launch prompt
+
+    /// Prompt the user once to enable Claude Code / Codex integration when
+    /// their respective config directories (~/.claude / ~/.codex) are detected.
+    private func promptAgentHookFirstLaunchIfNeeded() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        if !Defaults[.agentHookDidPromptClaude] {
+            Defaults[.agentHookDidPromptClaude] = true
+            if FileManager.default.fileExists(atPath: home + "/.claude") {
+                presentAgentHookPrompt(for: .claude)
+            }
+        }
+        if !Defaults[.agentHookDidPromptCodex] {
+            Defaults[.agentHookDidPromptCodex] = true
+            if FileManager.default.fileExists(atPath: home + "/.codex") {
+                presentAgentHookPrompt(for: .codex)
+            }
+        }
+        if !Defaults[.agentHookDidPromptOpenCode] {
+            Defaults[.agentHookDidPromptOpenCode] = true
+            if FileManager.default.fileExists(atPath: home + "/.config/opencode") {
+                presentAgentHookPrompt(for: .opencode)
+            }
+        }
+    }
+
+    private func presentAgentHookPrompt(for platform: AgentPlatform) {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.icon = NSImage(systemSymbolName: "antenna.radiowaves.left.and.right",
+                             accessibilityDescription: nil)
+        alert.messageText = "启用 \(platform.displayName) 集成？"
+        alert.informativeText = "Seven Island 将在 settings 中注册 hook 以接收会话状态事件。可在「设置 → Agent 集成」随时关闭。"
+        alert.addButton(withTitle: "启用")
+        alert.addButton(withTitle: "以后再说")
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+        do {
+            try HookRegistrationManager.install(
+                platform,
+                permissionIntercept: Defaults[.agentHookPermissionIntercept],
+                timeoutSeconds: Defaults[.agentHookPermissionTimeout]
+            )
+            switch platform {
+            case .claude:   Defaults[.agentHookClaudeEnabled]   = true
+            case .codex:    Defaults[.agentHookCodexEnabled]    = true
+            case .opencode: Defaults[.agentHookOpenCodeEnabled] = true
+            }
+        } catch {
+            print("[AgentHook] First-launch install failed (\(platform.rawValue)): \(error.localizedDescription)")
         }
     }
 

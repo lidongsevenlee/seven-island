@@ -53,6 +53,9 @@ struct SettingsView: View {
                 NavigationLink(value: "Claude Gateway") {
                     Label("Claude 网关", systemImage: "network")
                 }
+                NavigationLink(value: "Agent Integration") {
+                    Label("Agent 集成", systemImage: "antenna.radiowaves.left.and.right")
+                }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
                 // }
@@ -86,6 +89,8 @@ struct SettingsView: View {
                     VSCodeSettingsView()
                 case "Claude Gateway":
                     GatewaySettingsView()
+                case "Agent Integration":
+                    AgentIntegrationSettingsView()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":

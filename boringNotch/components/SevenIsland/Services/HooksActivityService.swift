@@ -218,7 +218,8 @@ final class HooksActivityService: ObservableObject {
                 status: .idle,
                 lastUserPrompt: nil,
                 lastAssistantMessage: nil,
-                notableEvents: []
+                notableEvents: [],
+                platform: event.agentPlatform
             )
         }
 
@@ -238,7 +239,8 @@ final class HooksActivityService: ObservableObject {
                         status: .idle,
                         lastUserPrompt: nil,
                         lastAssistantMessage: nil,
-                        notableEvents: []
+                        notableEvents: [],
+                        platform: event.agentPlatform
                     )
                 } else {
                     // update model if we now have it
