@@ -11,11 +11,17 @@ import SwiftUI
 
 // MARK: - SVG path utilities
 
-/// Parses an SVG path `d` string (supports M/L/H/V/C/Z) into a SwiftUI `Path`
-/// and auto-scales/centers the result into `rect`.
+/// Parses an SVG path `d` string (supports M/L/H/V/C/Z + lowercase relative variants)
+/// into a SwiftUI `Path` and auto-scales/centers the result into `rect`.
 func pathFromSVG(_ d: String, in rect: CGRect) -> Path {
     let cmdSet = CharacterSet(charactersIn: "MmLlHhVvCcZz")
-    let tokens = d.components(separatedBy: cmdSet.union(.whitespaces)).filter { !$0.isEmpty }
+    // Split the `d` string into (cmd, args...) segments.
+    // Enumerate the cleaned command letters to match arguments.
+    let cleaned = d
+        .replacingOccurrences(of: ",", with: " ")
+        .replacingOccurrences(of: "-", with: " -")
+    let tokens = cleaned.components(separatedBy: cmdSet.union(.whitespaces))
+        .compactMap { Double($0) }
     let cmds = d.filter { cmdSet.contains($0.unicodeScalars.first!) }
 
     var path = Path()
@@ -25,35 +31,50 @@ func pathFromSVG(_ d: String, in rect: CGRect) -> Path {
 
     func num(_ idx: Int) -> Double? {
         guard idx < tokens.count else { return nil }
-        return Double(tokens[idx])
+        return tokens[idx]
     }
 
     for cmd in cmds {
+        let relative = cmd.isLowercase
         switch cmd {
-        case "M":
+        case "M", "m":
             guard let x = num(i), let y = num(i + 1) else { break }
-            let pt = CGPoint(x: x, y: y)
+            let pt = relative
+                ? CGPoint(x: current.x + x, y: current.y + y)
+                : CGPoint(x: x, y: y)
             path.move(to: pt); start = pt; current = pt; i += 2
-        case "L":
+        case "L", "l":
             guard let x = num(i), let y = num(i + 1) else { break }
-            let pt = CGPoint(x: x, y: y)
+            let pt = relative
+                ? CGPoint(x: current.x + x, y: current.y + y)
+                : CGPoint(x: x, y: y)
             path.addLine(to: pt); current = pt; i += 2
-        case "H":
+        case "H", "h":
             guard let x = num(i) else { break }
-            let pt = CGPoint(x: x, y: current.y)
+            let pt = relative
+                ? CGPoint(x: current.x + x, y: current.y)
+                : CGPoint(x: x, y: current.y)
             path.addLine(to: pt); current = pt; i += 1
-        case "V":
+        case "V", "v":
             guard let y = num(i) else { break }
-            let pt = CGPoint(x: current.x, y: y)
+            let pt = relative
+                ? CGPoint(x: current.x, y: current.y + y)
+                : CGPoint(x: current.x, y: y)
             path.addLine(to: pt); current = pt; i += 1
-        case "C":
+        case "C", "c":
             guard let cx1 = num(i), let cy1 = num(i + 1),
                   let cx2 = num(i + 2), let cy2 = num(i + 3),
                   let x = num(i + 4), let y = num(i + 5) else { break }
-            let pt = CGPoint(x: x, y: y)
-            path.addCurve(to: pt,
-                          control1: CGPoint(x: cx1, y: cy1),
-                          control2: CGPoint(x: cx2, y: cy2))
+            let pt = relative
+                ? CGPoint(x: current.x + x, y: current.y + y)
+                : CGPoint(x: x, y: y)
+            let cp1 = relative
+                ? CGPoint(x: current.x + cx1, y: current.y + cy1)
+                : CGPoint(x: cx1, y: cy1)
+            let cp2 = relative
+                ? CGPoint(x: current.x + cx2, y: current.y + cy2)
+                : CGPoint(x: cx2, y: cy2)
+            path.addCurve(to: pt, control1: cp1, control2: cp2)
             current = pt; i += 6
         case "Z", "z":
             path.closeSubpath()
@@ -118,87 +139,36 @@ struct ClaudeStarLogo: Shape {
     }
 }
 
-// MARK: - Codex (OpenAI hexa-spiral flower)
+// MARK: - Codex (OpenAI blossom)
 
-/// The OpenAI "Nexus" / "flower" mark used by Codex — the iconic six-petal
-/// knotted loop designed by Studio Dumbar.  Path data vectorised from the
-/// brand kit at brand.openai.com; supports the same coordinates Claude's
-/// `pathFromSVG` parser already understands.
+/// The official OpenAI "blossom" / flower mark — the six-petal knotted loop
+/// designed by Studio Dumbar. Path data from openai.com/favicon.svg (180×180 viewBox
+/// with centre at ~90). Supports relative cubic Beziers (`c`) in addition to M/L/C/Z.
 struct CodexSpiralLogo: Shape {
-    // The official OpenAI logo's `d` attribute (from the public SVG at
-    // https://openai.com/brand). All 60+ cubic Bezier segments preserved.
     private static let pathData = """
-    M23.5534 0.630852C27.3575 1.54108 30.5484 4.20202 32.2907 7.97458 \
-    C33.0174 9.57334 33.479 11.3005 33.6509 13.0802C30.0576 13.0194 25.7537 12.3162 \
-    21.6697 10.5406C17.7605 8.83802 14.6587 6.34297 12.2469 3.08759C14.4508 1.00763 17.3131 -0.120681 \
-    20.3228 0.0116986C21.4074 0.0601989 22.4878 0.269587 23.5534 0.630852Z \
-    M31.4486 16.8749C31.7629 18.9176 31.679 21.0495 31.1671 23.1639 \
-    C29.2394 22.8826 27.0589 22.5084 24.8183 21.9937C19.7663 20.8308 15.6437 19.111 12.6192 17.2485 \
-    C12.8363 15.9338 13.2667 14.6518 13.9082 13.4637C16.5851 15.182 19.9804 16.7282 \
-    24.0759 17.7827C26.7294 18.4653 29.2431 18.7557 31.4486 16.8749Z \
-    M30.1547 25.9003C28.9673 28.8594 26.6711 31.0549 23.9206 32.0875 \
-    C23.6399 31.1814 23.3793 30.1994 23.1519 29.1444L23.1517 29.1437C22.7586 27.3078 22.4695 \
-    25.4024 22.272 23.4489C26.1123 24.0178 29.8505 24.1785 33.0062 23.8186C32.2623 24.5932 31.3762 \
-    25.2529 30.1547 25.9003Z \
-    M20.2024 22.9889C20.4147 25.1319 20.7113 27.2181 21.0824 29.2229 \
-    C19.1022 28.5711 17.2781 27.5038 15.7429 26.0964C17.0967 24.9234 18.5544 23.8792 20.2024 22.9889Z \
-    M18.9642 21.4845C17.3772 22.2783 15.9449 23.2342 14.6668 24.3273 \
-    C13.8584 23.2878 13.1978 22.1301 12.7081 20.8885C14.6675 21.4977 16.7554 21.6731 18.9642 \
-    21.4845Z \
-    M11.7671 18.7221C11.6301 18.1076 11.5327 17.4836 11.4747 16.856 \
-    C13.7133 15.8789 16.5479 14.8419 19.9119 14.0063C20.411 13.883 20.9012 13.7686 21.3828 13.6625 \
-    C19.4587 15.1324 17.2772 16.6537 14.9134 18.1824C13.8833 18.8525 12.8352 19.421 11.7671 18.7221Z \
-    M11.3769 14.4549C11.3775 9.73435 13.7002 6.07475 14.5004 5.0076C14.8472 5.48486 15.2824 \
-    6.07514 15.8131 6.74357C13.4889 9.08738 11.9932 12.1314 11.6745 15.4672C11.4626 15.1206 11.3769 \
-    14.7916 11.3769 14.4549Z \
-    M18.9992 13.1946C21.1134 12.6823 23.2155 12.3244 25.2025 12.1088C25.2123 11.6223 25.2171 11.1408 \
-    25.2171 10.6659C25.2171 8.31738 25.0891 6.16504 24.8436 4.22084C20.8467 6.74296 19.1014 9.73381 \
-    18.9992 13.1946Z \
-    M26.5127 12.0079C28.9469 12.0149 31.3884 12.2299 33.7899 12.6689C33.7897 12.7325 33.7853 12.7959 \
-    33.7807 12.8607C33.7161 13.7188 33.5744 14.5587 33.3674 15.3749C30.7833 14.8504 28.1138 14.5294 \
-    25.4077 14.4139C25.8784 13.6356 26.5127 12.0079 26.5127 12.0079Z \
-    M27.0236 11.0887C28.9536 7.50063 28.0604 3.40165 24.1219 0C25.5926 0.829747 26.9149 1.92987 28.0318 \
-    3.27281C29.5924 5.07189 30.6169 7.25537 30.9911 9.57881C29.6924 9.96539 28.3724 10.291 27.0236 \
-    11.0887Z \
-    M33.7988 8.82413C34.4998 12.5324 33.9997 16.381 33.385 20.1629C32.4189 19.4834 31.2269 18.8782 \
-    29.8154 18.379C29.9484 16.8135 29.8328 15.242 29.4711 13.7226C30.9356 13.1999 32.3972 12.6579 \
-    33.7988 8.82413Z \
-    M32.864 25.8085C33.6567 26.0089 34.3576 26.2797 35.0001 26.6157C34.0569 28.9596 32.8366 30.7723 \
-    31.2629 32.0869C31.7918 30.0567 32.0461 27.9515 32.864 25.8085Z \
-    M30.2826 25.3185C29.4769 26.903 28.548 28.2502 27.5236 29.3698C26.0294 29.1629 24.5685 28.7752 \
-    23.1117 28.2402C25.5941 27.5828 28.0236 26.5879 30.2826 25.3185Z \
-    M26.2141 30.0152C24.3026 31.5385 22.1649 32.558 19.9886 33.0666C21.1151 32.2461 22.1389 31.2917 \
-    23.0328 30.2231C24.106 30.2236 25.1701 30.1545 26.2141 30.0152Z \
-    M21.7248 30.1866C20.6807 31.3753 19.4381 32.3096 18.0095 33.0001C17.0525 33.0424 16.0867 32.9649 \
-    15.1482 32.7563C17.8025 32.2448 20.4672 31.2146 23.0041 29.6836C22.6064 29.8659 22.169 30.0363 \
-    21.7248 30.1866Z \
-    M16.4874 32.4143C13.9746 31.5203 11.7256 29.766 10.1976 27.4308C11.6544 27.9235 13.1745 28.2019 \
-    14.7113 28.2561C15.1941 29.8806 15.7626 31.207 16.4874 32.4143Z \
-    M14.7264 27.1087C12.9649 27.0302 11.2155 26.5453 9.59385 25.6657C8.76763 24.4242 8.12211 23.0499 \
-    7.68619 21.5952C9.44707 23.9703 11.769 25.7686 14.5195 26.9902C14.5852 27.027 14.6559 27.0706 \
-    14.7264 27.1087Z \
-    M14.2353 25.902C11.0695 24.4691 8.50062 21.877 7.09177 18.7488C7.07897 18.0713 7.11574 17.3954 \
-    7.20004 16.7248C7.73283 18.7383 9.3026 20.4382 11.7151 21.7873C13.0408 22.5309 14.5669 23.0085 \
-    16.2829 23.2231C15.6755 24.0708 14.9746 24.9247 14.2353 25.902Z \
-    M16.7701 22.225C15.0431 22.0414 13.5716 21.6504 12.2552 20.9523C10.0451 19.7822 8.61191 18.2087 \
-    8.06259 16.3898C8.4052 14.5148 9.16134 12.7377 10.2901 11.1795C12.1951 13.6713 15.0017 15.8757 \
-    18.6103 17.6281C18.0335 18.6924 17.4137 19.5827 16.7701 22.225Z \
-    M19.2542 16.7245C15.7822 15.0529 13.106 12.9224 11.3008 10.3888C12.2476 9.38577 13.3494 8.53192 \
-    14.5851 7.87353C16.9466 11.0329 20.0279 13.4781 23.6374 14.9705C22.3654 15.7189 20.9594 16.3172 \
-    19.2542 16.7245Z \
-    M24.6754 13.9179C20.9614 12.5374 17.7634 10.2465 15.3649 7.13546C16.3688 6.70953 17.4316 6.42021 \
-    18.5267 6.2829C18.9461 6.85219 19.3654 7.40036 19.7847 7.92761C22.277 11.053 24.9822 13.3226 \
-    27.8313 14.7343C26.8193 14.539 25.7625 14.2798 24.6754 13.9179Z \
-    M28.9186 14.9539C25.608 13.5769 22.4602 10.9526 19.9156 7.53886C19.5345 7.04915 19.1536 6.53985 \
-    18.7726 6.01112C19.8317 5.96652 20.8937 6.06219 21.9314 6.2966C24.7211 6.92762 27.4017 8.76322 \
-    29.3801 11.4608C29.2686 11.9905 29.2033 12.5308 29.2033 13.0802C29.2033 13.7153 29.2692 14.3408 \
-    28.9186 14.9539Z \
-    M33.999 13.0802C33.999 6.50496 29.7461 0.973672 22.9293 0.0116986C26.0262 0.404071 29.0032 1.68377 \
-    31.364 3.76456C34.3184 6.36643 35.9998 10.1324 35.9998 14.4549C35.9998 17.5261 34.9573 20.4074 \
-    33.1582 22.739C32.0045 21.5421 30.5841 20.3771 28.9186 19.2741C30.5533 18.0056 32.0531 16.5443 \
-    33.3674 14.9116C33.7913 14.5473 33.9988 13.8121 33.999 13.0802Z \
-    M34.5999 23.7328C32.5424 26.5856 29.5225 28.7322 25.8919 29.5236C28.3795 28.2139 30.5934 26.452 \
-    32.5049 24.3124C33.2361 24.1928 33.9533 23.9914 34.5999 23.7328Z
+    M75.91 73.628V62.232c0-.96.36-1.68 1.199-2.16l22.912-13.194c3.119-1.8 6.838-2.639 \
+    10.676-2.639 14.394 0 23.511 11.157 23.511 23.032 0 .839 0 1.799-.12 2.758 \
+    l-23.752-13.914c-1.439-.84-2.879-.84-4.318 0L75.91 73.627Zm53.499 44.383v-27.23 \
+    c0-1.68-.72-2.88-2.159-3.719L97.142 69.55l9.836-5.638c.839-.48 1.559-.48 \
+    2.399 0l22.912 13.195c6.598 3.839 11.035 11.995 11.035 19.912 0 9.116-5.397 \
+    17.513-13.915 20.992v.001Zm-60.577-23.99-9.836-5.758c-.84-.48-1.2-1.2 \
+    -1.2-2.16v-26.39c0-12.834 9.837-22.55 23.152-22.55 5.039 0 9.716 1.679 13.676 \
+    4.678L70.993 55.516c-1.44.84-2.16 2.039-2.16 3.719v34.787-.002Zm21.173 \
+    12.234L75.91 98.339V81.546l14.095-7.917 14.094 7.917v16.793l-14.094 7.916Zm9.056 \
+    36.467c-5.038 0-9.716-1.68-13.675-4.678l23.631-13.676c1.439-.839 2.159-2.038 \
+    2.159-3.718V85.863l9.956 5.757c.84.48 1.2 1.2 1.2 2.16v26.389c0 12.835-9.957 \
+    22.552-23.27 22.552v.001Zm-28.43-26.75L47.72 102.778c-6.599-3.84-11.036-11.996 \
+    -11.036-19.913 0-9.236 5.518-17.513 14.034-20.992v27.35c0 1.68.72 2.879 2.16 \
+    3.718l29.989 17.393-9.837 5.638c-.84.48-1.56.48-2.399 0Zm-1.318 19.673c-13.555 0 \
+    -23.512-10.196-23.512-22.792 0-.959.12-1.919.24-2.879l23.63 13.675c1.44.84 2.88.84 \
+    4.32 0l30.108-17.392v11.395c0 .96-.361 1.68-1.2 2.16l-22.912 13.194c-3.119 \
+    1.8-6.837 2.639-10.675 2.639Zm29.748 14.274c14.515 0 26.63-10.316 29.39-23.991 \
+    13.434-3.479 22.071-16.074 22.071-28.91 0-8.396-3.598-16.553-10.076-22.43.6-2.52 \
+    .96-5.039.96-7.557 0-17.153-13.915-29.99-29.989-29.99-3.239 0-6.358.48-9.477 1.56 \
+    -5.398-5.278-12.835-8.637-20.992-8.637-14.515 0-26.63 10.316-29.39 23.991-13.434 \
+    3.48-22.07 16.074-22.07 28.91 0 8.396 3.598 16.553 10.075 22.431-.6 2.519-.96 \
+    5.038-.96 7.556 0 17.154 13.915 29.989 29.99 29.989 3.238 0 6.357-.479 9.476-1.559 \
+    5.397 5.278 12.835 8.637 20.992 8.637Z
     """
 
     func path(in rect: CGRect) -> Path {
@@ -206,44 +176,31 @@ struct CodexSpiralLogo: Shape {
     }
 }
 
-// MARK: - OpenCode (terminal window with caret)
+// MARK: - OpenCode (terminal monitor)
 
-/// OpenCode badge mark — a rounded terminal window with a `>` caret inside.
-/// Pure SwiftUI (no SVG asset needed) so the glyph scales crisply.
+/// OpenCode official mark — a filled terminal monitor shape.
+/// Inspired by opencode.ai/favicon.svg; rendered as a single solid outline
+/// so `.fill()` works uniformly with the other brand logos.
 struct OpenCodeTerminalLogo: Shape {
     func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-        let r = min(w, h) * 0.18  // corner radius
+        var p = Path()
+        let scale = min(rect.width, rect.height) / 512.0
+        let ox = rect.midX - 256 * scale
+        let oy = rect.midY - 256 * scale
 
-        // Rounded rectangle outline (OK to leave as path; caller will stroke or fill)
-        let bounds = CGRect(
-            x: rect.minX + w * 0.05,
-            y: rect.minY + h * 0.05,
-            width:  w * 0.90,
-            height: h * 0.90
-        )
-        path.addRoundedRect(in: bounds, cornerSize: CGSize(width: r, height: r))
+        // Outer frame (128,96  →  384,416) — 256×320
+        let outerX = ox + 128 * scale
+        let outerY = oy + 96  * scale
+        let outerW = 256 * scale
+        let outerH = 320 * scale
 
-        // Caret — a chevron `>` near the left, vertically centred and sized
-        // to roughly half of the inner height.
-        let caretCx = bounds.minX + bounds.width * 0.22
-        let caretCy = bounds.midY
-        // Size relative to inner height.
-        let caretHalfH = bounds.height * 0.22
-        let caretIndent = bounds.width * 0.14
-        path.move(to: CGPoint(x: caretCx, y: caretCy - caretHalfH))
-        path.addLine(to: CGPoint(x: caretCx + caretIndent, y: caretCy))
-        path.addLine(to: CGPoint(x: caretCx, y: caretCy + caretHalfH))
-        // Underscore bar to the right of the caret — makes the icon read
-        // as a terminal prompt `>_`
-        let barLeft = caretCx + caretIndent + bounds.width * 0.04
-        let barRight = barLeft + bounds.width * 0.22
-        let barY = caretCy + caretHalfH
-        path.move(to: CGPoint(x: barLeft, y: barY))
-        path.addLine(to: CGPoint(x: barRight, y: barY))
-        return path
+        p.move(to: CGPoint(x: outerX, y: outerY))
+        p.addLine(to: CGPoint(x: outerX + outerW, y: outerY))
+        p.addLine(to: CGPoint(x: outerX + outerW, y: outerY + outerH))
+        p.addLine(to: CGPoint(x: outerX, y: outerY + outerH))
+        p.closeSubpath()
+
+        return p
     }
 }
 

@@ -32,9 +32,9 @@ enum AgentPlatform: String {
     /// App-side brand accent color (RGB) — used by HooksActivityView.
     var brandColorRGB: (Double, Double, Double) {
         switch self {
-        case .claude:   return (0.85, 0.55, 0.35)
-        case .codex:    return (0.35, 0.70, 0.95)
-        case .opencode: return (0.55, 0.85, 0.55)
+        case .claude:   return (0.85, 0.55, 0.35)  // Anthropic copper/amber
+        case .codex:    return (0.07, 0.64, 0.49)  // OpenAI green #10a37f
+        case .opencode: return (0.14, 0.19, 0.27)  // OpenCode near-black #242A3B
         }
     }
 }
