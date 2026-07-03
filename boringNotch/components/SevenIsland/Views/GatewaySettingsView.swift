@@ -392,10 +392,15 @@ private struct ProviderEditSheet: View {
                         Text("x-api-key (Anthropic 官方)").tag("x-api-key")
                         Text("Static").tag("static")
                     }
+
+                    Picker("Protocol", selection: $draft.protocolType) {
+                        Text("Anthropic (Messages API)").tag("anthropic")
+                        Text("OpenAI (Chat Completions API)").tag("openai")
+                    }
                 } header: {
                     Text("基础配置")
                 } footer: {
-                    Text("Base URL 不带 /v1/messages 后缀，网关转发时自动拼接。Authorization 头按 Auth Scheme 写：bearer → `Authorization: Bearer <key>`；x-api-key → `x-api-key: <key>`。")
+                    Text("Base URL 不带 /v1/messages 后缀，网关转发时自动拼接。Protocol 选择 Anthropic 时转发到 /v1/messages；选择 OpenAI 时转发到 /v1/chat/completions 并自动做协议转换。")
                 }
 
                 // 模型映射

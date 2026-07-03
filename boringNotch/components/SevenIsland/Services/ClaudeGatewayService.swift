@@ -108,7 +108,12 @@ final class ClaudeGatewayService: ObservableObject {
         }
         // Anthropic Messages 转发（阶段 C）
         router.post("/v1/messages") { request, context in
-            try await GatewayMessagesHandler.handle(request, context: context)
+            try await GatewayMessagesHandler.handle(request, context: context, isOpenAIPath: false)
+        }
+        // OpenAI chat completions endpoint
+        // 当请求直接访问此路径时，说明请求已是 OpenAI 格式，直接透传
+        router.post("/v1/chat/completions") { request, context in
+            try await GatewayMessagesHandler.handle(request, context: context, isOpenAIPath: true)
         }
 
         // Hummingbird Application。监听 127.0.0.1 不暴露外网。

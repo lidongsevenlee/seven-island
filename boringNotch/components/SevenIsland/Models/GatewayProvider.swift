@@ -44,6 +44,10 @@ struct GatewayProvider: Codable, Identifiable, Equatable {
     /// - "x-api-key"：写 `x-api-key: <apiKey>`（Anthropic 官方 API 用这个）
     /// - 其他字符串：直接当 Authorization 头值写（高级用户）
     var authScheme: String
+    /// 下游 provider 的协议类型。
+    /// - anthropic: 下游是 Anthropic Messages API (/v1/messages)
+    /// - openai: 下游是 OpenAI Chat Completions API (/v1/chat/completions)
+    var protocolType: String
     /// 是否让 gateway 自动透传 model 字段（不查映射）
     var useModelDiscovery: Bool
     /// 模型映射列表（useModelDiscovery=false 时生效）
@@ -55,6 +59,7 @@ struct GatewayProvider: Codable, Identifiable, Equatable {
         baseUrl: String = "",
         apiKey: String = "",
         authScheme: String = "bearer",
+        protocolType: String = "anthropic",
         useModelDiscovery: Bool = false,
         modelMappings: [ClaudeModelMapping] = ClaudeModelMapping.defaultMappings
     ) {
@@ -63,6 +68,7 @@ struct GatewayProvider: Codable, Identifiable, Equatable {
         self.baseUrl = baseUrl
         self.apiKey = apiKey
         self.authScheme = authScheme
+        self.protocolType = protocolType
         self.useModelDiscovery = useModelDiscovery
         self.modelMappings = modelMappings
     }
@@ -73,7 +79,7 @@ struct GatewayProvider: Codable, Identifiable, Equatable {
     // 字段。新版本忽略它；旧字段缺失时填默认值。
 
     enum CodingKeys: String, CodingKey {
-        case id, name, baseUrl, apiKey, authScheme
+        case id, name, baseUrl, apiKey, authScheme, protocolType
         case useModelDiscovery, modelMappings
     }
 
@@ -84,6 +90,7 @@ struct GatewayProvider: Codable, Identifiable, Equatable {
         self.baseUrl         = try c.decodeIfPresent(String.self, forKey: .baseUrl) ?? ""
         self.apiKey          = try c.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
         self.authScheme      = try c.decodeIfPresent(String.self, forKey: .authScheme) ?? "bearer"
+        self.protocolType    = try c.decodeIfPresent(String.self, forKey: .protocolType) ?? "anthropic"
         self.useModelDiscovery = try c.decodeIfPresent(Bool.self, forKey: .useModelDiscovery) ?? false
         self.modelMappings   = try c.decodeIfPresent([ClaudeModelMapping].self, forKey: .modelMappings)
                                 ?? ClaudeModelMapping.defaultMappings
