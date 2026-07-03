@@ -11,75 +11,115 @@ import SwiftUI
 
 // MARK: - SVG path utilities
 
-/// Parses an SVG path `d` string (supports M/L/H/V/C/Z + lowercase relative variants)
-/// into a SwiftUI `Path` and auto-scales/centers the result into `rect`.
+/// Parses an SVG path `d` string into a SwiftUI `Path` and auto-scales/centers
+/// the result into `rect`. Supports M/L/H/V/C/Q/S/T/Z + lowercase relative
+/// variants, implicit repeated command groups (e.g. `q1 2 3 4 5 6 7 8` repeats
+/// the quadratic twice), and the SVG moveto-after-first-pair-becomes-lineto rule.
+/// S/s (smooth cubic) and T/t (smooth quadratic) reflect the previous curve's
+/// control point per the SVG spec. Used by the brand-logo Shapes below.
 func pathFromSVG(_ d: String, in rect: CGRect) -> Path {
-    let cmdSet = CharacterSet(charactersIn: "MmLlHhVvCcZz")
-    // Split the `d` string into (cmd, args...) segments.
-    // Enumerate the cleaned command letters to match arguments.
-    let cleaned = d
-        .replacingOccurrences(of: ",", with: " ")
-        .replacingOccurrences(of: "-", with: " -")
-    let tokens = cleaned.components(separatedBy: cmdSet.union(.whitespaces))
-        .compactMap { Double($0) }
-    let cmds = d.filter { cmdSet.contains($0.unicodeScalars.first!) }
-
+    let chars = Array(d)
+    let n = chars.count
     var path = Path()
     var i = 0
     var start = CGPoint.zero
     var current = CGPoint.zero
+    var prevCubic: CGPoint? = nil
+    var prevQuad: CGPoint? = nil
+    var cmd: Character? = nil
 
-    func num(_ idx: Int) -> Double? {
-        guard idx < tokens.count else { return nil }
-        return tokens[idx]
+    func readNumber() -> Double? {
+        while i < n, chars[i].isWhitespace || chars[i] == "," { i += 1 }
+        guard i < n else { return nil }
+        let s = i
+        if chars[i] == "+" || chars[i] == "-" { i += 1 }
+        while i < n, chars[i].isNumber { i += 1 }
+        if i < n, chars[i] == "." {
+            i += 1
+            while i < n, chars[i].isNumber { i += 1 }
+        }
+        if i < n, chars[i] == "e" || chars[i] == "E" {
+            i += 1
+            if i < n, chars[i] == "+" || chars[i] == "-" { i += 1 }
+            while i < n, chars[i].isNumber { i += 1 }
+        }
+        guard i > s else { return nil }
+        return Double(String(chars[s..<i]))
     }
 
-    for cmd in cmds {
-        let relative = cmd.isLowercase
-        switch cmd {
-        case "M", "m":
-            guard let x = num(i), let y = num(i + 1) else { break }
-            let pt = relative
-                ? CGPoint(x: current.x + x, y: current.y + y)
-                : CGPoint(x: x, y: y)
-            path.move(to: pt); start = pt; current = pt; i += 2
-        case "L", "l":
-            guard let x = num(i), let y = num(i + 1) else { break }
-            let pt = relative
-                ? CGPoint(x: current.x + x, y: current.y + y)
-                : CGPoint(x: x, y: y)
-            path.addLine(to: pt); current = pt; i += 2
-        case "H", "h":
-            guard let x = num(i) else { break }
-            let pt = relative
-                ? CGPoint(x: current.x + x, y: current.y)
-                : CGPoint(x: x, y: current.y)
-            path.addLine(to: pt); current = pt; i += 1
-        case "V", "v":
-            guard let y = num(i) else { break }
-            let pt = relative
-                ? CGPoint(x: current.x, y: current.y + y)
-                : CGPoint(x: current.x, y: y)
-            path.addLine(to: pt); current = pt; i += 1
-        case "C", "c":
-            guard let cx1 = num(i), let cy1 = num(i + 1),
-                  let cx2 = num(i + 2), let cy2 = num(i + 3),
-                  let x = num(i + 4), let y = num(i + 5) else { break }
-            let pt = relative
-                ? CGPoint(x: current.x + x, y: current.y + y)
-                : CGPoint(x: x, y: y)
-            let cp1 = relative
-                ? CGPoint(x: current.x + cx1, y: current.y + cy1)
-                : CGPoint(x: cx1, y: cy1)
-            let cp2 = relative
-                ? CGPoint(x: current.x + cx2, y: current.y + cy2)
-                : CGPoint(x: cx2, y: cy2)
+    func invalidateCubic() { prevCubic = nil }
+    func invalidateQuad() { prevQuad = nil }
+
+    while i < n {
+        while i < n, chars[i].isWhitespace || chars[i] == "," { i += 1 }
+        guard i < n else { break }
+        if chars[i].isLetter {
+            cmd = chars[i]
+            i += 1
+        }
+        guard let c = cmd, let up = c.uppercased().first else { break }
+        let relative = c.isLowercase
+
+        switch up {
+        case "M":
+            guard let x = readNumber(), let y = readNumber() else { break }
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+            path.move(to: pt); start = pt; current = pt
+            cmd = relative ? "l" : "L"
+            invalidateCubic(); invalidateQuad()
+        case "L":
+            guard let x = readNumber(), let y = readNumber() else { break }
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+            path.addLine(to: pt); current = pt
+            invalidateCubic(); invalidateQuad()
+        case "H":
+            guard let x = readNumber() else { break }
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y) : CGPoint(x: x, y: current.y)
+            path.addLine(to: pt); current = pt
+            invalidateCubic(); invalidateQuad()
+        case "V":
+            guard let y = readNumber() else { break }
+            let pt = relative ? CGPoint(x: current.x, y: current.y + y) : CGPoint(x: current.x, y: y)
+            path.addLine(to: pt); current = pt
+            invalidateCubic(); invalidateQuad()
+        case "C":
+            guard let x1 = readNumber(), let y1 = readNumber(),
+                  let x2 = readNumber(), let y2 = readNumber(),
+                  let x = readNumber(), let y = readNumber() else { break }
+            let cp1 = relative ? CGPoint(x: current.x + x1, y: current.y + y1) : CGPoint(x: x1, y: y1)
+            let cp2 = relative ? CGPoint(x: current.x + x2, y: current.y + y2) : CGPoint(x: x2, y: y2)
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
             path.addCurve(to: pt, control1: cp1, control2: cp2)
-            current = pt; i += 6
-        case "Z", "z":
+            prevCubic = cp2; invalidateQuad(); current = pt
+        case "Q":
+            guard let x1 = readNumber(), let y1 = readNumber(),
+                  let x = readNumber(), let y = readNumber() else { break }
+            let cp = relative ? CGPoint(x: current.x + x1, y: current.y + y1) : CGPoint(x: x1, y: y1)
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+            path.addQuadCurve(to: pt, control: cp)
+            prevQuad = cp; invalidateCubic(); current = pt
+        case "S":
+            guard let x2 = readNumber(), let y2 = readNumber(),
+                  let x = readNumber(), let y = readNumber() else { break }
+            let cp1 = prevCubic.map { CGPoint(x: 2 * current.x - $0.x, y: 2 * current.y - $0.y) } ?? current
+            let cp2 = relative ? CGPoint(x: current.x + x2, y: current.y + y2) : CGPoint(x: x2, y: y2)
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+            path.addCurve(to: pt, control1: cp1, control2: cp2)
+            prevCubic = cp2; invalidateQuad(); current = pt
+        case "T":
+            guard let x = readNumber(), let y = readNumber() else { break }
+            let cp = prevQuad.map { CGPoint(x: 2 * current.x - $0.x, y: 2 * current.y - $0.y) } ?? current
+            let pt = relative ? CGPoint(x: current.x + x, y: current.y + y) : CGPoint(x: x, y: y)
+            path.addQuadCurve(to: pt, control: cp)
+            prevQuad = cp; invalidateCubic(); current = pt
+        case "Z":
             path.closeSubpath()
             current = start
-        default: break
+            invalidateCubic(); invalidateQuad()
+            // Z takes no params; force re-read of next command letter.
+            cmd = nil
+        default:
+            cmd = nil
         }
     }
 
@@ -139,36 +179,17 @@ struct ClaudeStarLogo: Shape {
     }
 }
 
-// MARK: - Codex (OpenAI blossom)
+// MARK: - Codex (OpenAI Codex blossom)
 
-/// The official OpenAI "blossom" / flower mark — the six-petal knotted loop
-/// designed by Studio Dumbar. Path data from openai.com/favicon.svg (180×180 viewBox
-/// with centre at ~90). Supports relative cubic Beziers (`c`) in addition to M/L/C/Z.
+/// The official Codex mark — the gradient "blossom"/spiral flower.
+/// Path data from codex-logo.svg (250×250 viewBox). Uses relative moveto,
+/// quadratic (`q`) and cubic (`c`) Beziers with implicit repeated groups.
+/// Rendered here as a single solid silhouette; the brand accent color is set
+/// to the codex purple in `AgentPlatform.brandColorRGB` so the silhouette reads
+/// as the Codex mark even without the gradient.
 struct CodexSpiralLogo: Shape {
     private static let pathData = """
-    M75.91 73.628V62.232c0-.96.36-1.68 1.199-2.16l22.912-13.194c3.119-1.8 6.838-2.639 \
-    10.676-2.639 14.394 0 23.511 11.157 23.511 23.032 0 .839 0 1.799-.12 2.758 \
-    l-23.752-13.914c-1.439-.84-2.879-.84-4.318 0L75.91 73.627Zm53.499 44.383v-27.23 \
-    c0-1.68-.72-2.88-2.159-3.719L97.142 69.55l9.836-5.638c.839-.48 1.559-.48 \
-    2.399 0l22.912 13.195c6.598 3.839 11.035 11.995 11.035 19.912 0 9.116-5.397 \
-    17.513-13.915 20.992v.001Zm-60.577-23.99-9.836-5.758c-.84-.48-1.2-1.2 \
-    -1.2-2.16v-26.39c0-12.834 9.837-22.55 23.152-22.55 5.039 0 9.716 1.679 13.676 \
-    4.678L70.993 55.516c-1.44.84-2.16 2.039-2.16 3.719v34.787-.002Zm21.173 \
-    12.234L75.91 98.339V81.546l14.095-7.917 14.094 7.917v16.793l-14.094 7.916Zm9.056 \
-    36.467c-5.038 0-9.716-1.68-13.675-4.678l23.631-13.676c1.439-.839 2.159-2.038 \
-    2.159-3.718V85.863l9.956 5.757c.84.48 1.2 1.2 1.2 2.16v26.389c0 12.835-9.957 \
-    22.552-23.27 22.552v.001Zm-28.43-26.75L47.72 102.778c-6.599-3.84-11.036-11.996 \
-    -11.036-19.913 0-9.236 5.518-17.513 14.034-20.992v27.35c0 1.68.72 2.879 2.16 \
-    3.718l29.989 17.393-9.837 5.638c-.84.48-1.56.48-2.399 0Zm-1.318 19.673c-13.555 0 \
-    -23.512-10.196-23.512-22.792 0-.959.12-1.919.24-2.879l23.63 13.675c1.44.84 2.88.84 \
-    4.32 0l30.108-17.392v11.395c0 .96-.361 1.68-1.2 2.16l-22.912 13.194c-3.119 \
-    1.8-6.837 2.639-10.675 2.639Zm29.748 14.274c14.515 0 26.63-10.316 29.39-23.991 \
-    13.434-3.479 22.071-16.074 22.071-28.91 0-8.396-3.598-16.553-10.076-22.43.6-2.52 \
-    .96-5.039.96-7.557 0-17.153-13.915-29.99-29.989-29.99-3.239 0-6.358.48-9.477 1.56 \
-    -5.398-5.278-12.835-8.637-20.992-8.637-14.515 0-26.63 10.316-29.39 23.991-13.434 \
-    3.48-22.07 16.074-22.07 28.91 0 8.396 3.598 16.553 10.075 22.431-.6 2.519-.96 \
-    5.038-.96 7.556 0 17.154 13.915 29.989 29.99 29.989 3.238 0 6.357-.479 9.476-1.559 \
-    5.397 5.278 12.835 8.637 20.992 8.637Z
+    m84.3 5.1q3.7-1.5 7.7-2.6 3.9-1 7.9-1.6 4-0.5 8.1-0.6 4 0 8 0.5 20.7 2.4 37.1 17.7 0.1 0.1 0.4 0.3 0.1 0 0.2 0 0 0 0.2 0 0 0 0.1 0 0 0 0.1 0 5.2-1.4 10.7-1.9 5.4-0.4 10.7 0.1 5.5 0.4 10.7 1.9 5.2 1.3 10.1 3.6l0.6 0.4 1.6 0.8q5.2 2.5 9.7 6.1 4.7 3.4 8.6 7.7 3.8 4.3 6.9 9.2 3 4.8 5.2 10.2 4.3 10.5 4.3 22.1 0.2 2.1 0 4.2-0.1 2.2-0.2 4.3-0.3 2.1-0.7 4.3-0.4 2.1-0.9 4.1 0 0.2 0 0.4 0 0.2 0 0.5 0 0.1 0.1 0.4 0.1 0.1 0.3 0.3 12.3 12.6 16.3 30 6 29.7-12.2 53.5l-1.9 2.2q-3 3.5-6.5 6.4-3.4 3.1-7.3 5.5-3.8 2.4-8.1 4.2-4.1 1.9-8.5 3.2-0.3 0-0.4 0.2-0.3 0-0.4 0.1-0.1 0.1-0.3 0.4 0 0.1-0.1 0.3c-2.7 7.7-5.3 14.2-10.2 20.7-12.5 16.5-30.8 25.5-51.5 25.5q-24.6-0.1-43.6-18.1-0.2-0.1-0.4-0.2-0.2-0.1-0.4-0.1-0.2 0-0.3 0-0.3 0-0.4 0c-5.4 1.7-10.9 1.9-16.7 1.9q-3.5 0-7-0.5-3.4-0.4-6.9-1.2-3.3-0.8-6.6-2-3.3-1.2-6.4-2.8-3.3-1.6-6.4-3.6-3-2-5.8-4.3-3-2.3-5.5-5-2.5-2.6-4.6-5.6c-2.2-2.7-4.3-5.4-5.8-8.5q-0.8-1.6-1.6-3.2-0.6-1.7-1.3-3.3-0.7-1.7-1.2-3.4-0.5-1.6-1-3.4-1.1-4-1.6-7.9-0.6-4-0.6-8 0-4 0.6-8 0.4-4 1.4-8 0 0 0-0.1 0-0.1 0-0.1 0.2-0.2 0.2-0.3 0-0.1-0.2-0.1 0-0.2 0-0.3 0-0.1-0.1-0.1 0-0.2 0-0.2-0.1-0.1-0.1-0.1-2.4-2.5-4.6-5.2-2.1-2.7-4-5.4-1.7-3-3.2-6-1.5-3.1-2.6-6.3-0.8-2-1.3-4.1-0.7-2-1.1-4-0.4-2.1-0.7-4.2-0.2-2.2-0.4-4.3-0.2-2.8-0.1-5.6 0-2.8 0.3-5.4 0.1-2.8 0.6-5.6 0.4-2.8 1.1-5.5 7-23.1 26.9-36.3 4.3-2.9 8.2-4.5 4.5-1.9 9-3.2 0.2 0 0.3-0.1 0.1-0.2 0.3-0.3 0.1 0 0.1-0.3 0.1-0.1 0.1-0.2 1-3.1 2.2-6 1-2.9 2.5-5.7 1.5-3 3.2-5.6 1.7-2.7 3.7-5.1 2.5-3.2 5.3-5.9 3-2.8 6.1-5.4 3.2-2.4 6.8-4.4 3.5-2 7.2-3.5zm48.3 146.4c-2.3 0.1-4.4 1-6 2.8-1.5 1.6-2.4 3.7-2.4 5.9 0 2.3 0.9 4.4 2.4 6.2 1.6 1.6 3.7 2.5 6 2.6h50.4c2.4 0.1 4.8-0.6 6.5-2.4 1.7-1.6 2.8-4 2.8-6.4 0-2.4-1.1-4.7-2.8-6.3-1.7-1.8-4.1-2.6-6.5-2.4zm-56.7-64.9c-1.2-1.9-3-3.4-5.3-3.9-2.2-0.5-4.5-0.3-6.5 0.9-2 1.1-3.5 3-4.1 5.2-0.7 2.2-0.4 4.6 0.6 6.5l17.7 30.9-17.5 29.5c-1.2 2-1.6 4.5-1.1 6.8 0.7 2.3 2.1 4.1 4.1 5.3 2 1.2 4.4 1.6 6.7 0.9 2.2-0.5 4.2-1.9 5.4-3.9l20.1-34.1q0.7-0.9 0.9-2.1 0.3-1.1 0.3-2.3 0-1.2-0.3-2.2-0.2-1.2-0.8-2.2z
     """
 
     func path(in rect: CGRect) -> Path {
@@ -178,51 +199,126 @@ struct CodexSpiralLogo: Shape {
 
 // MARK: - OpenCode (terminal monitor)
 
-/// OpenCode official mark — a filled terminal monitor shape.
-/// Inspired by opencode.ai/favicon.svg; rendered as a single solid outline
-/// so `.fill()` works uniformly with the other brand logos.
-struct OpenCodeTerminalLogo: Shape {
+/// OpenCode official mark — faithfully reproduced from opencode-logo-light.svg
+/// (240×300 viewBox). The SVG has two elements: a frame (outer rect with an
+/// inner rectangular hole) and a bar (the bottom half of the inner area).
+///
+/// Because the two elements use different colours in the source SVG (#211E1E
+/// frame + #CFCECD bar), they can't be expressed as a single `Shape` with one
+/// `.fill()`. Instead `OpenCodeLogoView` renders them as two explicit shapes
+/// stacked in a ZStack, matching the SVG's geometry exactly.
+///
+/// On the notch's dark background the "light" variant's dark frame would be
+/// invisible, so both elements use the brand accent colour (light grey #CFCECD)
+/// — the gap between frame and bar shows the dark background, producing the
+/// recognisable OpenCode glyph.
+
+/// Frame shape: outer rectangle (0,0)–(240,300) with an inner rectangular hole
+/// (60,60)–(180,240). Designed for **even-odd** fill so the inner area becomes
+/// a hole regardless of subpath winding direction.
+struct OpenCodeFrameShape: Shape {
     func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width / 240, rect.height / 300)
+        let w = 240 * scale
+        let h = 300 * scale
+        let ox = rect.midX - w / 2
+        let oy = rect.midY - h / 2
+
         var p = Path()
-        let scale = min(rect.width, rect.height) / 512.0
-        let ox = rect.midX - 256 * scale
-        let oy = rect.midY - 256 * scale
-
-        // Outer frame (128,96  →  384,416) — 256×320
-        let outerX = ox + 128 * scale
-        let outerY = oy + 96  * scale
-        let outerW = 256 * scale
-        let outerH = 320 * scale
-
-        p.move(to: CGPoint(x: outerX, y: outerY))
-        p.addLine(to: CGPoint(x: outerX + outerW, y: outerY))
-        p.addLine(to: CGPoint(x: outerX + outerW, y: outerY + outerH))
-        p.addLine(to: CGPoint(x: outerX, y: outerY + outerH))
-        p.closeSubpath()
-
+        // Outer rect
+        p.addRect(CGRect(x: ox, y: oy, width: w, height: h))
+        // Inner rect (hole — even-odd fill makes this a hole)
+        let innerW = 120 * scale
+        let innerH = 180 * scale
+        p.addRect(CGRect(x: ox + 60 * scale, y: oy + 60 * scale,
+                         width: innerW, height: innerH))
         return p
+    }
+}
+
+/// Bar shape: rectangle (60,120)–(180,240) — the bottom half of the inner area.
+struct OpenCodeBarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width / 240, rect.height / 300)
+        let w = 240 * scale
+        let h = 300 * scale
+        let ox = rect.midX - w / 2
+        let oy = rect.midY - h / 2
+
+        let barW = 120 * scale
+        let barH = 120 * scale
+        return Path(CGRect(x: ox + 60 * scale, y: oy + 120 * scale,
+                           width: barW, height: barH))
+    }
+}
+
+/// Composite view rendering the full OpenCode mark: frame (even-odd fill) + bar.
+struct OpenCodeLogoView: View {
+    var opacity: Double = 1.0
+
+    var body: some View {
+        let color = Color(
+            red: 0.811, green: 0.807, blue: 0.803  // #CFCECD
+        ).opacity(opacity)
+
+        ZStack {
+            OpenCodeFrameShape()
+                .fill(color, style: FillStyle(eoFill: true))
+            OpenCodeBarShape()
+                .fill(color)
+        }
+    }
+}
+
+// MARK: - Generic brand-icon view
+
+/// Renders the correct brand glyph for an `AgentPlatform` at a given size and
+/// opacity. For Claude and Codex this is a simple `Shape` + `.fill()`. For
+/// OpenCode it delegates to `OpenCodeLogoView` which needs two stacked shapes
+/// to faithfully reproduce the SVG's two-tone geometry.
+///
+/// Usage:
+///
+///     BrandIconView(platform: session.platform, size: 11)
+///     BrandIconView(platform: session.platform, size: 9, opacity: 0.7)
+struct BrandIconView: View {
+    let platform: AgentPlatform
+    var size: CGFloat = 11
+    var opacity: Double = 1.0
+
+    var body: some View {
+        Group {
+            switch platform {
+            case .claude:
+                ClaudeStarLogo()
+                    .fill(brandColor.opacity(opacity))
+            case .codex:
+                CodexSpiralLogo()
+                    .fill(brandColor.opacity(opacity))
+            case .opencode:
+                OpenCodeLogoView(opacity: opacity)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+
+    private var brandColor: Color {
+        let rgb = platform.brandColorRGB
+        return Color(red: rgb.0, green: rgb.1, blue: rgb.2)
     }
 }
 
 // MARK: - SwiftUI helper to Draw the platform-specific brand glyph
 
-/// Convenience view that selects the correct logo `Shape` for each agent
-/// and fills it with the platform brand color. Use as:
-///
-///     BrandIcon(platform: session.platform, size: 12)
-///         .fill(.white)
-///
-/// or directly embed the Shape inside an `Image`-style layout by wrapping
-/// it in `Image(systemName:)` semantics.
+/// Type-erased Shape wrapper (avoids shadowing SwiftUI's `AnyShape`).
+/// Used for single-fill logos (Claude, Codex). OpenCode uses `BrandIconView`
+/// instead because its SVG requires two stacked shapes.
 extension AgentPlatform {
-    /// Returns an `ErasedShape` wrapping the appropriate brand mark, so the
-    /// caller can use it as a generic `Shape` (avoids shadowing SwiftUI's
-    /// built-in `AnyShape`).
     var brandIconShape: ErasedShape {
         switch self {
         case .claude:   return ErasedShape(ClaudeStarLogo())
         case .codex:    return ErasedShape(CodexSpiralLogo())
-        case .opencode: return ErasedShape(OpenCodeTerminalLogo())
+        case .opencode: return ErasedShape(OpenCodeFrameShape())  // frame only; prefer BrandIconView
         }
     }
 }

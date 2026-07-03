@@ -29,12 +29,15 @@ enum AgentPlatform: String {
         }
     }
 
-    /// App-side brand accent color (RGB) — used by HooksActivityView.
+    /// App-side brand accent color (RGB) — used by HooksActivityView to fill
+    /// the brand-logo `Shape` per platform. Codex uses the mid-stop of its logo
+    /// gradient (#7a9dff) and OpenCode uses the light-grey (#CFCECD) so the
+    /// glyph reads on the notch's dark background.
     var brandColorRGB: (Double, Double, Double) {
         switch self {
         case .claude:   return (0.85, 0.55, 0.35)  // Anthropic copper/amber
-        case .codex:    return (0.07, 0.64, 0.49)  // OpenAI green #10a37f
-        case .opencode: return (0.14, 0.19, 0.27)  // OpenCode near-black #242A3B
+        case .codex:    return (0.478, 0.616, 1.0) // Codex blossom purple #7a9dff
+        case .opencode: return (0.811, 0.807, 0.803) // OpenCode light grey #CFCECD
         }
     }
 }

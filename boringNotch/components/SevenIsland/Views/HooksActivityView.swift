@@ -160,9 +160,7 @@ private struct SessionCard: View {
             // Row 1: platform brand Shape + cwd name + status dot + status label | duration + model
             HStack(spacing: 5) {
                 // Platform brand glyph in its accent color
-                session.platform.brandIconShape
-                    .fill(platformAccent)
-                    .frame(width: 11, height: 11)
+                BrandIconView(platform: session.platform, size: 11)
                     .frame(width: 12, alignment: .center)
                 Text(session.cwdBasename)
                     .font(.system(size: 12, weight: .semibold))
@@ -196,9 +194,7 @@ private struct SessionCard: View {
 
             // Row 3: AI reply — platform brand Shape variant with darker fill
             HStack(spacing: 4) {
-                session.platform.brandIconShape
-                    .fill(platformAccent.opacity(0.7))
-                    .frame(width: 9, height: 9)
+                BrandIconView(platform: session.platform, size: 9, opacity: 0.7)
                     .frame(width: 12, alignment: .center)
                 Text(session.lastAssistantMessage ?? "—")
                     .font(.system(size: 11))
