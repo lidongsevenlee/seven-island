@@ -361,7 +361,7 @@ final class HookRegistrationManager {
                     "PermissionRequest"]
         case .codex:
             return ["SessionStart", "UserPromptSubmit", "Stop", "SubagentStop",
-                    "PreToolUse", "PostToolUse"]
+                    "PreToolUse", "PostToolUse", "SessionEnd"]
         case .opencode:
             return [] // OpenCode doesn't use shell hooks
         }
@@ -374,7 +374,7 @@ final class HookRegistrationManager {
                     "Notification", "PreToolUse", "PostToolUse", "SessionEnd"]
         case .codex:
             return ["SessionStart", "UserPromptSubmit", "Stop", "SubagentStop",
-                    "PreToolUse", "PostToolUse"]
+                    "PreToolUse", "PostToolUse", "SessionEnd"]
         case .opencode:
             return [] // OpenCode doesn't use shell hooks
         }
