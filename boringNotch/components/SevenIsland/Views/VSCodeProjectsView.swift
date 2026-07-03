@@ -2,7 +2,7 @@ import Defaults
 import SwiftUI
 
 struct VSCodeProjectsView: View {
-@ObservedObject private var service = VSCodeRecentProjectsService.shared
+    @ObservedObject private var service = VSCodeRecentProjectsService.shared
     @EnvironmentObject private var vm: BoringViewModel
     @Default(.vscodeProjectsDirectory) private var vscodeProjectsDirectory
     @State private var searchText = ""
@@ -22,12 +22,6 @@ struct VSCodeProjectsView: View {
         let query = searchText.lowercased()
         return service.projects
             .filter { $0.matches(query: query) }
-            .sorted { lhs, rhs in
-                let lhPrefix = lhs.name.lowercased().hasPrefix(query)
-                let rhPrefix = rhs.name.lowercased().hasPrefix(query)
-                if lhPrefix != rhPrefix { return lhPrefix }
-                return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-            }
     }
 
     var body: some View {

@@ -32,6 +32,7 @@ final class VSCodeRecentProjectsService: ObservableObject {
         // the result back to main when ready.
         let directory = Self.effectiveProjectsDirectoryURL()
         let pinned = Defaults[.vscodePinnedFolders]
+        let recentlyOpened = localFolderURLsFromStateDatabase()
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             var loaded = self.loadProjects(from: directory, includeMissing: includeMissing, limit: .max)
@@ -47,11 +48,17 @@ final class VSCodeRecentProjectsService: ObservableObject {
                 loaded.append(VSCodeProjectItem(url: standardized, exists: exists))
             }
 
+            // 匹配最近打开的文件夹，设置 lastSeenAt
+            let now = Date()
+            for (index, item) in loaded.enumerated() {
+                if recentlyOpened.contains(where: { $0.path == item.url.path }) {
+                    loaded[index] = VSCodeProjectItem(url: item.url, lastSeenAt: now, exists: item.exists)
+                }
+            }
+
             loaded.sort { lhs, rhs in
-                let lhDate = lhs.lastSeenAt
-                    ?? ((try? lhs.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
-                let rhDate = rhs.lastSeenAt
-                    ?? ((try? rhs.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
+                let lhDate = lhs.lastSeenAt ?? .distantPast
+                let rhDate = rhs.lastSeenAt ?? .distantPast
                 return lhDate > rhDate
             }
             DispatchQueue.main.async {
@@ -85,6 +92,13 @@ final class VSCodeRecentProjectsService: ObservableObject {
 
     func open(_ item: VSCodeProjectItem) {
         AppLauncherService.openVSCodeProject(item.url)
+        // 更新 lastSeenAt，使其排在最前面
+        let now = Date()
+        projects = projects.map { existing in
+            existing.id == item.id 
+                ? VSCodeProjectItem(url: item.url, lastSeenAt: now, exists: item.exists)
+                : existing
+        }
     }
 
     private func localProjectsFromDirectory(_ dir: URL) -> [URL] {
