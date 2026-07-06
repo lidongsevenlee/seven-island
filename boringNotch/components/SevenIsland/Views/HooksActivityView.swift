@@ -38,15 +38,12 @@ struct HooksActivityView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // ── Header ──────────────────────────────────────────────────────
-            HStack(spacing: 5) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Text("Agent 会话")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                Spacer()
+            // ── Filter pills ───────────────────────────────────────────────
+            HStack(spacing: 6) {
+                ForEach(SessionFilter.allCases) { filter in
+                    filterPill(filter)
+                }
+                Spacer(minLength: 0)
                 Text("\(filteredSessions.count) 个")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -62,15 +59,6 @@ struct HooksActivityView: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 2)
-
-            // ── Filter pills ───────────────────────────────────────────────
-            HStack(spacing: 6) {
-                ForEach(SessionFilter.allCases) { filter in
-                    filterPill(filter)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
 
             // ── Content ─────────────────────────────────────────────────────
             if filteredSessions.isEmpty {
@@ -156,71 +144,89 @@ private struct SessionCard: View {
     let session: HookSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            // Row 1: platform brand Shape + cwd name + status dot + status label | duration + model
-            HStack(spacing: 5) {
-                // Platform brand glyph in its accent color
-                BrandIconView(platform: session.platform, size: 11)
-                    .frame(width: 12, alignment: .center)
-                Text(session.cwdBasename)
+        HStack(alignment: .top, spacing: 10) {
+            // ── Left: Agent icon + name | Status + Duration ──────────────
+            VStack(alignment: .leading, spacing: 4) {
+                // Agent icon + model/agent name (same row)
+                HStack(spacing: 4) {
+                    BrandIconView(platform: session.platform, size: 13)
+                    Text(session.modelShort != "—" ? session.modelShort : session.platformLabel)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+
+                // Status dot + label + duration (same row)
+                HStack(spacing: 3) {
+                    StatusDot(status: session.status)
+                    Text(session.status.label)
+                        .font(.system(size: 10))
+                        .foregroundStyle(statusTextColor)
+                    Text(session.durationLabel)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: 80, alignment: .leading)
+
+            // ── Divider ────────────────────────────────────────────────────
+            RoundedRectangle(cornerRadius: 1)
+                .fill(platformAccent.opacity(0.12))
+                .frame(width: 2)
+                .padding(.vertical, 2)
+
+            // ── Right: Title + Conversation (top-bottom) ───────────────────
+            VStack(alignment: .leading, spacing: 2) {
+                // Session title — independent row
+                Text(session.displayTitle)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                StatusDot(status: session.status)
-                Text(session.status.label)
-                    .font(.system(size: 10))
-                    .foregroundStyle(statusTextColor)
-                Spacer()
-                Text(session.durationLabel)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Text(session.modelShort)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
 
-            // Row 2: user prompt
-            HStack(spacing: 4) {
-                Image(systemName: "person.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.gray)
-                Text(session.lastUserPrompt ?? "—")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.gray)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-
-            // Row 3: AI reply — platform brand Shape variant with darker fill
-            HStack(spacing: 4) {
-                BrandIconView(platform: session.platform, size: 9, opacity: 0.7)
-                    .frame(width: 12, alignment: .center)
-                Text(session.lastAssistantMessage ?? "—")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-
-            // Row 4: notable event badges (only when present)
-            if !session.notableEvents.isEmpty {
+                // User prompt
                 HStack(spacing: 4) {
-                    let permCount = session.notableEvents.filter { $0.event == "PermissionRequest" }.count
-                    let notifCount = session.notableEvents.filter { $0.event == "Notification" }.count
-                    let failCount = session.notableEvents.filter { $0.event == "StopFailure" }.count
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.gray)
+                        .frame(width: 12)
+                    Text(session.lastUserPrompt ?? "—")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.gray)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
 
-                    if permCount > 0 {
-                        NotableBadge(icon: "lock.shield", label: "\(permCount)", color: .orange)
-                    }
-                    if notifCount > 0 {
-                        NotableBadge(icon: "bell.fill", label: "\(notifCount)", color: .pink)
-                    }
-                    if failCount > 0 {
-                        NotableBadge(icon: "exclamationmark.triangle.fill", label: "\(failCount)", color: .red)
+                // AI reply
+                HStack(spacing: 4) {
+                    BrandIconView(platform: session.platform, size: 9, opacity: 0.7)
+                        .frame(width: 12, alignment: .center)
+                    Text(session.lastAssistantMessage ?? "—")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+
+                // Notable event badges (only when present)
+                if !session.notableEvents.isEmpty {
+                    HStack(spacing: 4) {
+                        let permCount = session.notableEvents.filter { $0.event == "PermissionRequest" }.count
+                        let notifCount = session.notableEvents.filter { $0.event == "Notification" }.count
+                        let failCount = session.notableEvents.filter { $0.event == "StopFailure" }.count
+
+                        if permCount > 0 {
+                            NotableBadge(icon: "lock.shield", label: "\(permCount)", color: .orange)
+                        }
+                        if notifCount > 0 {
+                            NotableBadge(icon: "bell.fill", label: "\(notifCount)", color: .pink)
+                        }
+                        if failCount > 0 {
+                            NotableBadge(icon: "exclamationmark.triangle.fill", label: "\(failCount)", color: .red)
+                        }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

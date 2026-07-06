@@ -32,6 +32,9 @@ final class HooksActivityService: ObservableObject {
     /// every approved permission.
     private var suppressNextIdleNotice: Set<String> = []
 
+    /// Cached session names (title) keyed by sessionId, loaded from platform session JSON files.
+    private var sessionNameCache: [String: String] = [:]
+
     /// Called from AgentSocketServer when an external decision (terminal UI)
     /// dismisses the banner. The next blocked → idle transition for `sessionId`
     /// is treated as a continuation, not a completion.
@@ -92,6 +95,7 @@ final class HooksActivityService: ObservableObject {
                 guard let self else { return }
                 self.lastReadOffset = byteCount
                 self.allEvents = events
+                self.loadSessionNames()
                 self.rebuild()
             }
         }
@@ -122,6 +126,7 @@ final class HooksActivityService: ObservableObject {
                         if self.allEvents.count > 2000 {
                             self.allEvents = Array(self.allEvents.suffix(2000))
                         }
+                        self.loadSessionNames()
                         self.rebuild()
                     }
                 }
@@ -192,6 +197,30 @@ final class HooksActivityService: ObservableObject {
         startWatching()
     }
 
+    // MARK: - Session name cache
+
+    /// Scans platform session JSON files (~/.claude/sessions/*.json,
+    /// ~/.codex/sessions/**/*.json) and populates sessionNameCache keyed by sessionId.
+    private func loadSessionNames() {
+        let dirs = [
+            (NSHomeDirectory() + "/.claude/sessions"),
+            (NSHomeDirectory() + "/.codex/sessions"),
+        ]
+        for dir in dirs {
+            let dirURL = URL(fileURLWithPath: dir)
+            guard let enumerator = FileManager.default.enumerator(
+                at: dirURL, includingPropertiesForKeys: nil
+            ) else { continue }
+            for case let url as URL in enumerator where url.pathExtension == "json" {
+                guard let data = try? Data(contentsOf: url),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let sid = json["sessionId"] as? String,
+                      let name = json["name"] as? String, !name.isEmpty else { continue }
+                sessionNameCache[sid] = name
+            }
+        }
+    }
+
     // MARK: - Session rebuild
 
     private func rebuild() {
@@ -219,7 +248,8 @@ final class HooksActivityService: ObservableObject {
                 lastUserPrompt: nil,
                 lastAssistantMessage: nil,
                 notableEvents: [],
-                platform: event.agentPlatform
+                platform: event.agentPlatform,
+                name: sessionNameCache[sid]
             )
         }
 
@@ -228,7 +258,7 @@ final class HooksActivityService: ObservableObject {
             guard !sid.isEmpty, !childIds.contains(sid) else { continue }
 
             switch event.event {
-            case "SessionStart":
+            case "SessionStart", "session":
                 if sessionMap[sid] == nil {
                     sessionMap[sid] = HookSession(
                         id: sid,
@@ -240,11 +270,14 @@ final class HooksActivityService: ObservableObject {
                         lastUserPrompt: nil,
                         lastAssistantMessage: nil,
                         notableEvents: [],
-                        platform: event.agentPlatform
+                        platform: event.agentPlatform,
+                        name: sessionNameCache[sid]
                     )
                 } else {
                     // update model if we now have it
                     if let m = event.model { sessionMap[sid]!.model = m }
+                    // update name if cache has it
+                    if let n = sessionNameCache[sid] { sessionMap[sid]!.name = n }
                 }
 
             case "UserPromptSubmit":
@@ -262,7 +295,7 @@ final class HooksActivityService: ObservableObject {
                 ensureSession(sid, firstEvent: event)
                 if sessionMap[sid]!.status == .blocked { sessionMap[sid]!.status = .working }
 
-            case "Stop":
+            case "Stop", "stop":
                 ensureSession(sid, firstEvent: event)
                 if sessionMap[sid]!.status != .ended { sessionMap[sid]!.status = .idle }
                 if let s = event.summary, !s.isEmpty { sessionMap[sid]!.lastAssistantMessage = s }
@@ -291,28 +324,9 @@ final class HooksActivityService: ObservableObject {
             .max(by: { $0.ts < $1.ts })
         currentProjectCwd = latestEvent?.cwd
 
-        // 4. Per-cwd dedup: pick the single session that best represents this cwd.
-        //    Score (higher = better): working=3, blocked=2, idle=1, ended=0.
-        //    Tiebreak: has messages > no messages, then most recent lastEventTs.
-        func statusScore(_ s: HookSession) -> Int {
-            switch s.status {
-            case .working: return 3
-            case .blocked: return 2
-            case .idle:    return 1
-            case .ended:   return 0
-            }
-        }
-        func hasMessages(_ s: HookSession) -> Bool {
-            s.lastUserPrompt != nil || s.lastAssistantMessage != nil
-        }
-        // Track most recent event timestamp per session for tiebreak
-        var lastEventTs: [String: Double] = [:]
-        for e in allEvents where !e.sessionId.isEmpty {
-            lastEventTs[e.sessionId] = max(lastEventTs[e.sessionId] ?? 0, e.ts)
-        }
-
-        // If no pending permission request in socket server, downgrade stale blocked → idle
-        // in sessionMap *before* bestPerCwd so all downstream consumers see the real status.
+        // 4. Show every live session independently (no cwd dedup).
+        //    If no pending permission request in socket server, downgrade stale blocked → idle
+        //    so all downstream consumers see the real status.
         let hasRealPending = AgentSocketServer.shared.pendingPermission != nil
         if !hasRealPending {
             for key in sessionMap.keys where sessionMap[key]!.status == .blocked {
@@ -320,43 +334,7 @@ final class HooksActivityService: ObservableObject {
             }
         }
 
-        var bestPerCwd: [String: HookSession] = [:]
-        for session in sessionMap.values {
-            let key = session.cwd
-            guard let existing = bestPerCwd[key] else {
-                bestPerCwd[key] = session; continue
-            }
-            let sScore = statusScore(session)
-            let eScore = statusScore(existing)
-            let newWins: Bool = {
-                if sScore != eScore { return sScore > eScore }
-                if hasMessages(session) != hasMessages(existing) { return hasMessages(session) }
-                // both equal — prefer the one with the most recent activity
-                let sTs = lastEventTs[session.id] ?? session.startTs
-                let eTs = lastEventTs[existing.id] ?? existing.startTs
-                return sTs > eTs
-            }()
-            if newWins { bestPerCwd[key] = session }
-        }
-
-        // 5. Message fallback: if winner has no messages, borrow from most active sibling.
-        let allByCwd = Dictionary(grouping: sessionMap.values, by: { $0.cwd })
-        for cwd in bestPerCwd.keys {
-            guard var best = bestPerCwd[cwd], !hasMessages(best) else { continue }
-            if let donor = allByCwd[cwd]?
-                .filter({ $0.id != best.id && hasMessages($0) })
-                .max(by: {
-                    let aTs = lastEventTs[$0.id] ?? $0.startTs
-                    let bTs = lastEventTs[$1.id] ?? $1.startTs
-                    return aTs < bTs
-                }) {
-                best.lastUserPrompt = donor.lastUserPrompt
-                best.lastAssistantMessage = donor.lastAssistantMessage
-                bestPerCwd[cwd] = best
-            }
-        }
-
-        filteredSessions = bestPerCwd.values
+        filteredSessions = sessionMap.values
             .filter { $0.status.isLive }
             .sorted { $0.startTs > $1.startTs }
             .prefix(20)

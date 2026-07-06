@@ -79,6 +79,7 @@ struct HookSession: Identifiable {
     var lastAssistantMessage: String?  // most recent Stop.summary
     var notableEvents: [HookEvent]     // PermissionRequest / Notification / StopFailure
     var platform: AgentPlatform         // source agent
+    var name: String?           // session title from ~/.claude/sessions/*.json
 
     // MARK: Computed
 
@@ -112,6 +113,12 @@ struct HookSession: Identifiable {
                 .replacingOccurrences(of: "auto-", with: "")
             return cleaned.isEmpty ? m : cleaned
         }
+    }
+
+    /// Primary display title: session name (e.g. "seven-island-23"), fallback to folder name
+    var displayTitle: String {
+        if let n = name, !n.isEmpty { return n }
+        return cwdBasename
     }
 
     /// Short display name for the platform ("Claude" / "Codex" / "OpenCode")

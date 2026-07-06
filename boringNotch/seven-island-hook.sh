@@ -93,9 +93,37 @@ if [ ! -S "$SOCKET_PATH" ]; then
 fi
 
 case "$ACTION" in
-  session|stop)
-    # Fire-and-forget: record to JSONL, nudge socket (action: hook so AgentSocketServer talks)
-    _write_jsonl "$ACTION" "$payload" "$LOG_PATH"
+  session)
+    # Fire-and-forget: record to JSONL, nudge socket
+    _write_jsonl "SessionStart" "$payload" "$LOG_PATH"
+    python3 -c "
+import socket, sys, json
+platform = sys.argv[1]
+action   = sys.argv[2]
+payload  = sys.argv[3]
+sock     = sys.argv[4]
+try:
+    p = json.loads(payload)
+except Exception:
+    sys.exit(0)
+p['platform'] = platform
+msg = json.dumps({'action': action, 'payload': p}) + '\n'
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(3)
+try:
+    s.connect(sock)
+    s.sendall(msg.encode())
+    s.shutdown(socket.SHUT_RDWR)
+except Exception:
+    pass
+finally:
+    s.close()
+" "$PLATFORM" "$ACTION" "$payload" "$SOCKET_PATH" 2>/dev/null || true
+    ;;
+
+  stop)
+    # Fire-and-forget: record to JSONL, nudge socket
+    _write_jsonl "Stop" "$payload" "$LOG_PATH"
     python3 -c "
 import socket, sys, json
 platform = sys.argv[1]
