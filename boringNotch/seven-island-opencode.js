@@ -254,7 +254,7 @@ export default async ({ client, serverUrl }) => {
       }
       return { hook_event_name: "PermissionRequest", session_id: makeID(p.sessionID), cwd,
                tool_name: toolName,
-               tool_input: JSON.stringify(toolInput).slice(0, 200),
+               tool_input: toolInput,
                description: patterns.length > 0 ? `${toolName}: ${patterns[0]}` : toolName,
                permission_id: p.id };
     }
