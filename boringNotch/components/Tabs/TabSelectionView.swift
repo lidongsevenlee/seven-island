@@ -15,7 +15,6 @@ struct TabModel: Identifiable {
 
 let tabs = [
     TabModel(label: "音乐", view: .music),
-    TabModel(label: "文件架", view: .shelf),
     TabModel(label: "剪贴板", view: .clipboard),
     TabModel(label: "VS Code", view: .vscodeProjects),
     TabModel(label: "菜单栏", view: .menuBarItems)
@@ -76,9 +75,6 @@ struct TabSelectionView: View {
                 .foregroundStyle(color)
                 .opacity(isSelected ? 0.98 : 0.82)
                 .offset(y: -0.25)
-        case .shelf:
-            Image(systemName: "tray.fill")
-                .foregroundStyle(color)
         case .clipboard:
             Image(systemName: "doc.on.clipboard")
                 .foregroundStyle(color)
@@ -91,9 +87,6 @@ struct TabSelectionView: View {
         case .menuBarItems:
             Image(systemName: "menubar.rectangle")
                 .foregroundStyle(color)
-        case .hooksActivity:
-            // Rendered in BoringHeader right side
-            EmptyView()
         }
     }
 }

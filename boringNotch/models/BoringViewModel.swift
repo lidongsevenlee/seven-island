@@ -23,11 +23,6 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var contentType: ContentType = .normal
     @Published private(set) var notchState: NotchState = .closed
 
-    @Published var dragDetectorTargeting: Bool = false
-    @Published var generalDropTargeting: Bool = false
-    @Published var dropZoneTargeting: Bool = false
-    @Published var dropEvent: Bool = false
-    @Published var anyDropZoneTargeting: Bool = false
     var cancellables: Set<AnyCancellable> = []
     
     @Published var hideOnClosed: Bool = true
@@ -35,6 +30,9 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
+    @Published var isSearchFocused: Bool = false
+    @Published var clipboardSearchText: String = ""
+    @Published var vscodeSearchText: String = ""
 
     @Published var screenUUID: String?
 
@@ -63,13 +61,6 @@ class BoringViewModel: NSObject, ObservableObject {
         notchSize = getClosedNotchSize(screenUUID: screenUUID)
         closedNotchSize = notchSize
 
-        Publishers.CombineLatest3($dropZoneTargeting, $dragDetectorTargeting, $generalDropTargeting)
-            .map { shelf, drag, general in
-                shelf || drag || general
-            }
-            .assign(to: \.anyDropZoneTargeting, on: self)
-            .store(in: &cancellables)
-        
         setupDetectorObserver()
     }
     
@@ -212,15 +203,25 @@ class BoringViewModel: NSObject, ObservableObject {
         setOpenNotchHeight(openNotchSize.height)
     }
 
+    func closeAutomatically() {
+        guard !isSearchFocused else { return }
+        close()
+    }
+
+    func closeAfterHoverExit(position: NSPoint = NSEvent.mouseLocation) {
+        // Typing can hide the cursor and end SwiftUI hover tracking in place.
+        guard notchState == .open,
+              !isMouseHovering(position: position),
+              !isBatteryPopoverActive else { return }
+        close()
+    }
+
     func close() {
-        // Do not close while a share picker or sharing service is active
-        if SharingStateManager.shared.preventNotchClose {
-            return
-        }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
         self.isBatteryPopoverActive = false
+        self.isSearchFocused = false
         self.coordinator.sneakPeek.show = false
         self.edgeAutoOpenActive = false
 

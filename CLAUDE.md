@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-**Seven Island** is a macOS notch enhancement app — it turns the MacBook notch into a dynamic hub: music controls, calendar, clipboard history, file shelf with AirDrop, HUD replacement (volume/brightness), and developer tool monitoring (Codex/Claude Code sessions). Written in SwiftUI for macOS 14+.
+**Seven Island** is a macOS notch enhancement app with music controls, calendar, clipboard history, VS Code projects, menu bar controls, and volume/brightness HUD replacement. Written in SwiftUI for macOS 14+.
 
 The app uses a borderless, floating panel window positioned at the top-center of the screen, mimicking the notch. It has two visual states: **closed** (compact, lives in the notch area) and **open** (expanded, shows a tabbed interface).
 
@@ -66,55 +66,54 @@ The tag push triggers the GitHub Actions release workflow (`.github/workflows/re
 | Constant | Value | Use |
 |---|---|---|
 | `openNotchSize` | 640×240 | Default open notch dimensions |
-| `sevenIslandFeatureNotchHeight` | 360 (1.5×) | Clipboard, VS Code, Codex/Claude views (max open height) |
+| `sevenIslandFeatureNotchHeight` | 360 (1.5×) | Maximum supported open height |
 | `windowSize` | 640×500 | Window frame (covers max height + shadow) |
 
 ### ContentView structure (`ContentView.swift`)
+
 ```
-NotchLayout()                         // VStack: header + body
-  ├── BoringHeader()                  // Tab bar, "open notch" chrome
+NotchLayout()
+  ├── BoringHeader()
   └── (if open) content switch:
-        .home         → NotchHomeView
-        .shelf        → ShelfView
-        .clipboard    → ClipboardHistoryView
+        .music          → MusicHomeView
+        .clipboard      → ClipboardHistoryView
         .vscodeProjects → VSCodeProjectsView
-        .codexStatus  → CodexStatusView
-        .claudeStatus → ClaudeStatusView
+        .menuBarItems   → MenuBarItemsView
 ```
 
-**Closed state** renders live activities directly in NotchLayout (music visualizer, Codex/Claude activity icons, battery notifications, face animation). Open/closed transitions are animated springs.
+The closed state renders music, battery notifications, HUD indicators, and the face animation. Open/closed transitions use animated springs. Unknown persisted tab identifiers fall back to `.music`.
 
 ### Seven Island feature modules
 
-Each feature under `components/SevenIsland/` follows the pattern: **Model → Service → View**:
+Features under `components/SevenIsland/` follow **Model → Service → View**:
 
-| Feature | Models | Service | View |
+| Feature | Model | Service | View |
 |---|---|---|---|
-| Codex status | `Models/CodexStatusSnapshot.swift` | `Services/CodexStatusService.swift` | `Views/CodexStatusView.swift` |
-| Claude status | `Models/ClaudeStatusSnapshot.swift` | `Services/ClaudeStatusService.swift` | `Views/ClaudeStatusView.swift` |
 | Clipboard | `Models/ClipboardHistoryItem.swift` | `Services/ClipboardHistoryStore.swift` | `Views/ClipboardHistoryView.swift` |
 | VS Code | `Models/VSCodeProjectItem.swift` | `Services/VSCodeRecentProjectsService.swift` | `Views/VSCodeProjectsView.swift` |
+| Menu bar | `Models/MenuBarProxyItem.swift` | `Services/MenuBarItemMonitor.swift` | `Views/MenuBarItemsView.swift` |
 
-**Service pattern:** Singleton `ObservableObject` with `@Published private(set) var snapshot` and a `refresh()` method that dispatches background work to `.global(qos: .utility)` then publishes results on `.main`. Views observe the service and poll via a 10-second `Timer.publish` `.onReceive`.
+`ClipboardHistoryStore` monitors `NSPasteboard` and persists history to the app's Application Support directory. Copying a history item updates its recency and saves the new order. `VSCodeRecentProjectsService` scans the configured project directory, includes pinned folders, and uses VS Code's recent-folder data for ordering.
 
-**Dynamic notch height:** For Claude and Codex views, the ContentView does NOT set a fixed notch height. Each view's `.task` modifier computes its own height based on session count (`count * 38 + chrome`) and calls `vm.setOpenNotchHeight()`. ContentView keeps the current height (`vm.notchSize.height`) when switching to these views. This avoids animation conflicts between ContentView's 0.35s transition and the subview's 0.24s height update.
-
-### Data sources for external tools
-- **Codex:** reads `~/.codex/sessions/*.json` + `~/.codex/projects/{encoded-cwd}/{sessionId}.jsonl`. CWD encoding: replace `/` with `-`
-- **Claude Code:** reads `~/.claude/sessions/*.json` + `~/.claude/projects/{encoded-cwd}/{sessionId}.jsonl`. CWD encoding: same `-` replacement. Session `startedAt` is a millisecond Unix timestamp (Int). JSONL tool_use blocks are inside `message.content[]` (not top-level). Idle threshold: 30 seconds
-- **VS Code:** reads `~/Library/Application Support/Code/storage.json` for recent projects
+Search text lives in the per-window `BoringViewModel` through `clipboardSearchText` and `vscodeSearchText`, so it survives tab changes and notch closure during the app session. `closeAutomatically()` respects search focus. `closeAfterHoverExit(position:)` checks the actual mouse position because text entry can hide the cursor and end SwiftUI hover tracking.
 
 ### Adding a new tab/feature
-1. Add `case yourFeature` to `NotchViews` enum in `enums/generic.swift`
-2. Create Model → Service → View files under `components/SevenIsland/`
-3. Add tab entry in `TabSelectionView.swift` (`tabs` array + icon routing)
-4. Add view routing in `ContentView.swift` NotchLayout switch
-5. If it needs a live activity in closed notch: add computed properties and view builder in ContentView
-6. Wire notch height: set initial height in `onChange(of: vm.notchState)` and `onChange(of: coordinator.currentView)`. For dynamic height views, keep `vm.notchSize.height` (no forced change) and let the view manage its own height via `.task`
+
+1. Add a case to `NotchViews` in `enums/generic.swift`.
+2. Create the feature's model, service, and view under `components/SevenIsland/`.
+3. Add its tab and icon to `components/Tabs/TabSelectionView.swift`.
+4. Add routing to the `ContentView.swift` content switch.
+5. Keep open-height changes coordinated through `vm.setOpenNotchHeight()`; current tabs use `openNotchSize.height`.
 
 ### Key patterns
-- **`Defaults`** (from `swiftui-defaults`) for all user preferences — keys defined in `models/Constants.swift` as `extension Defaults.Keys`
-- **`@AppStorage`** used in BoringViewCoordinator for tab persistence, `firstLaunch`, `musicLiveActivityEnabled`
-- **Custom Shapes** for app icons — SVG path data tokenized at init time into `CGMutablePath`, scaled in `path(in:)` via `CGAffineTransform`
-- **Shelf** feature uses a separate suite of services under `components/Shelf/Services/` including `ShelfPersistenceService` (JSON file storage), `ThumbnailService`, `QuickLookService`, `QuickShareService`
-- **HUD replacement** uses XPC helper (`BoringNotchXPCHelper`) for accessibility permissions and media key interception
+
+- User preferences use `Defaults`; keys are defined in `models/Constants.swift`.
+- `BoringViewCoordinator` uses `@AppStorage` for the last tab, first launch, and music activity preferences.
+- App icons use custom SwiftUI shapes backed by cached SVG paths.
+- HUD replacement uses `BoringNotchXPCHelper` for accessibility authorization and media key interception.
+
+### Verification
+
+- Run `./script/run_clipboard_tests.sh` for clipboard ordering, deduplication, and persistence.
+- After building the Debug app, run `./script/run_notch_interaction_tests.sh` for search focus and dismissal behavior.
+- Run `./script/run_feature_tests.sh` against the Debug app for clipboard, VS Code, and lyrics checks.

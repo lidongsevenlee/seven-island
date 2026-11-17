@@ -11,13 +11,11 @@ import SwiftUI
 struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
-    @StateObject var tvm = ShelfStateViewModel.shared
     @State private var isSettingsHovered = false
-    @State private var isClaudeHovered = false
     var body: some View {
         HStack(spacing: 0) {
             HStack {
-                if !tvm.isEmpty || coordinator.alwaysShowTabs {
+                if coordinator.alwaysShowTabs {
                     TabSelectionView()
                 } else if vm.notchState == .open {
                     EmptyView()
@@ -59,30 +57,6 @@ struct BoringHeader: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        // Agent (Claude / Codex / OpenCode) tab
-                        Button(action: {
-                            coordinator.currentView = .hooksActivity
-                        }) {
-                            Capsule()
-                                .fill(Color(nsColor: .secondarySystemFill).opacity(isClaudeHovered || coordinator.currentView == .hooksActivity ? 1 : 0))
-                                .frame(width: 24, height: 24)
-                                .overlay {
-                                    Image(systemName: "antenna.radiowaves.left.and.right")
-                                        .symbolRenderingMode(.hierarchical)
-                                        .foregroundStyle(
-                                            coordinator.currentView == .hooksActivity
-                                            ? .white
-                                            : .gray.opacity(isClaudeHovered ? 0.98 : 0.82)
-                                        )
-                                        .font(.system(size: 12, weight: .medium))
-                                }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .help("Agent 会话")
-                        .onHover { hovering in
-                            isClaudeHovered = hovering
-                        }
-
                         if Defaults[.settingsIconInNotch] {
                             Button(action: {
                                 DispatchQueue.main.async {

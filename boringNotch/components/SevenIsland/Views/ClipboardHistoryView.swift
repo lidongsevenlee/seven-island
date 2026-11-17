@@ -3,14 +3,13 @@ import SwiftUI
 struct ClipboardHistoryView: View {
     @ObservedObject private var store = ClipboardHistoryStore.shared
     @EnvironmentObject private var vm: BoringViewModel
-    @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
 
     private var filteredItems: [ClipboardHistoryItem] {
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
+        guard !vm.clipboardSearchText.trimmingCharacters(in: .whitespaces).isEmpty else {
             return store.items
         }
-        let query = searchText.lowercased()
+        let query = vm.clipboardSearchText.lowercased()
         return store.items.filter { item in
             if item.isImage {
                 return false
@@ -25,14 +24,14 @@ struct ClipboardHistoryView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 12))
-                TextField("搜索剪贴板历史...", text: $searchText)
+                TextField("搜索剪贴板历史...", text: $vm.clipboardSearchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(.white)
                     .focused($isSearchFocused)
-                if !searchText.isEmpty {
+                if !vm.clipboardSearchText.isEmpty {
                     Button {
-                        searchText = ""
+                        vm.clipboardSearchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
@@ -73,6 +72,12 @@ struct ClipboardHistoryView: View {
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+        .onChange(of: isSearchFocused) { _, focused in
+            vm.isSearchFocused = focused
+        }
+        .onDisappear {
+            vm.isSearchFocused = false
+        }
         .preferredColorScheme(.dark)
     }
 }

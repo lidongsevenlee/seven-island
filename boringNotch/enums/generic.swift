@@ -26,11 +26,9 @@ public enum NotchState {
 
 public enum NotchViews: String {
     case music = "home"
-    case shelf
     case clipboard
     case vscodeProjects
     case menuBarItems
-    case hooksActivity
 }
 
 enum SettingsEnum {
@@ -40,7 +38,6 @@ enum SettingsEnum {
     case download
     case mediaPlayback
     case hud
-    case shelf
     case extensions
 }
 

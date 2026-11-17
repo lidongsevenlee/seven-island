@@ -115,7 +115,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow?
     let vm: BoringViewModel = .init()
     @ObservedObject var coordinator = BoringViewCoordinator.shared
-    var quickShareService = QuickShareService.shared
     var whatsNewWindow: NSWindow?
     var timer: Timer?
     var closeNotchTask: Task<Void, Never>?
@@ -124,10 +123,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenLockedObserver: Any?
     private var screenUnlockedObserver: Any?
     private var isScreenLocked: Bool = false
-    /// One token per window — observers are scoped to a specific NSWindow object.
-    /// Keyed by display UUID; the single-window mode uses the special key "main".
-    private var windowScreenDidChangeObservers: [String: NSObjectProtocol] = [:]
-    private var dragDetectors: [String: DragDetector] = [:] // UUID -> DragDetector
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
@@ -144,7 +139,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             screenUnlockedObserver = nil
         }
         MusicManager.shared.destroy()
-        cleanupDragDetectors()
         cleanupWindows()
         XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
     }
@@ -215,84 +209,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             windows.removeAll()
             viewModels.removeAll()
-            // Drop all per-window screen observers along with their windows.
-            windowScreenDidChangeObservers.values.forEach {
-                NotificationCenter.default.removeObserver($0)
-            }
-            windowScreenDidChangeObservers.removeAll()
         } else if let window = window {
             window.close()
             NotchSpaceManager.shared.notchSpace.windows.remove(window)
-            if let obs = windowScreenDidChangeObservers.removeValue(forKey: "main") {
-                NotificationCenter.default.removeObserver(obs)
-            }
             self.window = nil
-        }
-    }
-
-    private func cleanupDragDetectors() {
-        dragDetectors.values.forEach { detector in
-            detector.stopMonitoring()
-        }
-        dragDetectors.removeAll()
-    }
-
-    private func setupDragDetectors() {
-        cleanupDragDetectors()
-
-        guard Defaults[.expandedDragDetection] else { return }
-
-        if Defaults[.showOnAllDisplays] {
-            for screen in NSScreen.screens {
-                setupDragDetectorForScreen(screen)
-            }
-        } else {
-            let preferredScreen: NSScreen? = window?.screen
-                ?? NSScreen.screen(withUUID: coordinator.selectedScreenUUID)
-                ?? NSScreen.main
-
-            if let screen = preferredScreen {
-                setupDragDetectorForScreen(screen)
-            }
-        }
-    }
-
-    private func setupDragDetectorForScreen(_ screen: NSScreen) {
-        guard let uuid = screen.displayUUID else { return }
-        
-        let screenFrame = screen.frame
-        let notchHeight = openNotchSize.height
-        let notchWidth = openNotchSize.width
-        
-        // Create notch region at the top-center of the screen where an open notch would occupy
-        let notchRegion = CGRect(
-            x: screenFrame.midX - notchWidth / 2,
-            y: screenFrame.maxY - notchHeight,
-            width: notchWidth,
-            height: notchHeight
-        )
-        
-        let detector = DragDetector(notchRegion: notchRegion)
-        
-        detector.onDragEntersNotchRegion = { [weak self] in
-            Task { @MainActor in
-                self?.handleDragEntersNotchRegion(onScreen: screen)
-            }
-        }
-        
-        dragDetectors[uuid] = detector
-        detector.startMonitoring()
-    }
-
-    private func handleDragEntersNotchRegion(onScreen screen: NSScreen) {
-        guard let uuid = screen.displayUUID else { return }
-        
-        if Defaults[.showOnAllDisplays], let viewModel = viewModels[uuid] {
-            viewModel.open()
-            coordinator.currentView = .shelf
-        } else if !Defaults[.showOnAllDisplays], let windowScreen = window?.screen, screen == windowScreen {
-            vm.open()
-            coordinator.currentView = .shelf
         }
     }
 
@@ -317,22 +237,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
 
-        // Observe when this window's screen changes so we can update drag detectors.
-        // Tokens are stored per-window so cleanupWindows() can remove the right one
-        // instead of orphaning observers across multiple displays.
-        let observerKey = screen.displayUUID ?? "main"
-        if let old = windowScreenDidChangeObservers.removeValue(forKey: observerKey) {
-            NotificationCenter.default.removeObserver(old)
-        }
-        let token = NotificationCenter.default.addObserver(
-            forName: NSWindow.didChangeScreenNotification,
-            object: window,
-            queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    self?.setupDragDetectors()
-                }
-        }
-        windowScreenDidChangeObservers[observerKey] = token
         return window
     }
 
@@ -353,19 +257,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = ClipboardHistoryStore.shared
-        AgentSocketServer.shared.start()
-        setupHooksNotifications()
-        setupGatewayLifecycle()
-
-        // Repair stale hook paths (app moved/updated) and prompt first-launch
-        // integration for Claude Code / Codex if detected.
-        DispatchQueue.global(qos: .utility).async {
-            HookRegistrationManager.repairStalePathsIfNeeded()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.promptAgentHookFirstLaunchIfNeeded()
-        }
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenConfigurationDidChange),
@@ -378,7 +269,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.adjustWindowPosition(changeAlpha: true)
-                self?.setupDragDetectors()
             }
         }
 
@@ -387,7 +277,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.adjustWindowPosition()
-                self?.setupDragDetectors()
             }
         }
 
@@ -407,17 +296,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self = self else { return }
                 self.cleanupWindows(shouldInvert: true)
                 self.adjustWindowPosition(changeAlpha: true)
-                self.setupDragDetectors()
             }
         }
 
-        NotificationCenter.default.addObserver(
-            forName: Notification.Name.expandedDragDetectionChanged, object: nil, queue: nil
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.setupDragDetectors()
-            }
-        }
 
         // Use closure-based observers for DistributedNotificationCenter and keep tokens for removal
         screenLockedObserver = DistributedNotificationCenter.default().addObserver(
@@ -482,7 +363,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         do {
                             try await Task.sleep(for: .seconds(3))
                             await MainActor.run {
-                                viewModel?.close()
+                                viewModel?.closeAutomatically()
                             }
                         } catch { }
                     }
@@ -511,7 +392,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             adjustWindowPosition(changeAlpha: true)
         }
 
-        setupDragDetectors()
 
         if coordinator.firstLaunch {
             DispatchQueue.main.async {
@@ -560,7 +440,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { [weak self] in
                 self?.cleanupWindows()
                 self?.adjustWindowPosition()
-                self?.setupDragDetectors()
             }
         }
     }
@@ -576,9 +455,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     NotchSpaceManager.shared.notchSpace.windows.remove(window)
                     windows.removeValue(forKey: uuid)
                     viewModels.removeValue(forKey: uuid)
-                    if let obs = windowScreenDidChangeObservers.removeValue(forKey: uuid) {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
                 }
             }
 
@@ -652,110 +528,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(self)
     }
 
-    // MARK: - Gateway lifecycle
-
-    /// 启动时按 Defaults[.gatewayEnabled] 拉起 gateway；订阅 toggle 变化即时启停。
-    /// 阶段 B：仅启动 /health endpoint，阶段 C 后才支持真正的转发。
-    private func setupGatewayLifecycle() {
-        if Defaults[.gatewayEnabled] {
-            ClaudeGatewayService.shared.start()
-        }
-        // 监听用户在 Settings 里拨 toggle 的变化。Defaults.observe 在 MainActor 上回调。
-        Defaults.observe(.gatewayEnabled) { change in
-            Task { @MainActor in
-                if change.newValue {
-                    ClaudeGatewayService.shared.start()
-                } else {
-                    ClaudeGatewayService.shared.stop()
-                }
-            }
-        }.tieToLifetime(of: self)
-        // 端口变化时如果在跑，重启
-        Defaults.observe(.gatewayPort) { _ in
-            Task { @MainActor in
-                if ClaudeGatewayService.shared.status.isRunning {
-                    ClaudeGatewayService.shared.restart()
-                }
-            }
-        }.tieToLifetime(of: self)
-    }
-
-    // MARK: - Hooks notifications
-
-    private func setupHooksNotifications() {
-        HooksActivityService.shared.onNotifiableStatusChange = { [weak self] _, _, status, cwdBasename in
-            guard let self else { return }
-            // Only surface PermissionRequest banners. Stop / idle transitions are too
-            // noisy: every assistant turn ends with a Stop, so the active session you
-            // are watching would pop "<cwd> 已完成" after every reply. The user is
-            // already looking at the terminal that produced the Stop — they don't need
-            // a notch banner on top of it.
-            guard status == .blocked else { return }
-            let coordinator = BoringViewCoordinator.shared
-            ClaudeHookNotificationState.shared.label = "\(cwdBasename) 需要授权"
-            ClaudeHookNotificationState.shared.isBlocked = true
-            coordinator.toggleExpandingView(
-                status: true,
-                type: .claudeHook,
-                value: 1
-            )
-        }
-    }
-
-    // MARK: - Agent Hook first-launch prompt
-
-    /// Prompt the user once to enable Claude Code / Codex integration when
-    /// their respective config directories (~/.claude / ~/.codex) are detected.
-    private func promptAgentHookFirstLaunchIfNeeded() {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-
-        if !Defaults[.agentHookDidPromptClaude] {
-            Defaults[.agentHookDidPromptClaude] = true
-            if FileManager.default.fileExists(atPath: home + "/.claude") {
-                presentAgentHookPrompt(for: .claude)
-            }
-        }
-        if !Defaults[.agentHookDidPromptCodex] {
-            Defaults[.agentHookDidPromptCodex] = true
-            if FileManager.default.fileExists(atPath: home + "/.codex") {
-                presentAgentHookPrompt(for: .codex)
-            }
-        }
-        if !Defaults[.agentHookDidPromptOpenCode] {
-            Defaults[.agentHookDidPromptOpenCode] = true
-            if FileManager.default.fileExists(atPath: home + "/.config/opencode") {
-                presentAgentHookPrompt(for: .opencode)
-            }
-        }
-    }
-
-    private func presentAgentHookPrompt(for platform: AgentPlatform) {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.icon = NSImage(systemSymbolName: "antenna.radiowaves.left.and.right",
-                             accessibilityDescription: nil)
-        alert.messageText = "启用 \(platform.displayName) 集成？"
-        alert.informativeText = "Seven Island 将在 settings 中注册 hook 以接收会话状态事件。可在「设置 → Agent 集成」随时关闭。"
-        alert.addButton(withTitle: "启用")
-        alert.addButton(withTitle: "以后再说")
-        let response = alert.runModal()
-        guard response == .alertFirstButtonReturn else { return }
-        do {
-            try HookRegistrationManager.install(
-                platform,
-                permissionIntercept: Defaults[.agentHookPermissionIntercept],
-                timeoutSeconds: Defaults[.agentHookPermissionTimeout]
-            )
-            switch platform {
-            case .claude:   Defaults[.agentHookClaudeEnabled]   = true
-            case .codex:    Defaults[.agentHookCodexEnabled]    = true
-            case .opencode: Defaults[.agentHookOpenCodeEnabled] = true
-            }
-        } catch {
-            print("[AgentHook] First-launch install failed (\(platform.rawValue)): \(error.localizedDescription)")
-        }
-    }
-
     private func showOnboardingWindow(step: OnboardingStep = .welcome) {
         if onboardingWindowController == nil {
             let window = NSWindow(
@@ -800,7 +572,6 @@ extension Notification.Name {
     static let notchHeightChanged = Notification.Name("NotchHeightChanged")
     static let showOnAllDisplaysChanged = Notification.Name("showOnAllDisplaysChanged")
     static let automaticallySwitchDisplayChanged = Notification.Name("automaticallySwitchDisplayChanged")
-    static let expandedDragDetectionChanged = Notification.Name("expandedDragDetectionChanged")
 }
 
 extension CGRect: @retroactive Hashable {

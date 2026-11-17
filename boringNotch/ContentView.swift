@@ -25,7 +25,6 @@ struct ContentView: View {
     @ObservedObject var volumeManager = VolumeManager.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
-    @State private var anyDropDebounceTask: Task<Void, Never>?
 
     @State private var haptics: Bool = false
 
@@ -59,11 +58,7 @@ struct ContentView: View {
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
-        if coordinator.expandingView.type == .claudeHook && coordinator.expandingView.show
-            && vm.notchState == .closed
-        {
-            chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
-        } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
+        if coordinator.expandingView.type == .battery && coordinator.expandingView.show
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
@@ -134,28 +129,9 @@ struct ContentView: View {
                         TapGesture()
                             .onEnded { _ in
                                 guard vm.notchState == .closed else { return }
-                                // Block tap while a claude permission banner is visible
-                                let isPermissionBanner = coordinator.expandingView.show
-                                    && coordinator.expandingView.type == .claudeHook
-                                    && ClaudeHookNotificationState.shared.isBlocked
-                                guard !isPermissionBanner else { return }
                                 doOpen()
                             }
                     )
-                    .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
-                        if vm.notchState == .open && !isHovering && !vm.isBatteryPopoverActive {
-                            hoverTask?.cancel()
-                            hoverTask = Task {
-                                try? await Task.sleep(for: .milliseconds(100))
-                                guard !Task.isCancelled else { return }
-                                await MainActor.run {
-                                    if self.vm.notchState == .open && !self.isHovering && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
-                                        self.vm.close()
-                                    }
-                                }
-                            }
-                        }
-                    }
                     .onChange(of: vm.notchState) { _, newState in
                         if newState == .closed && isHovering {
                             withAnimation {
@@ -169,23 +145,19 @@ struct ContentView: View {
                         }
                     }
                     .onChange(of: coordinator.currentView) { _, _ in
-                        // All tabs share the same default open height.
-                        // Previously, hooksActivity used sevenIslandFeatureNotchHeight (360)
-                        // which caused the notch to randomly jump tall when switching to the
-                        // Claude tab while the notch was already open.
                         withAnimation(.smooth(duration: 0.35)) {
                             vm.setOpenNotchHeight(openNotchSize.height)
                         }
                     }
                     .onChange(of: vm.isBatteryPopoverActive) {
-                        if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open && !SharingStateManager.shared.preventNotchClose {
+                        if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open {
                             hoverTask?.cancel()
                             hoverTask = Task {
                                 try? await Task.sleep(for: .milliseconds(100))
                                 guard !Task.isCancelled else { return }
                                 await MainActor.run {
-                                    if !self.vm.isBatteryPopoverActive && !self.isHovering && self.vm.notchState == .open && !SharingStateManager.shared.preventNotchClose {
-                                        self.vm.close()
+                                    if !self.vm.isBatteryPopoverActive && !self.isHovering && self.vm.notchState == .open {
+                                        self.vm.closeAutomatically()
                                     }
                                 }
                             }
@@ -215,35 +187,8 @@ struct ContentView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .compositingGroup()
-        .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
-        .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
-            anyDropDebounceTask?.cancel()
-
-            if isTargeted {
-                if vm.notchState == .closed {
-                    coordinator.currentView = .shelf
-                    doOpen()
-                }
-                return
-            }
-
-            anyDropDebounceTask = Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
-                guard !Task.isCancelled else { return }
-
-                if vm.dropEvent {
-                    vm.dropEvent = false
-                    return
-                }
-
-                vm.dropEvent = false
-                if !SharingStateManager.shared.preventNotchClose {
-                    vm.close()
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -261,14 +206,7 @@ struct ContentView: View {
                     .padding(.top, 40)
                     Spacer()
                 } else {
-                    if coordinator.expandingView.type == .claudeHook && coordinator.expandingView.show
-                        && vm.notchState == .closed
-                    {
-                        ClaudeHookNotificationView()
-                            .frame(height: ClaudeHookNotificationState.shared.isBlocked
-                                   ? claudeHookBlockedHeight
-                                   : vm.effectiveClosedNotchHeight)
-                    } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
+                    if coordinator.expandingView.type == .battery && coordinator.expandingView.show
                         && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
                     {
                         HStack(spacing: 0) {
@@ -357,16 +295,12 @@ struct ContentView: View {
                     switch coordinator.currentView {
                     case .music:
                         MusicHomeView(albumArtNamespace: albumArtNamespace)
-                    case .shelf:
-                        ShelfView()
                     case .clipboard:
                         ClipboardHistoryView()
                     case .vscodeProjects:
                         VSCodeProjectsView()
                     case .menuBarItems:
                         MenuBarItemsView()
-                    case .hooksActivity:
-                        HooksActivityView()
                     }
                 }
                 // .id() makes SwiftUI treat each tab as a distinct view identity,
@@ -383,7 +317,6 @@ struct ContentView: View {
                 .allowsHitTesting(vm.notchState == .open)
             }
         }
-        .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], delegate: GeneralDropTargetDelegate(isTargeted: $vm.generalDropTargeting))
     }
 
     @ViewBuilder
@@ -507,22 +440,6 @@ struct ContentView: View {
         )
     }
 
-    @ViewBuilder
-    var dragDetector: some View {
-        if Defaults[.boringShelf] && vm.notchState == .closed {
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-        .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $vm.dragDetectorTargeting) { providers in
-            vm.dropEvent = true
-            ShelfStateViewModel.shared.load(providers)
-            return true
-        }
-        } else {
-            EmptyView()
-        }
-    }
-
     private func doOpen() {
         withAnimation(animationSpring) {
             vm.open()
@@ -542,13 +459,9 @@ struct ContentView: View {
                 haptics.toggle()
             }
             
-            let isPermissionBanner = coordinator.expandingView.show
-                && coordinator.expandingView.type == .claudeHook
-                && ClaudeHookNotificationState.shared.isBlocked
             guard vm.notchState == .closed,
                   !coordinator.sneakPeek.show,
-                  Defaults[.openNotchOnHover],
-                  !isPermissionBanner else { return }
+                  Defaults[.openNotchOnHover] else { return }
             
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
@@ -568,64 +481,16 @@ struct ContentView: View {
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
+                    let mousePosition = NSEvent.mouseLocation
+                    let isPointerInside = self.vm.isMouseHovering(position: mousePosition)
                     withAnimation(animationSpring) {
-                        self.isHovering = false
+                        self.isHovering = isPointerInside
                     }
 
-                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
-                        self.vm.close()
-                    }
+                    self.vm.closeAfterHoverExit(position: mousePosition)
                 }
             }
         }
     }
 
-}
-
-struct FullScreenDropDelegate: DropDelegate {
-    @Binding var isTargeted: Bool
-    let onDrop: () -> Void
-
-    func dropEntered(info _: DropInfo) {
-        isTargeted = true
-    }
-
-    func dropExited(info _: DropInfo) {
-        isTargeted = false
-    }
-
-    func performDrop(info _: DropInfo) -> Bool {
-        isTargeted = false
-        onDrop()
-        return true
-    }
-
-}
-
-struct GeneralDropTargetDelegate: DropDelegate {
-    @Binding var isTargeted: Bool
-
-    func dropEntered(info: DropInfo) {
-        isTargeted = true
-    }
-
-    func dropExited(info: DropInfo) {
-        isTargeted = false
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        return DropProposal(operation: .cancel)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        return false
-    }
-}
-
-#Preview {
-    let vm = BoringViewModel()
-    vm.open()
-    return ContentView()
-        .environmentObject(vm)
-        .frame(width: vm.notchSize.width, height: vm.notchSize.height)
 }

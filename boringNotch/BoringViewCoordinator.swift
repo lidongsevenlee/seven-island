@@ -18,7 +18,6 @@ enum SneakContentType {
     case mic
     case battery
     case download
-    case claudeHook  // Claude Code session state notification (blocked / stop)
 }
 
 struct sneakPeek {
@@ -71,9 +70,7 @@ class BoringViewCoordinator: ObservableObject {
         didSet {
             if !alwaysShowTabs {
                 openLastTabByDefault = false
-                if ShelfStateViewModel.shared.isEmpty || !Defaults[.openShelfByDefault] {
-                    currentView = .music
-                }
+                currentView = .music
             }
         }
     }
@@ -303,17 +300,12 @@ class BoringViewCoordinator: ObservableObject {
         didSet {
             if expandingView.show {
                 expandingViewTask?.cancel()
-                // Permission requests stay until the user explicitly responds
-                let isBlockedPermission = expandingView.type == .claudeHook
-                    && ClaudeHookNotificationState.shared.isBlocked
-                if !isBlockedPermission {
-                    let duration: TimeInterval = (expandingView.type == .download ? 2 : expandingView.type == .claudeHook ? 5 : 3)
-                    let currentType = expandingView.type
-                    expandingViewTask = Task { [weak self] in
-                        try? await Task.sleep(for: .seconds(duration))
-                        guard let self = self, !Task.isCancelled else { return }
-                        self.toggleExpandingView(status: false, type: currentType)
-                    }
+                let duration: TimeInterval = expandingView.type == .download ? 2 : 3
+                let currentType = expandingView.type
+                expandingViewTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(duration))
+                    guard let self = self, !Task.isCancelled else { return }
+                    self.toggleExpandingView(status: false, type: currentType)
                 }
             } else {
                 expandingViewTask?.cancel()

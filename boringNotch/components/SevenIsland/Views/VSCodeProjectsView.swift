@@ -5,8 +5,6 @@ struct VSCodeProjectsView: View {
     @ObservedObject private var service = VSCodeRecentProjectsService.shared
     @EnvironmentObject private var vm: BoringViewModel
     @Default(.vscodeProjectsDirectory) private var vscodeProjectsDirectory
-    @State private var searchText = ""
-
     @FocusState private var isSearchFocused: Bool
 
     private var emptyMessage: String {
@@ -16,10 +14,10 @@ struct VSCodeProjectsView: View {
         return "\(vscodeProjectsDirectory) 中没有文件夹"
     }
     private var filteredProjects: [VSCodeProjectItem] {
-        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else {
+        guard !vm.vscodeSearchText.trimmingCharacters(in: .whitespaces).isEmpty else {
             return service.projects
         }
-        let query = searchText.lowercased()
+        let query = vm.vscodeSearchText.lowercased()
         return service.projects
             .filter { $0.matches(query: query) }
     }
@@ -30,7 +28,7 @@ struct VSCodeProjectsView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 12))
-                TextField("搜索项目...", text: $searchText)
+                TextField("搜索项目...", text: $vm.vscodeSearchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundStyle(.white)
@@ -42,9 +40,9 @@ struct VSCodeProjectsView: View {
                             vm.close()
                         }
                     }
-                if !searchText.isEmpty {
+                if !vm.vscodeSearchText.isEmpty {
                     Button {
-                        searchText = ""
+                        vm.vscodeSearchText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
@@ -94,6 +92,12 @@ struct VSCodeProjectsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 isSearchFocused = true
             }
+        }
+        .onChange(of: isSearchFocused) { _, focused in
+            vm.isSearchFocused = focused
+        }
+        .onDisappear {
+            vm.isSearchFocused = false
         }
         .preferredColorScheme(.dark)
     }

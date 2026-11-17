@@ -50,10 +50,13 @@ final class ClipboardHistoryStore: ObservableObject {
         pasteboard.clearContents()
         if let imageData = item.imageData {
             pasteboard.setData(imageData, forType: .png)
+            items = Self.nextItems(insertingImageData: imageData, into: items, limit: maxItemCount)
         } else if let text = item.content {
             pasteboard.setString(text, forType: .string)
+            items = Self.nextItems(inserting: text, into: items, limit: maxItemCount)
         }
         lastChangeCount = pasteboard.changeCount
+        scheduleSave()
     }
 
     func record(_ content: String) {

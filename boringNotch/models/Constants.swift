@@ -157,15 +157,6 @@ extension Defaults.Keys {
     // Option key modifier behaviour for media keys
     static let optionKeyAction = Key<OptionKeyAction>("optionKeyAction", default: OptionKeyAction.openSettings)
     
-    // MARK: Shelf
-    static let boringShelf = Key<Bool>("boringShelf", default: true)
-    static let openShelfByDefault = Key<Bool>("openShelfByDefault", default: true)
-    static let shelfTapToOpen = Key<Bool>("shelfTapToOpen", default: true)
-    static let quickShareProvider = Key<String>("quickShareProvider", default: QuickShareProvider.defaultProvider.id)
-    static let copyOnDrag = Key<Bool>("copyOnDrag", default: false)
-    static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
-    static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
-    
     // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)
@@ -188,16 +179,6 @@ extension Defaults.Keys {
     static let vscodeIncludeHidden = Key<Bool>("vscodeIncludeHidden", default: false)
     static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
 
-    // Agent (Claude Code / Codex / OpenCode) hooks integration
-    static let agentHookClaudeEnabled        = Key<Bool>("agentHookClaudeEnabled", default: false)
-    static let agentHookCodexEnabled         = Key<Bool>("agentHookCodexEnabled", default: false)
-    static let agentHookOpenCodeEnabled      = Key<Bool>("agentHookOpenCodeEnabled", default: false)
-    static let agentHookPermissionIntercept  = Key<Bool>("agentHookPermissionIntercept", default: true)
-    static let agentHookPermissionTimeout    = Key<Int>("agentHookPermissionTimeout", default: 60)
-    static let agentHookDidPromptClaude      = Key<Bool>("agentHookDidPromptClaude", default: false)
-    static let agentHookDidPromptCodex       = Key<Bool>("agentHookDidPromptCodex", default: false)
-    static let agentHookDidPromptOpenCode    = Key<Bool>("agentHookDidPromptOpenCode", default: false)
-    
     // Helper to determine the default media controller based on NowPlaying deprecation status
     static var defaultMediaController: MediaControllerType {
         if MusicManager.shared.isNowPlayingDeprecated {

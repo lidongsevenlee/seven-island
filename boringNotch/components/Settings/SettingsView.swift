@@ -41,20 +41,11 @@ struct SettingsView: View {
 //                NavigationLink(value: "Downloads") {
 //                    Label("Downloads", systemImage: "square.and.arrow.down")
 //                }
-                NavigationLink(value: "Shelf") {
-                    Label("文件架", systemImage: "books.vertical")
-                }
                 NavigationLink(value: "Clipboard") {
                     Label("剪贴板", systemImage: "clipboard")
                 }
                 NavigationLink(value: "VS Code") {
                     Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-                NavigationLink(value: "Claude Gateway") {
-                    Label("Claude 网关", systemImage: "network")
-                }
-                NavigationLink(value: "Agent Integration") {
-                    Label("Agent 集成", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
@@ -81,16 +72,10 @@ struct SettingsView: View {
                     Media()
                 case "HUD":
                     HUD()
-                case "Shelf":
-                    Shelf()
                 case "Clipboard":
                     ClipboardSettingsView()
                 case "VS Code":
                     VSCodeSettingsView()
-                case "Claude Gateway":
-                    GatewaySettingsView()
-                case "Agent Integration":
-                    AgentIntegrationSettingsView()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":
@@ -710,115 +695,6 @@ struct About: View {
             CheckForUpdatesView(updater: updaterController.updater)
         }
         .navigationTitle("关于")
-    }
-}
-
-struct Shelf: View {
-    
-    @Default(.shelfTapToOpen) var shelfTapToOpen: Bool
-    @Default(.quickShareProvider) var quickShareProvider
-    @Default(.expandedDragDetection) var expandedDragDetection: Bool
-    @StateObject private var quickShareService = QuickShareService.shared
-
-    private var selectedProvider: QuickShareProvider? {
-        quickShareService.availableProviders.first(where: { $0.id == quickShareProvider })
-    }
-    
-    init() {
-        Task { await QuickShareService.shared.discoverAvailableProviders() }
-    }
-    
-    var body: some View {
-        Form {
-            Section {
-                Defaults.Toggle(key: .boringShelf) {
-                    Text("启用文件架")
-                }
-                Defaults.Toggle(key: .openShelfByDefault) {
-                    Text("有项目时默认打开文件架")
-                }
-                Defaults.Toggle(key: .expandedDragDetection) {
-                    Text("扩展拖拽检测区域")
-                }
-                .onChange(of: expandedDragDetection) {
-                    NotificationCenter.default.post(
-                        name: Notification.Name.expandedDragDetectionChanged,
-                        object: nil
-                    )
-                }
-                Defaults.Toggle(key: .copyOnDrag) {
-                    Text("拖拽时复制项目")
-                }
-                Defaults.Toggle(key: .autoRemoveShelfItems) {
-                    Text("拖拽后从文件架移除")
-                }
-
-            } header: {
-                HStack {
-                    Text("常规")
-                }
-            }
-            
-            Section {
-                Picker("快速分享服务", selection: $quickShareProvider) {
-                    ForEach(quickShareService.availableProviders, id: \.id) { provider in
-                        HStack {
-                            Group {
-                                if let imgData = provider.imageData, let nsImg = NSImage(data: imgData) {
-                                    Image(nsImage: nsImg)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                } else {
-                                    Image(systemName: "square.and.arrow.up")
-                                }
-                            }
-                            .frame(width: 16, height: 16)
-                            .foregroundColor(.accentColor)
-                            Text(provider.id)
-                        }
-                        .tag(provider.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                
-                if let selectedProvider = selectedProvider {
-                    HStack {
-                        Group {
-                            if let imgData = selectedProvider.imageData, let nsImg = NSImage(data: imgData) {
-                                Image(nsImage: nsImg)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } else {
-                                Image(systemName: "square.and.arrow.up")
-                            }
-                        }
-                        .frame(width: 16, height: 16)
-                        .foregroundColor(.accentColor)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("当前选择：\(selectedProvider.id)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("拖拽到文件架的文件将通过此服务分享")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                // Providers are always enabled; user can pick default service above.
-                
-            } header: {
-                HStack {
-                    Text("快速分享")
-                }
-            } footer: {
-                Text("选择从文件架分享文件时使用的服务。点击文件架按钮选择文件，或将文件拖拽到文件架上立即分享。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("文件架")
     }
 }
 
