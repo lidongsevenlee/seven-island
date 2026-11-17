@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -30,6 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
           fetch-depth: 0
 
       - name: Resolve Tag Ref
@@ -114,12 +115,10 @@ jobs:
         if: steps.check-key.outputs.available == 'true'
         run: |
           git fetch origin main
-          # Branch from origin/main — not from the tag — so the commit lands
-          # cleanly on top of whatever previous release cycles may have appended.
+          # Prepare the latest main appcast before regenerating the release entry.
+          git restore -- updater/appcast.xml
           git checkout -B appcast-update origin/main
-          # Re-run the signing script against origin/main's appcast so all
-          # prior entries are preserved (stash-pop was conflict-prone when a
-          # previous release had already appended entries not present locally).
+          # Sign the DMG and prepend the release to the existing version history.
           python3 -m venv build/sign-venv
           source build/sign-venv/bin/activate
           pip install -q cryptography
