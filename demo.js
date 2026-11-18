@@ -1,6 +1,7 @@
 "use strict";
 
 const demo = document.getElementById("demo");
+const captureViewport = demo.querySelector(".capture-viewport");
 const tabs = Array.from(demo.querySelectorAll('[role="tab"]'));
 const description = document.getElementById("demo-description");
 const fullCapture = document.getElementById("full-capture");
@@ -102,25 +103,10 @@ reduceMotion.addEventListener("change", ({ matches }) => {
 
 if ("IntersectionObserver" in window) {
   const playbackObserver = new IntersectionObserver(([entry]) => {
-    inView = entry.isIntersecting;
+    inView = entry.intersectionRatio >= 0.08;
     syncPlayback();
   }, { threshold: 0.08 });
-  playbackObserver.observe(demo);
-
-  if (!reduceMotion.matches) {
-    const revealObserver = new IntersectionObserver((entries, observer) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.remove("reveal-pending");
-        entry.target.classList.add("reveal-in");
-        observer.unobserve(entry.target);
-      }
-    }, { threshold: 0.08 });
-    for (const section of document.querySelectorAll("[data-reveal]")) {
-      section.classList.add("reveal-pending");
-      revealObserver.observe(section);
-    }
-  }
+  playbackObserver.observe(captureViewport);
 }
 
 syncPlayback();
