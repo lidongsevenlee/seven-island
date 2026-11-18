@@ -3,29 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 把 Mac 的刘海变成音乐、剪贴板、VS Code 项目和备忘录的入口。">
-  <meta name="theme-color" content="#f9f7f4">
+  <meta name="description" content="Seven Island 把 Mac 的刘海变成控制音乐、查找剪贴板和项目、随手记事的入口。">
+  <meta name="theme-color" content="#faf7f1">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island — Mac 刘海里的常用工具">
   <meta property="og:description" content="在 Mac 的屏幕顶部控制音乐、搜索剪贴板、打开项目和记录想法。">
   <meta property="og:url" content="https://lidongsevenlee.github.io/seven-island/">
+  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-playing.png">
   <link rel="icon" href="assets/icon.png">
-  <link rel="stylesheet" href="styles.css">
-  <script src="demo.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=motion-1">
+  <script src="demo.js?v=motion-1" defer></script>
   <title>Seven Island — Mac 刘海里的常用工具</title>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
   <header class="site-header">
     <nav class="wrap header-inner" aria-label="主要导航">
-      <a class="brand" href="#top">
-        <img src="assets/icon.png" width="32" height="32" alt="">
-        <span>Seven Island</span>
-      </a>
+      <a class="brand" href="#top"><img src="assets/icon.png" width="32" height="32" alt=""><span>Seven Island</span></a>
       <div class="header-links">
+        <a href="#demo">使用演示</a>
         <a href="#features">功能</a>
-        <a href="https://github.com/lidongsevenlee/seven-island">GitHub <span aria-hidden="true">↗</span></a>
-        <a class="button button-small" href="#download">下载</a>
+        <a href="#download">安装</a>
+      </div>
+      <div class="header-actions">
+        <a class="github-link" href="https://github.com/lidongsevenlee/seven-island">GitHub <span aria-hidden="true">↗</span></a>
+        <a class="button button-small" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 <span aria-hidden="true">↓</span></a>
       </div>
     </nav>
   </header>
@@ -33,93 +35,91 @@
   <main id="main">
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="wrap hero-copy">
-        <p class="eyebrow"><span></span> macOS 刘海控制中心</p>
-        <h1 id="hero-title">Mac 刘海里的<span>常用工具</span></h1>
-        <p class="hero-summary">控制音乐、找回复制过的内容、打开项目、记下想法。<br class="desktop-break">把鼠标移到屏幕顶部，随时展开。</p>
+        <h1 id="hero-title">把常用工具<span>放进 Mac 刘海</span></h1>
+        <p class="hero-summary">把鼠标移到屏幕顶部，控制音乐、找回剪贴板内容、打开项目，或随手记下想法。</p>
         <div class="hero-actions">
           <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 macOS 版 <span aria-hidden="true">↓</span></a>
-          <a class="text-link" href="#demo">查看实际界面 <span aria-hidden="true">↘</span></a>
+          <a class="text-link" href="#demo">看使用演示 <span aria-hidden="true">↘</span></a>
         </div>
         <p class="system-requirement">适用于 macOS 14 及以上</p>
       </div>
 
-      <figure class="wrap demo" id="demo">
-        <div class="desktop">
-          <div class="desktop-shape" aria-hidden="true"></div>
-          <div class="desktop-shape desktop-shape-two" aria-hidden="true"></div>
-          <div class="capture-tabs" role="tablist" aria-label="查看应用截图">
-            <button type="button" id="tab-music" role="tab" aria-selected="true" aria-controls="panel-music">音乐</button>
-            <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
-            <button type="button" id="tab-vscode" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
-            <button type="button" id="tab-memo" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
-          </div>
+      <figure class="wrap demo" id="demo" aria-label="Seven Island 使用演示">
+        <div class="demo-board">
           <div class="capture-viewport">
             <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
-              <img src="assets/seven-island-music-playing.png" width="1360" height="532" alt="Seven Island 原生音乐界面，显示示例专辑封面、播放进度、柱状频谱和逐字高亮歌词。">
+              <video muted playsinline loop preload="none" poster="assets/seven-island-music-playing.png" data-src="assets/seven-island-music-demo.mp4" aria-label="音乐演示，刘海展开，歌词和频谱随播放推进。"></video>
             </div>
             <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-              <img src="assets/seven-island-clipboard.png" width="1360" height="532" alt="Seven Island 剪贴板界面，搜索框下显示链接和两条文本记录。">
+              <video muted playsinline loop preload="none" poster="assets/seven-island-clipboard.png" data-src="assets/seven-island-clipboard-demo.mp4" aria-label="剪贴板演示，输入设计，历史记录按关键词筛选。"></video>
             </div>
             <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
-              <img src="assets/seven-island-vscode.png" width="1360" height="532" alt="Seven Island 的 VS Code 项目界面，显示搜索框和三个示例项目。">
+              <video muted playsinline loop preload="none" poster="assets/seven-island-vscode.png" data-src="assets/seven-island-vscode-demo.mp4" aria-label="VS Code 演示，输入 Studio，定位 StudioNotes 项目。"></video>
             </div>
             <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
-              <img src="assets/seven-island-memo.png" width="1360" height="532" alt="Seven Island 备忘录界面，标签上方可切换备忘录，右边的加号可以新建。">
+              <video muted playsinline loop preload="none" poster="assets/seven-island-memo.png" data-src="assets/seven-island-memo-demo.mp4" aria-label="备忘录演示，切换笔记、编辑内容并新建一条备忘录。"></video>
             </div>
           </div>
+          <div class="capture-tabs" role="tablist" aria-label="切换使用场景">
+            <button type="button" id="tab-music" role="tab" aria-selected="true" aria-controls="panel-music" data-caption="展开刘海，歌词和频谱跟随播放，随时暂停。"><span aria-hidden="true">♪</span> 听音乐</button>
+            <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1" data-caption="输入「设计」，从剪贴板历史里筛出匹配的记录。"><span aria-hidden="true">▤</span> 找剪贴板</button>
+            <button type="button" id="tab-vscode" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1" data-caption="输入项目名称的一部分，快速定位 VS Code 项目。"><span aria-hidden="true">›_</span> 找项目</button>
+            <button type="button" id="tab-memo" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1" data-caption="切换备忘录，接着写，再用加号新建一条。"><span aria-hidden="true">≡</span> 写备忘录</button>
+          </div>
         </div>
-        <figcaption><span>应用截图 · 当前开发版 · 示例数据</span><a id="full-capture" href="assets/seven-island-music-playing.png" target="_blank" rel="noopener">查看原图 <span aria-hidden="true">↗</span></a></figcaption>
+        <figcaption class="demo-caption">
+          <div>
+            <p id="demo-description" aria-live="polite">展开刘海，歌词和频谱跟随播放，随时暂停。</p>
+            <p class="demo-source">原生界面录制 · 示例数据 · 当前开发版</p>
+            <p id="demo-error" class="demo-error" role="status" hidden>演示暂时无法播放，可以查看原图。</p>
+          </div>
+          <div class="demo-actions">
+            <button type="button" id="motion-toggle" class="demo-action"><span id="motion-icon" aria-hidden="true">▶</span> <span id="motion-label">播放演示</span></button>
+            <a id="full-capture" class="demo-action" href="assets/seven-island-music-playing.png" target="_blank" rel="noopener">查看原图 <span aria-hidden="true">↗</span></a>
+          </div>
+        </figcaption>
       </figure>
     </section>
 
-    <section class="features wrap" id="features" aria-labelledby="features-title">
+    <section class="features wrap" id="features" aria-labelledby="features-title" data-reveal>
       <div class="section-intro">
-        <p class="eyebrow"><span></span> 功能</p>
-        <h2 id="features-title">从听歌到继续工作</h2>
-        <p>收起时显示播放状态，展开后切换到你手头需要的工具。</p>
+        <h2 id="features-title">从听歌<br>到继续工作</h2>
+        <p>收起时，播放状态留在刘海。展开后，用四个标签切换手边的工具。</p>
       </div>
-      <div class="feature-grid">
-        <article class="feature-music">
-          <span class="feature-icon music-icon" aria-hidden="true">♫</span>
-          <div>
-            <h3>音乐跟着播放走</h3>
-            <p>在刘海控制播放和进度。实时频谱随声音变化，有同步时间的歌词会跟随播放位置。</p>
-          </div>
-          <div class="feature-wave" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
-          </div>
+      <div class="feature-list">
+        <article>
+          <span class="feature-icon" aria-hidden="true">♪</span>
+          <div><h3>音乐</h3><p>控制播放和进度，查看实时频谱。有同步时间的歌词会跟着播放位置走。</p></div>
         </article>
-        <div class="utility-list">
-          <article>
-            <span class="feature-icon" aria-hidden="true">▤</span>
-            <div><h3>找回复制过的内容</h3><p>搜索剪贴板历史。再次复制的内容会回到列表顶部。</p></div>
-          </article>
-          <article>
-            <span class="feature-icon" aria-hidden="true">›_</span>
-            <div><h3>打开 VS Code 项目</h3><p>按名称搜索工作目录和固定项目，点击即可打开。</p></div>
-          </article>
-          <article>
-            <span class="feature-icon" aria-hidden="true">≡</span>
-            <div><h3>随手记下想法</h3><p>新建多个备忘录，横向标签一键切换，文字自动保存。</p></div>
-          </article>
-        </div>
+        <article>
+          <span class="feature-icon" aria-hidden="true">▤</span>
+          <div><h3>剪贴板</h3><p>找回复制过的文字和图片。再次复制同一内容时，条目会回到列表顶部。</p></div>
+        </article>
+        <article>
+          <span class="feature-icon" aria-hidden="true">›_</span>
+          <div><h3>VS Code 项目</h3><p>搜索工作目录和固定项目，点击即可在 VS Code 中打开。</p></div>
+        </article>
+        <article>
+          <span class="feature-icon" aria-hidden="true">≡</span>
+          <div><h3>备忘录</h3><p>同时保留多份备忘录，点击标签切换，文字自动保存在本机。</p></div>
+        </article>
+        <p class="extra-features">刘海还可以显示日历，以及音量和亮度调节提示。</p>
       </div>
-      <p class="extra-features"><strong>还有日历和 HUD</strong><span>查看日程，音量和亮度调节也能在刘海里显示。</span></p>
     </section>
 
-    <section class="download wrap" id="download" aria-labelledby="download-title">
+    <section class="download wrap" id="download" aria-labelledby="download-title" data-reveal>
       <div class="download-card">
-        <img src="assets/icon.png" width="80" height="80" alt="">
+        <img src="assets/icon.png" width="75" height="75" alt="">
         <div>
           <h2 id="download-title">安装 Seven Island</h2>
-          <p>从 GitHub Releases 下载 DMG，打开后将应用拖入「应用程序」。</p>
+          <p>下载 DMG，打开后将 Seven Island 拖入「应用程序」。</p>
         </div>
         <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">前往下载 <span aria-hidden="true">↗</span></a>
       </div>
       <div class="install-details">
         <div><h3>系统要求</h3><p>macOS 14 Sonoma 或更高版本。</p></div>
-        <div><h3>版本说明</h3><p>页面展示当前开发版。GitHub Releases 提供已发布版本和更新说明。</p></div>
-        <div><h3>音频和歌词</h3><p>实时频谱需要系统音频录制权限。Apple Music 缓存歌词可在「设置」的「媒体」中授权读取。</p></div>
+        <div><h3>版本说明</h3><p>演示展示当前开发版。GitHub Releases 提供已发布版本和更新说明。</p></div>
+        <div><h3>音频和歌词</h3><p>实时频谱需要系统音频录制权限。Apple Music 缓存歌词可在「设置 → 媒体」中授权读取。</p></div>
       </div>
     </section>
   </main>
