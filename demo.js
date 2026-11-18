@@ -2,35 +2,34 @@
 
 const demo = document.getElementById("demo");
 const captureViewport = demo.querySelector(".capture-viewport");
-const tabs = Array.from(demo.querySelectorAll('[role="tab"]'));
-const description = document.getElementById("demo-description");
-const fullCapture = document.getElementById("full-capture");
+const tabList = demo.querySelector(".capture-tabs");
+const tabs = Array.from(tabList.querySelectorAll('[role="tab"]'));
 const motionToggle = document.getElementById("motion-toggle");
 const motionIcon = document.getElementById("motion-icon");
-const motionLabel = document.getElementById("motion-label");
 const demoError = document.getElementById("demo-error");
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-const demos = new Map(tabs.map((tab) => {
+const demos = tabs.map((tab) => {
   const panel = document.getElementById(tab.getAttribute("aria-controls"));
-  return [tab, { panel, video: panel.querySelector("video") }];
-}));
+  return { tab, panel, video: panel.querySelector("video") };
+});
 
-let activeTab = tabs.find((tab) => tab.getAttribute("aria-selected") === "true");
+let activeIndex = tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true");
 let shouldPlay = !reduceMotion.matches;
 let inView = !("IntersectionObserver" in window);
 
 function updatePlaybackControl() {
-  const { video } = demos.get(activeTab);
-  const playing = !video.paused;
-  motionIcon.textContent = playing ? "Ⅱ" : "▶";
-  motionLabel.textContent = playing ? "暂停演示" : "播放演示";
+  const { video } = demos[activeIndex];
+  const label = video.paused ? "播放录屏" : "暂停录屏";
+  motionIcon.textContent = video.paused ? "▶" : "Ⅱ";
+  motionToggle.setAttribute("aria-label", label);
+  motionToggle.title = label;
   motionToggle.disabled = video.error !== null;
   demoError.hidden = video.error === null;
 }
 
 function syncPlayback() {
-  const activeVideo = demos.get(activeTab).video;
-  for (const { video } of demos.values()) {
+  const activeVideo = demos[activeIndex].video;
+  for (const { video } of demos) {
     if (video !== activeVideo) video.pause();
   }
 
@@ -39,7 +38,7 @@ function syncPlayback() {
   } else if (!activeVideo.error) {
     if (!activeVideo.hasAttribute("src")) activeVideo.src = activeVideo.dataset.src;
     activeVideo.play().catch((error) => {
-      if (error.name === "AbortError" || activeVideo !== demos.get(activeTab).video) return;
+      if (error.name === "AbortError" || activeVideo !== demos[activeIndex].video) return;
       shouldPlay = false;
       updatePlaybackControl();
     });
@@ -47,24 +46,23 @@ function syncPlayback() {
   updatePlaybackControl();
 }
 
-function selectTab(tab) {
-  if (activeTab === tab) return;
-  activeTab = tab;
-  for (const [option, { panel }] of demos) {
-    const selected = option === activeTab;
-    option.setAttribute("aria-selected", String(selected));
-    option.tabIndex = selected ? 0 : -1;
+function selectTab(index) {
+  if (activeIndex === index) return;
+  activeIndex = index;
+  tabList.style.setProperty("--active-index", index);
+  for (const [option, { tab, panel }] of demos.entries()) {
+    const selected = option === activeIndex;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
     panel.hidden = !selected;
   }
-  const { video } = demos.get(tab);
+  const { video } = demos[index];
   if (video.readyState > 0) video.currentTime = 0;
-  description.textContent = tab.dataset.caption;
-  fullCapture.href = video.poster;
   syncPlayback();
 }
 
-for (const [index, tab] of tabs.entries()) {
-  tab.addEventListener("click", () => selectTab(tab));
+for (const [index, { tab, video }] of demos.entries()) {
+  tab.addEventListener("click", () => selectTab(index));
   tab.addEventListener("keydown", (event) => {
     const moves = {
       ArrowRight: (index + 1) % tabs.length,
@@ -74,21 +72,29 @@ for (const [index, tab] of tabs.entries()) {
     };
     if (!Object.hasOwn(moves, event.key)) return;
     event.preventDefault();
-    const next = tabs[moves[event.key]];
-    selectTab(next);
-    next.focus();
+    const nextIndex = moves[event.key];
+    selectTab(nextIndex);
+    tabs[nextIndex].focus();
   });
-  const { video } = demos.get(tab);
   video.muted = true;
   for (const event of ["play", "pause", "error"]) {
     video.addEventListener(event, () => {
-      if (tab === activeTab) updatePlaybackControl();
+      if (index === activeIndex) updatePlaybackControl();
     });
   }
+  video.addEventListener("ended", () => {
+    if (index !== activeIndex || !shouldPlay || !inView || document.hidden) return;
+    if (reduceMotion.matches || tabList.contains(document.activeElement)) {
+      shouldPlay = false;
+      updatePlaybackControl();
+      return;
+    }
+    selectTab((index + 1) % tabs.length);
+  });
 }
 
 motionToggle.addEventListener("click", () => {
-  shouldPlay = demos.get(activeTab).video.paused;
+  shouldPlay = demos[activeIndex].video.paused;
   syncPlayback();
 });
 document.addEventListener("visibilitychange", syncPlayback);

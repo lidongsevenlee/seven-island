@@ -3,115 +3,62 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 是一款开源 macOS 应用。把鼠标移到屏幕顶部，就能控制音乐、搜索剪贴板、打开 VS Code 项目和记事。">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板历史、VS Code 项目与备忘录。">
+  <meta name="theme-color" content="#fbfbfb">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Seven Island · Mac 刘海里的常用工具">
-  <meta property="og:description" content="在 Mac 的屏幕顶部控制音乐、搜索剪贴板、打开项目和记录想法。">
+  <meta property="og:title" content="Seven Island">
+  <meta property="og:description" content="Seven Island 的原生界面操作录屏与 macOS 下载。">
   <meta property="og:url" content="https://lidongsevenlee.github.io/seven-island/">
-  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-preview.png">
+  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-showcase.jpg">
   <link rel="icon" href="assets/icon.png">
-  <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=single-entry">
-  <script src="demo.js?v=single-entry" defer></script>
-  <title>Seven Island · Mac 刘海里的常用工具</title>
+  <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=showcase">
+  <script src="demo.js?v=showcase" defer></script>
+  <title>Seven Island</title>
 </head>
 <body>
-  <a class="skip-link" href="#main">跳到主要内容</a>
-
   <main id="main">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="product-name"><img src="assets/icon.png" width="28" height="28" alt="">Seven Island</p>
-        <h1 id="hero-title"><span>把常用工具</span> <span>收进 Mac 刘海</span></h1>
-        <p class="hero-description">鼠标移到屏幕顶部，就能控制音乐、找剪贴板记录、打开项目和记事。</p>
-        <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest"><span aria-hidden="true">↓</span> macOS 下载与源码</a>
-        <p class="requirement">macOS 14 及以上</p>
-      </div>
-
-      <figure class="demo" id="demo" aria-label="Seven Island 使用演示">
-        <div class="capture-tabs" role="tablist" aria-label="切换使用场景">
-          <button type="button" id="tab-music" role="tab" aria-selected="true" aria-controls="panel-music" data-caption="从收起的刘海展开播放器，看歌词和频谱随播放变化，再暂停和恢复。">音乐</button>
-          <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1" data-caption="输入「产品」筛选历史，再次复制一条已有记录后，它会回到顶部。">剪贴板</button>
-          <button type="button" id="tab-vscode" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1" data-caption="输入 Atlas，在最近项目中定位 AtlasStudio。">VS Code</button>
-          <button type="button" id="tab-memo" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1" data-caption="切到发布清单继续编辑，再新建一条备忘录。">备忘录</button>
-        </div>
-        <div class="capture-viewport">
-          <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
-            <video muted playsinline loop preload="none" poster="assets/seven-island-music-preview.png" data-src="assets/seven-island-music-tour.mp4" aria-label="音乐演示，展开刘海，歌词与频谱随播放变化。"></video>
-          </div>
-          <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-            <video muted playsinline loop preload="none" poster="assets/seven-island-clipboard-preview.png" data-src="assets/seven-island-clipboard-tour.mp4" aria-label="剪贴板演示，按关键词筛选，重新复制已有条目。"></video>
-          </div>
-          <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
-            <video muted playsinline loop preload="none" poster="assets/seven-island-vscode-preview.png" data-src="assets/seven-island-vscode-tour.mp4" aria-label="VS Code 演示，搜索 AtlasStudio 项目。"></video>
-          </div>
-          <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
-            <video muted playsinline loop preload="none" poster="assets/seven-island-memo-preview.png" data-src="assets/seven-island-memo-tour.mp4" aria-label="备忘录演示，切换、编辑并新建备忘录。"></video>
+    <figure id="demo" aria-labelledby="product-name">
+      <div class="hero">
+        <img class="wallpaper" src="assets/showcase-2560.jpg" srcset="assets/showcase-1280.jpg 1280w, assets/showcase-2560.jpg 2560w" sizes="100vw" alt="" fetchpriority="high">
+        <div class="hero-content">
+          <h1 class="product-notch" id="product-name"><img src="assets/icon.png" width="24" height="24" alt="Seven Island"></h1>
+          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest" aria-label="macOS 下载与源码，适用于 macOS 14 及以上">
+            <img src="assets/apple.svg" width="16" height="16" alt="">macOS 下载与源码
+          </a>
+          <div class="capture-frame">
+            <div class="capture-viewport">
+              <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
+                <video muted playsinline preload="none" poster="assets/seven-island-music-showcase.jpg" data-src="assets/seven-island-music-showcase.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
+              </div>
+              <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-showcase.jpg" data-src="assets/seven-island-clipboard-showcase.mp4" aria-label="剪贴板录屏。搜索设计，重新复制已存在的记录并将它移到顶部。"></video>
+              </div>
+              <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-vscode-showcase.jpg" data-src="assets/seven-island-vscode-showcase.mp4" aria-label="VS Code 录屏。输入 Orbit，定位 OrbitApp 项目。"></video>
+              </div>
+              <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-memo-showcase.jpg" data-src="assets/seven-island-memo-showcase.mp4" aria-label="备忘录录屏。切换到本周计划，编辑内容，再新建备忘录。"></video>
+              </div>
+            </div>
           </div>
         </div>
-        <figcaption class="demo-caption">
-          <div class="demo-copy">
-            <p id="demo-description" aria-live="polite">从收起的刘海展开播放器，看歌词和频谱随播放变化，再暂停和恢复。</p>
-            <p class="demo-source">开发版原生界面 · 示例数据</p>
-            <p id="demo-error" class="demo-error" role="status" hidden>演示暂时无法播放，可以查看原图。</p>
-          </div>
-          <div class="demo-actions">
-            <button type="button" id="motion-toggle" class="demo-action"><span id="motion-icon" aria-hidden="true">▶</span> <span id="motion-label">播放演示</span></button>
-            <a id="full-capture" class="demo-action" href="assets/seven-island-music-preview.png" target="_blank" rel="noopener">查看原图 <span aria-hidden="true">↗</span></a>
-          </div>
-        </figcaption>
-      </figure>
-    </section>
-
-    <section class="features wrap" id="features" aria-labelledby="features-title">
-      <h2 id="features-title">屏幕顶部的四个入口</h2>
-      <div class="feature-grid">
-        <article>
-          <div class="feature-icon" aria-hidden="true"><span class="glyph-music">♪</span></div>
-          <div><h3>音乐</h3><p>控制播放和进度，查看同步歌词与实时频谱。收起后也能看到音乐律动。</p></div>
-        </article>
-        <article>
-          <div class="feature-icon" aria-hidden="true"><span class="glyph-clipboard"></span></div>
-          <div><h3>剪贴板</h3><p>搜索复制过的文字和图片。再次复制同一内容，记录会移到顶部。</p></div>
-        </article>
-        <article>
-          <div class="feature-icon" aria-hidden="true"><span class="glyph-code">›_</span></div>
-          <div><h3>VS Code 项目</h3><p>查找最近目录和固定项目，点击即可在 VS Code 中打开。</p></div>
-        </article>
-        <article>
-          <div class="feature-icon" aria-hidden="true"><span class="glyph-memo"></span></div>
-          <div><h3>备忘录</h3><p>建立多份备忘录，点击标签切换。编辑内容自动保存在本机。</p></div>
-        </article>
       </div>
-    </section>
 
-    <section class="faq wrap" id="faq" aria-labelledby="faq-title">
-      <h2 id="faq-title">常见问题</h2>
-      <div class="faq-items">
-        <details>
-          <summary>需要什么系统？</summary>
-          <p>Seven Island 支持 macOS 14 Sonoma 及以上系统。实时频谱需要 macOS 14.2 及以上系统。</p>
-        </details>
-        <details>
-          <summary>怎样安装和展开？</summary>
-          <p>下载 DMG，打开后将 Seven Island 拖入「应用程序」。启动应用后，把鼠标移到屏幕顶部中央即可展开。</p>
-        </details>
-        <details>
-          <summary>音乐频谱和歌词需要什么权限？</summary>
-          <p>实时频谱使用 macOS 的系统音频录制权限。可在 Seven Island 的「设置 → 媒体」中授权读取 Apple Music 歌词缓存。歌词同步取决于可用数据。</p>
-        </details>
-        <details>
-          <summary>剪贴板和备忘录存在哪里？</summary>
-          <p>剪贴板历史和备忘录保存在当前 Mac 上。</p>
-        </details>
-        <details>
-          <summary>演示对应哪个版本？</summary>
-          <p>演示录自当前开发版。已发布版本的功能详见 GitHub 发布说明。</p>
-        </details>
+      <div class="demo-controls">
+        <div class="capture-tabs" role="tablist" aria-label="切换录屏场景">
+          <button id="tab-music" type="button" role="tab" aria-selected="true" aria-controls="panel-music">音乐</button>
+          <button id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
+          <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
+          <button id="tab-memo" type="button" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
+        </div>
+        <button id="motion-toggle" class="motion-toggle" type="button" aria-label="播放录屏" title="播放录屏">
+          <span id="motion-icon" aria-hidden="true">▶</span>
+        </button>
       </div>
-    </section>
-
+      <figcaption class="sr-only">当前开发版的原生界面录屏，使用示例数据。</figcaption>
+      <p id="demo-error" class="demo-error" role="status" hidden>录屏加载失败。可以切换到其他场景。</p>
+    </figure>
   </main>
 </body>
 </html>
