@@ -4,15 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Seven Island 把 Mac 的刘海变成控制音乐、查找剪贴板和项目、随手记事的入口。">
-  <meta name="theme-color" content="#faf7f1">
+  <meta name="theme-color" content="#fcfaf5">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island — Mac 刘海里的常用工具">
   <meta property="og:description" content="在 Mac 的屏幕顶部控制音乐、搜索剪贴板、打开项目和记录想法。">
   <meta property="og:url" content="https://lidongsevenlee.github.io/seven-island/">
   <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-playing.png">
   <link rel="icon" href="assets/icon.png">
-  <link rel="stylesheet" href="styles.css?v=motion-1">
-  <script src="demo.js?v=motion-1" defer></script>
+  <link rel="preload" href="assets/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=lindy-scale-2">
+  <script src="demo.js?v=lindy-scale-2" defer></script>
   <title>Seven Island — Mac 刘海里的常用工具</title>
 </head>
 <body>
@@ -28,6 +30,14 @@
       <div class="header-actions">
         <a class="github-link" href="https://github.com/lidongsevenlee/seven-island">GitHub <span aria-hidden="true">↗</span></a>
         <a class="button button-small" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 <span aria-hidden="true">↓</span></a>
+        <details class="mobile-nav">
+          <summary aria-label="导航菜单"><span aria-hidden="true"></span></summary>
+          <div class="mobile-nav-panel">
+            <a href="#demo">使用演示</a>
+            <a href="#features">功能</a>
+            <a href="#download">安装</a>
+          </div>
+        </details>
       </div>
     </nav>
   </header>
@@ -36,12 +46,7 @@
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="wrap hero-copy">
         <h1 id="hero-title">把常用工具<span>放进 Mac 刘海</span></h1>
-        <p class="hero-summary">把鼠标移到屏幕顶部，控制音乐、找回剪贴板内容、打开项目，或随手记下想法。</p>
-        <div class="hero-actions">
-          <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 macOS 版 <span aria-hidden="true">↓</span></a>
-          <a class="text-link" href="#demo">看使用演示 <span aria-hidden="true">↘</span></a>
-        </div>
-        <p class="system-requirement">适用于 macOS 14 及以上</p>
+        <p class="hero-summary">在 Mac 刘海里控制音乐、搜索<span class="keep-together">剪贴板</span>、打开项目和记事。把鼠标移到屏幕顶部，就能展开手边的工具。</p>
       </div>
 
       <figure class="wrap demo" id="demo" aria-label="Seven Island 使用演示">
@@ -79,6 +84,10 @@
           </div>
         </figcaption>
       </figure>
+      <div class="hero-actions wrap">
+        <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 macOS 版 <span aria-hidden="true">↓</span></a>
+        <p class="system-requirement">适用于 macOS 14 及以上</p>
+      </div>
     </section>
 
     <section class="features wrap" id="features" aria-labelledby="features-title" data-reveal>
