@@ -12,8 +12,8 @@
   <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-showcase.jpg">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=showcase">
-  <script src="demo.js?v=showcase" defer></script>
+  <link rel="stylesheet" href="styles.css?v=expand">
+  <script src="demo.js?v=expand" defer></script>
   <title>Seven Island</title>
 </head>
 <body>
@@ -23,22 +23,22 @@
         <img class="wallpaper" src="assets/showcase-2560.jpg" srcset="assets/showcase-1280.jpg 1280w, assets/showcase-2560.jpg 2560w" sizes="100vw" alt="" fetchpriority="high">
         <div class="hero-content">
           <h1 class="product-notch" id="product-name"><img src="assets/icon.png" width="24" height="24" alt="Seven Island"></h1>
-          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest" aria-label="macOS 下载与源码，适用于 macOS 14 及以上">
-            <img src="assets/apple.svg" width="16" height="16" alt="">macOS 下载与源码
+          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest">
+            <span class="download-icon" aria-hidden="true"><span></span></span>下载 macOS 版
           </a>
           <div class="capture-frame">
             <div class="capture-viewport">
               <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
-                <video muted playsinline preload="none" poster="assets/seven-island-music-showcase.jpg" data-src="assets/seven-island-music-showcase.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-music-expand.jpg" data-src="assets/seven-island-music-expand.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
               </div>
               <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-showcase.jpg" data-src="assets/seven-island-clipboard-showcase.mp4" aria-label="剪贴板录屏。搜索设计，重新复制已存在的记录并将它移到顶部。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-expand.jpg" data-src="assets/seven-island-clipboard-expand.mp4" aria-label="剪贴板录屏。展开刘海后搜索设计，重新复制一条记录并将它移到顶部。"></video>
               </div>
               <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-vscode-showcase.jpg" data-src="assets/seven-island-vscode-showcase.mp4" aria-label="VS Code 录屏。输入 Orbit，定位 OrbitApp 项目。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-vscode-expand.jpg" data-src="assets/seven-island-vscode-expand.mp4" aria-label="VS Code 录屏。展开刘海后输入 Orbit，定位 OrbitApp 项目。"></video>
               </div>
               <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-memo-showcase.jpg" data-src="assets/seven-island-memo-showcase.mp4" aria-label="备忘录录屏。切换到本周计划，编辑内容，再新建备忘录。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-memo-expand.jpg" data-src="assets/seven-island-memo-expand.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
               </div>
             </div>
           </div>
@@ -59,6 +59,54 @@
       <figcaption class="sr-only">当前开发版的原生界面录屏，使用示例数据。</figcaption>
       <p id="demo-error" class="demo-error" role="status" hidden>录屏加载失败。可以切换到其他场景。</p>
     </figure>
+
+    <section class="capabilities" aria-labelledby="capabilities-title">
+      <h2 id="capabilities-title">四项常用功能</h2>
+      <ul class="capability-grid">
+        <li>
+          <div class="capability-icon music-icon" aria-hidden="true">♪</div>
+          <h3>音乐</h3>
+          <p>控制播放和进度，查看同步歌词与实时频谱。</p>
+        </li>
+        <li>
+          <div class="capability-icon clipboard-icon" aria-hidden="true"></div>
+          <h3>剪贴板</h3>
+          <p>搜索复制过的文字和图片，快速找回历史记录。</p>
+        </li>
+        <li>
+          <div class="capability-icon code-icon" aria-hidden="true">‹<span>›</span></div>
+          <h3>VS Code</h3>
+          <p>查找最近使用或固定的项目，点击即可打开。</p>
+        </li>
+        <li>
+          <div class="capability-icon memo-icon" aria-hidden="true"></div>
+          <h3>备忘录</h3>
+          <p>用标签切换多份备忘录，编辑内容自动保存在本机。</p>
+        </li>
+      </ul>
+    </section>
+
+    <section class="requirements" aria-labelledby="requirements-title">
+      <h2 id="requirements-title">安装要求</h2>
+      <dl class="requirements-list">
+        <div>
+          <dt>系统版本</dt>
+          <dd>macOS 14 Sonoma 及以上。</dd>
+        </div>
+        <div>
+          <dt>安装方式</dt>
+          <dd>打开下载的 DMG，将 Seven Island 拖入「应用程序」。</dd>
+        </div>
+        <div>
+          <dt>实时频谱</dt>
+          <dd>使用 macOS 14.2 及以上版本，并允许系统音频录制。</dd>
+        </div>
+      </dl>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <a href="https://github.com/lidongsevenlee/seven-island">GitHub 源码 <span aria-hidden="true">↗</span></a>
+  </footer>
 </body>
 </html>
