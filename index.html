@@ -12,48 +12,29 @@
   <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-preview.png">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=notch-tour">
-  <script src="demo.js?v=notch-tour" defer></script>
+  <link rel="stylesheet" href="styles.css?v=single-entry">
+  <script src="demo.js?v=single-entry" defer></script>
   <title>Seven Island · Mac 刘海里的常用工具</title>
 </head>
-<body id="top">
+<body>
   <a class="skip-link" href="#main">跳到主要内容</a>
-  <header class="site-header">
-    <nav class="wrap header-inner" aria-label="主要导航">
-      <a class="brand" href="#top"><img src="assets/icon.png" width="34" height="34" alt="">Seven Island</a>
-      <div class="header-links">
-        <a href="#demo">演示</a>
-        <a href="#features">功能</a>
-        <a href="#faq">常见问题</a>
-        <a class="github-link" href="https://github.com/lidongsevenlee/seven-island">GitHub <span aria-hidden="true">↗</span></a>
-      </div>
-      <details class="mobile-nav">
-        <summary>菜单<span aria-hidden="true">↓</span></summary>
-        <div class="mobile-nav-panel">
-          <a href="#demo">演示</a>
-          <a href="#features">功能</a>
-          <a href="#faq">常见问题</a>
-          <a href="https://github.com/lidongsevenlee/seven-island">GitHub <span aria-hidden="true">↗</span></a>
-        </div>
-      </details>
-    </nav>
-  </header>
 
   <main id="main">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
+        <p class="product-name"><img src="assets/icon.png" width="28" height="28" alt="">Seven Island</p>
         <h1 id="hero-title"><span>把常用工具</span> <span>收进 Mac 刘海</span></h1>
-        <p>鼠标移到屏幕顶部，就能控制音乐、找剪贴板记录、打开项目和记事。</p>
-        <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 macOS 版 <span aria-hidden="true">↓</span></a>
-        <p class="requirement">macOS 14 及以上 · 免费开源</p>
+        <p class="hero-description">鼠标移到屏幕顶部，就能控制音乐、找剪贴板记录、打开项目和记事。</p>
+        <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest"><span aria-hidden="true">↓</span> macOS 下载与源码</a>
+        <p class="requirement">macOS 14 及以上</p>
       </div>
 
       <figure class="demo" id="demo" aria-label="Seven Island 使用演示">
         <div class="capture-tabs" role="tablist" aria-label="切换使用场景">
-          <button type="button" id="tab-music" role="tab" aria-selected="true" aria-controls="panel-music" data-caption="从收起的刘海展开播放器，看歌词和频谱随播放变化，再暂停和恢复。"><span class="tab-icon glyph-music" aria-hidden="true">♪</span>音乐</button>
-          <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1" data-caption="输入「产品」筛选历史，再次复制一条已有记录后，它会回到顶部。"><span class="tab-icon glyph-clipboard" aria-hidden="true"></span>剪贴板</button>
-          <button type="button" id="tab-vscode" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1" data-caption="输入 Atlas，在最近项目中定位 AtlasStudio。"><span class="tab-icon glyph-code" aria-hidden="true">›_</span>VS Code</button>
-          <button type="button" id="tab-memo" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1" data-caption="切到发布清单继续编辑，再新建一条备忘录。"><span class="tab-icon glyph-memo" aria-hidden="true"></span>备忘录</button>
+          <button type="button" id="tab-music" role="tab" aria-selected="true" aria-controls="panel-music" data-caption="从收起的刘海展开播放器，看歌词和频谱随播放变化，再暂停和恢复。">音乐</button>
+          <button type="button" id="tab-clipboard" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1" data-caption="输入「产品」筛选历史，再次复制一条已有记录后，它会回到顶部。">剪贴板</button>
+          <button type="button" id="tab-vscode" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1" data-caption="输入 Atlas，在最近项目中定位 AtlasStudio。">VS Code</button>
+          <button type="button" id="tab-memo" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1" data-caption="切到发布清单继续编辑，再新建一条备忘录。">备忘录</button>
         </div>
         <div class="capture-viewport">
           <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
@@ -126,27 +107,11 @@
         </details>
         <details>
           <summary>演示对应哪个版本？</summary>
-          <p>演示录自当前开发版。已发布版本的功能详见 <a href="https://github.com/lidongsevenlee/seven-island/releases">GitHub 发布记录</a>。</p>
+          <p>演示录自当前开发版。已发布版本的功能详见 GitHub 发布说明。</p>
         </details>
       </div>
     </section>
 
-    <section class="download wrap" id="download" aria-labelledby="download-title">
-      <img src="assets/icon.png" width="62" height="62" alt="">
-      <div>
-        <h2 id="download-title">安装 Seven Island</h2>
-        <p>适用于 macOS 14 及以上。</p>
-      </div>
-      <a class="button" href="https://github.com/lidongsevenlee/seven-island/releases/latest">下载 macOS 版 <span aria-hidden="true">↓</span></a>
-    </section>
   </main>
-
-  <footer class="site-footer wrap">
-    <a class="brand" href="#top"><img src="assets/icon.png" width="24" height="24" alt="">Seven Island</a>
-    <div class="footer-links">
-      <a href="https://github.com/lidongsevenlee/seven-island">开源代码 <span aria-hidden="true">↗</span></a>
-      <a href="https://github.com/lidongsevenlee/seven-island/releases">发布记录 <span aria-hidden="true">↗</span></a>
-    </div>
-  </footer>
 </body>
 </html>

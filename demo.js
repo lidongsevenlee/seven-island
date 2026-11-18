@@ -92,10 +92,6 @@ motionToggle.addEventListener("click", () => {
   syncPlayback();
 });
 document.addEventListener("visibilitychange", syncPlayback);
-const mobileNav = document.querySelector(".mobile-nav");
-for (const link of mobileNav.querySelectorAll("a")) {
-  link.addEventListener("click", () => { mobileNav.open = false; });
-}
 reduceMotion.addEventListener("change", ({ matches }) => {
   shouldPlay = !matches;
   syncPlayback();
