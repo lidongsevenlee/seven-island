@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板历史、VS Code 项目与备忘录。">
+  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录和屏幕取色。">
   <meta name="theme-color" content="#fbfbfb">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island">
@@ -12,7 +12,7 @@
   <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-showcase.jpg">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=installation">
+  <link rel="stylesheet" href="styles.css?v=toolbox-153">
   <script src="demo.js?v=expand" defer></script>
   <title>Seven Island</title>
 </head>
@@ -32,13 +32,16 @@
                 <video muted playsinline preload="none" poster="assets/seven-island-music-expand.jpg" data-src="assets/seven-island-music-expand.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
               </div>
               <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-expand.jpg" data-src="assets/seven-island-clipboard-expand.mp4" aria-label="剪贴板录屏。展开刘海后搜索设计，重新复制一条记录并将它移到顶部。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-153.jpg" data-src="assets/seven-island-clipboard-153.mp4" aria-label="剪贴板录屏。展开刘海后依次筛选文本、图片和文件，再搜索文件名。"></video>
               </div>
               <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
                 <video muted playsinline preload="none" poster="assets/seven-island-vscode-expand.jpg" data-src="assets/seven-island-vscode-expand.mp4" aria-label="VS Code 录屏。展开刘海后输入 Orbit，定位 OrbitApp 项目。"></video>
               </div>
               <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
                 <video muted playsinline preload="none" poster="assets/seven-island-memo-expand.jpg" data-src="assets/seven-island-memo-expand.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
+              </div>
+              <div id="panel-toolbox" role="tabpanel" aria-labelledby="tab-toolbox" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-toolbox-153.jpg" data-src="assets/seven-island-toolbox-153.mp4" aria-label="工具集录屏。展开刘海并打开工具集，使用取色器在屏幕上选色，查看自动复制的 HEX 和对应的 RGB。"></video>
               </div>
             </div>
           </div>
@@ -51,17 +54,18 @@
           <button id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
           <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
           <button id="tab-memo" type="button" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
+          <button id="tab-toolbox" type="button" role="tab" aria-selected="false" aria-controls="panel-toolbox" tabindex="-1">工具集</button>
         </div>
         <button id="motion-toggle" class="motion-toggle" type="button" aria-label="播放录屏" title="播放录屏">
           <span id="motion-icon" aria-hidden="true">▶</span>
         </button>
       </div>
-      <figcaption class="sr-only">当前开发版的原生界面录屏，使用示例数据。</figcaption>
+      <figcaption class="sr-only">Seven Island 原生界面录屏，使用示例数据。</figcaption>
       <p id="demo-error" class="demo-error" role="status" hidden>录屏加载失败。可以切换到其他场景。</p>
     </figure>
 
     <section class="capabilities" aria-labelledby="capabilities-title">
-      <h2 id="capabilities-title">四项常用功能</h2>
+      <h2 id="capabilities-title">常用功能</h2>
       <ul class="capability-grid">
         <li>
           <div class="capability-icon music-icon" aria-hidden="true">♪</div>
@@ -71,7 +75,7 @@
         <li>
           <div class="capability-icon clipboard-icon" aria-hidden="true"></div>
           <h3>剪贴板</h3>
-          <p>搜索复制过的文字和图片，快速找回历史记录。</p>
+          <p>按文本、图片和文件筛选剪贴板历史，也可搜索文件名。</p>
         </li>
         <li>
           <div class="capability-icon code-icon" aria-hidden="true">‹<span>›</span></div>
@@ -82,6 +86,11 @@
           <div class="capability-icon memo-icon" aria-hidden="true"></div>
           <h3>备忘录</h3>
           <p>用标签切换多份备忘录，编辑内容自动保存在本机。</p>
+        </li>
+        <li>
+          <div class="capability-icon toolbox-icon" aria-hidden="true"></div>
+          <h3>工具集</h3>
+          <p>用取色器在屏幕上选色，自动复制 HEX，也可查看 RGB。</p>
         </li>
       </ul>
     </section>
