@@ -57,7 +57,7 @@ class MusicManager: ObservableObject {
     @Published var currentLyrics: String = ""
     @Published var isFetchingLyrics: Bool = false
     @Published var syncedLyrics: [(time: Double, text: String)] = []
-    @Published var syncedLyricCharacterTimes: [[Double]] = []
+    @Published var syncedLyricCharacterTimings: [[LyricsDisplayText.CharacterTiming]] = []
     @Published var lyricsSource: LyricsSource = .none
     @Published var canFavoriteTrack: Bool = false
     @Published var isFavoriteTrack: Bool = false
@@ -71,10 +71,15 @@ class MusicManager: ObservableObject {
     }
 
     private let maxLyricsFetchAttempts = 3
-    private var lyricsFetchAttempts: [LyricsTrackKey: Int] = [:]
-    private var completedLyricsFetches = Set<LyricsTrackKey>()
+    private var completedLyricsFetchKey: LyricsTrackKey?
     private var activeLyricsFetchKey: LyricsTrackKey?
     private var lyricsFetchTask: Task<Void, Never>?
+    private enum WebLyricsReference {
+        case timeline([LyricsDisplayText.SyncedLine])
+        case lyrics(String)
+        case recording
+    }
+
     private struct WebLyricsCandidate {
         let plain: String
         let synced: String
@@ -83,12 +88,15 @@ class MusicManager: ObservableObject {
         /// when multiple results match the same title/artist — the entry whose duration
         /// is closest to the actual track duration wins.
         let lrclibDuration: Double
+        let recording: (title: String, artist: String, album: String)?
 
-        init(plain: String, synced: String, parsed: (lines: [LyricsDisplayText.SyncedLine], characterTimes: [[Double]]), lrclibDuration: Double = 0) {
+        init(plain: String, synced: String, parsed: (lines: [LyricsDisplayText.SyncedLine], characterTimes: [[Double]]), lrclibDuration: Double = 0,
+             recording: (title: String, artist: String, album: String)? = nil) {
             self.plain = plain
             self.synced = synced
             self.parsed = parsed
             self.lrclibDuration = lrclibDuration
+            self.recording = recording
         }
 
         var hasText: Bool {
@@ -416,55 +424,40 @@ class MusicManager: ObservableObject {
         guard Defaults[.enableLyrics], !title.isEmpty else {
             lyricsFetchTask?.cancel()
             activeLyricsFetchKey = nil
+            completedLyricsFetchKey = nil
             DispatchQueue.main.async {
                 self.isFetchingLyrics = false
                 self.currentLyrics = ""
                 self.syncedLyrics = []
-                self.syncedLyricCharacterTimes = []
+                self.syncedLyricCharacterTimings = []
                 self.lyricsSource = .none
             }
             return
         }
 
         let key = lyricsTrackKey(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album)
-        if force {
-            completedLyricsFetches.remove(key)
-            lyricsFetchAttempts[key] = 0
-        }
         guard force || activeLyricsFetchKey != key else { return }
-        guard force || !completedLyricsFetches.contains(key) else { return }
-        guard force || (lyricsFetchAttempts[key] ?? 0) < maxLyricsFetchAttempts else { return }
+        guard force || completedLyricsFetchKey != key else { return }
 
         lyricsFetchTask?.cancel()
+        completedLyricsFetchKey = nil
         activeLyricsFetchKey = key
         lyricsFetchTask = Task { @MainActor in
+            guard !Task.isCancelled else { return }
             self.isFetchingLyrics = true
             self.currentLyrics = ""
             self.syncedLyrics = []
-            self.syncedLyricCharacterTimes = []
+            self.syncedLyricCharacterTimings = []
             self.lyricsSource = .none
 
-            var didLoadLyrics = false
-            while !Task.isCancelled,
-                  !didLoadLyrics,
-                  (self.lyricsFetchAttempts[key] ?? 0) < self.maxLyricsFetchAttempts {
-                self.lyricsFetchAttempts[key, default: 0] += 1
-                didLoadLyrics = await self.fetchLyricsOnce(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album, duration: duration)
-                if !didLoadLyrics, (self.lyricsFetchAttempts[key] ?? 0) < self.maxLyricsFetchAttempts {
-                    try? await Task.sleep(for: .milliseconds(450))
-                }
+            for attempt in 0..<self.maxLyricsFetchAttempts {
+                guard !Task.isCancelled else { return }
+                if await self.fetchLyricsOnce(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album, duration: duration) { break }
+                if attempt + 1 < self.maxLyricsFetchAttempts { try? await Task.sleep(for: .milliseconds(450)) }
             }
 
-            if didLoadLyrics {
-                self.completedLyricsFetches.insert(key)
-            } else if !Task.isCancelled {
-                self.currentLyrics = ""
-                self.syncedLyrics = []
-                self.syncedLyricCharacterTimes = []
-                self.lyricsSource = .none
-            }
-
-            if self.activeLyricsFetchKey == key {
+            if !Task.isCancelled, self.activeLyricsFetchKey == key {
+                self.completedLyricsFetchKey = key
                 self.activeLyricsFetchKey = nil
                 self.isFetchingLyrics = false
             }
@@ -474,23 +467,68 @@ class MusicManager: ObservableObject {
     @MainActor
     private func fetchLyricsOnce(bundleIdentifier: String?, title: String, artist: String, album: String, duration: Double) async -> Bool {
         if let bundleIdentifier = bundleIdentifier, bundleIdentifier.contains("com.apple.Music") {
-            let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Music")
-            if !runningApps.isEmpty {
+            if let bookmark = Defaults[.appleMusicLyricsCacheBookmark] {
+                let timeline = await AppleMusicCachedLyrics.read(
+                    bookmark: bookmark, title: title, artist: artist, album: album, duration: duration
+                )
+                guard !Task.isCancelled else { return false }
+                if let timeline {
+                    applyAppleMusicLyrics(
+                        timeline.lines.map(\.text).joined(separator: "\n"),
+                        synced: timeline.lines,
+                        characterTimings: timeline.characterTimings
+                    )
+                    if timeline.characterTimings.allSatisfy(\.isEmpty) {
+                        isFetchingLyrics = false
+                        _ = await fetchLyricsFromWeb(
+                            title: title, artist: artist, album: album, duration: duration, matching: .timeline(timeline.lines)
+                        )
+                    }
+                    return !Task.isCancelled
+                }
+            }
+            if let music = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Music").first {
+                let accessibleLyrics = await AppleMusicAccessibilityLyrics.read(pid: music.processIdentifier, title: title, duration: duration)
+                guard !Task.isCancelled else { return false }
+                if let accessibleLyrics, !accessibleLyrics.syncedLines.isEmpty {
+                    applyAppleMusicLyrics(accessibleLyrics.text, synced: accessibleLyrics.syncedLines)
+                    return true
+                }
                 do {
                     if let lyrics = try await fetchLyricsFromAppleMusic(), !lyrics.isEmpty {
-                        currentLyrics = lyrics
-                        syncedLyrics = []
-                        syncedLyricCharacterTimes = []
-                        lyricsSource = .appleMusicOfficial
+                        guard !Task.isCancelled else { return false }
+                        applyAppleMusicLyrics(lyrics, synced: [])
                         return true
                     }
                 } catch {
                     // Fall through to web lookup.
                 }
+                guard !Task.isCancelled else { return false }
+                if let accessibleLyrics {
+                    applyAppleMusicLyrics(accessibleLyrics.text, synced: [])
+                    isFetchingLyrics = false
+                    _ = await fetchLyricsFromWeb(
+                        title: title, artist: artist, album: album, duration: duration, matching: .lyrics(accessibleLyrics.text)
+                    )
+                    return !Task.isCancelled
+                }
             }
+            return await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration, matching: .recording)
         }
 
         return await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration)
+    }
+
+    @MainActor
+    private func applyAppleMusicLyrics(
+        _ text: String,
+        synced: [LyricsDisplayText.SyncedLine],
+        characterTimings: [[LyricsDisplayText.CharacterTiming]] = []
+    ) {
+        currentLyrics = text
+        syncedLyrics = synced
+        syncedLyricCharacterTimings = characterTimings
+        lyricsSource = .appleMusicOfficial
     }
 
     @MainActor
@@ -573,16 +611,40 @@ class MusicManager: ObservableObject {
     }
 
     @MainActor
-    private func fetchLyricsFromWeb(title: String, artist: String, album: String = "", duration: Double = 0) async -> Bool {
+    private func fetchLyricsFromWeb(
+        title: String, artist: String, album: String = "", duration: Double = 0,
+        matching reference: WebLyricsReference? = nil
+    ) async -> Bool {
+        guard !Task.isCancelled else { return false }
         let cleanArtist = normalizedQuery(artist)
         let cleanAlbum = normalizedQuery(album)
+        let cleanTitle = normalizedQuery(title)
         var fallbackCandidate: WebLyricsCandidate?
+
+        func matchesReference(_ candidate: WebLyricsCandidate) -> Bool {
+            switch reference {
+            case .timeline(let lines):
+                return candidate.hasCharacterTiming && LyricsDisplayText.matchesPlaybackTimeline(candidate.parsed.lines, reference: lines)
+            case .lyrics(let text):
+                guard let end = candidate.parsed.lines.last?.time, duration <= 0 || end < duration else { return false }
+                return LyricsDisplayText.matchesLyricText(candidate.parsed.lines, reference: text)
+            case .recording:
+                guard let recording = candidate.recording, duration.isFinite, duration > 0,
+                      !album.isEmpty, abs(candidate.lrclibDuration - duration) <= 2 else { return false }
+                return normalizedQuery(recording.title).caseInsensitiveCompare(cleanTitle) == .orderedSame &&
+                    normalizedQuery(recording.artist).caseInsensitiveCompare(cleanArtist) == .orderedSame &&
+                    normalizedQuery(recording.album).caseInsensitiveCompare(cleanAlbum) == .orderedSame
+            case nil:
+                return true
+            }
+        }
 
         // ── Step 1: LRCLIB /api/get — exact match (title + artist + album + duration) ──
         // This endpoint returns a single result and matches on duration when provided,
         // giving accurate version selection without needing to sort a search result list.
-        if let exactURL = lyricExactURL(title: normalizedQuery(title), artist: cleanArtist, album: cleanAlbum, duration: duration) {
-            if let candidate = try? await fetchLrclibSingle(url: exactURL), candidate.hasText {
+        if let exactURL = lyricExactURL(title: cleanTitle, artist: cleanArtist, album: cleanAlbum, duration: duration) {
+            if let candidate = try? await fetchLrclibSingle(url: exactURL), candidate.hasText, matchesReference(candidate) {
+                guard !Task.isCancelled else { return false }
                 applyWebLyricsCandidate(candidate)
                 return true
             }
@@ -592,20 +654,14 @@ class MusicManager: ObservableObject {
         // Falls back here when the exact endpoint returns 404 (album name mismatch,
         // simplified/traditional Chinese differences, etc.).
         for titleQuery in lyricTitleQueries(from: title) {
+            guard !Task.isCancelled else { return false }
             guard let url = lyricSearchURL(title: titleQuery, artist: cleanArtist) else { continue }
             do {
                 let (data, response) = try await URLSession.shared.data(from: url)
                 guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { continue }
                 guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { continue }
 
-                var candidates = jsonArray.compactMap { result -> WebLyricsCandidate? in
-                    let plain = (result["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let synced = (result["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    let parsed = synced.isEmpty ? (lines: [], characterTimes: []) : LyricsDisplayText.parseSyncedLyrics(synced)
-                    let lrclibDuration = result["duration"] as? Double ?? 0
-                    let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed, lrclibDuration: lrclibDuration)
-                    return candidate.hasText ? candidate : nil
-                }
+                var candidates = jsonArray.compactMap(lrclibCandidate).filter(matchesReference)
 
                 // Sort by duration proximity when we have actual track duration.
                 // Candidates within 2 s are considered equally good; outside that,
@@ -621,6 +677,7 @@ class MusicManager: ObservableObject {
                 }
 
                 if let enhanced = candidates.first(where: \.hasCharacterTiming) {
+                    guard !Task.isCancelled else { return false }
                     applyWebLyricsCandidate(enhanced)
                     return true
                 }
@@ -633,20 +690,24 @@ class MusicManager: ObservableObject {
             }
         }
 
-        if let enhanced = await fetchEnhancedLyricsFromAdditionalWebProviders(title: title, artist: artist) {
+        guard !Task.isCancelled else { return false }
+        let allowsQQMusic = switch reference {
+        case .recording: false
+        default: true
+        }
+        if allowsQQMusic, let enhanced = await fetchEnhancedLyricsFromAdditionalWebProviders(title: title, artist: artist),
+           matchesReference(enhanced) {
+            guard !Task.isCancelled else { return false }
             applyWebLyricsCandidate(enhanced)
             return true
         }
 
+        guard !Task.isCancelled else { return false }
         if let fallbackCandidate {
             applyWebLyricsCandidate(fallbackCandidate)
             return true
         }
 
-        self.currentLyrics = ""
-        self.syncedLyrics = []
-        self.syncedLyricCharacterTimes = []
-        self.lyricsSource = .none
         return false
     }
 
@@ -655,11 +716,17 @@ class MusicManager: ObservableObject {
         let (data, response) = try await URLSession.shared.data(from: url)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
         guard let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return lrclibCandidate(result)
+    }
+
+    private func lrclibCandidate(_ result: [String: Any]) -> WebLyricsCandidate? {
         let plain = (result["plainLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let synced = (result["syncedLyrics"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let parsed = synced.isEmpty ? (lines: [], characterTimes: []) : LyricsDisplayText.parseSyncedLyrics(synced)
         let lrclibDuration = result["duration"] as? Double ?? 0
-        let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed, lrclibDuration: lrclibDuration)
+        let recording = (title: result["trackName"] as? String ?? "", artist: result["artistName"] as? String ?? "",
+                         album: result["albumName"] as? String ?? "")
+        let candidate = WebLyricsCandidate(plain: plain, synced: synced, parsed: parsed, lrclibDuration: lrclibDuration, recording: recording)
         return candidate.hasText ? candidate : nil
     }
 
@@ -667,7 +734,9 @@ class MusicManager: ObservableObject {
     private func applyWebLyricsCandidate(_ candidate: WebLyricsCandidate) {
         self.currentLyrics = candidate.displayLyrics
         self.syncedLyrics = candidate.parsed.lines
-        self.syncedLyricCharacterTimes = candidate.hasCharacterTiming ? candidate.parsed.characterTimes : []
+        self.syncedLyricCharacterTimings = candidate.hasCharacterTiming
+            ? candidate.parsed.characterTimes.map { $0.map { .init(start: $0) } }
+            : []
         self.lyricsSource = .web
     }
 

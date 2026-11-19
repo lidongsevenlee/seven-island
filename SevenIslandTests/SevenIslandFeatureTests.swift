@@ -193,19 +193,19 @@ func testLyricsDisplayTextUsesPerCharacterTimestampsWhenAvailable() {
         (10, "ABCD"),
         (20, "Next")
     ]
-    let characterTimes = [
+    let characterTimings = [
         [10.0, 11.0, 13.0, 16.0],
         [20.0, 21.0, 22.0, 23.0]
-    ]
+    ].map { $0.map { LyricsDisplayText.CharacterTiming(start: $0) } }
 
     let atTwelve = LyricsDisplayText.activeLineProgress(
         from: syncedLyrics,
-        characterTimes: characterTimes,
+        characterTimings: characterTimings,
         elapsed: 12
     ) ?? 0
     let atFifteen = LyricsDisplayText.activeLineProgress(
         from: syncedLyrics,
-        characterTimes: characterTimes,
+        characterTimings: characterTimings,
         elapsed: 15
     ) ?? 0
 
@@ -220,7 +220,7 @@ func testLyricsDisplayTextDoesNotAnimateWithoutPerCharacterTimestamps() {
     ]
 
     expectEqual(
-        LyricsDisplayText.activeLineProgress(from: syncedLyrics, characterTimes: [[], []], elapsed: 15),
+        LyricsDisplayText.activeLineProgress(from: syncedLyrics, characterTimings: [[], []], elapsed: 15),
         nil,
         "does not synthesize progress animation from line-only lyrics"
     )
@@ -240,6 +240,80 @@ func testLyricsDisplayTextParsesQRCCharacterTimestamps() {
 
     expectEqual(parsed.lines.map(\.text), ["你好世界"], "removes QRC inline timestamps from display text")
     expectEqual(parsed.characterTimes, [[10.0, 10.5, 11.2, 11.8]], "converts QRC word offsets into absolute character timestamps")
+}
+
+func testAppleMusicAccessibilityLyricsValidatesCompleteTiming() {
+    typealias Row = AppleMusicAccessibilityLyrics.Row
+    let plain = Row(text: "First line", timeLabels: [])
+    let first = Row(text: "First line", timeLabels: ["00:12.50"])
+    let second = Row(text: "[00:15.25]Second line", timeLabels: [])
+    let timed = AppleMusicAccessibilityLyrics(rows: [first, second], duration: 90)
+    expectEqual(timed?.text, "First line\nSecond line", "keeps the Apple Music line text")
+    expectEqual(timed?.syncedLines.map(\.time), [12.5, 15.25], "reads explicit line timestamps")
+    expectEqual(AppleMusicAccessibilityLyrics(rows: [plain, second], duration: 90)?.syncedLines.count, 0, "leaves partial timing to a fallback")
+    expectEqual(AppleMusicAccessibilityLyrics(rows: [second, first], duration: 90)?.syncedLines.count, 0, "rejects reversed timing")
+    expectEqual(AppleMusicAccessibilityLyrics(rows: [first, second], duration: 13)?.syncedLines.count, 0, "rejects timing beyond the current track")
+}
+
+func testAppleMusicCachedLyricsParsesAppleTimestampFormats() {
+    let ttml = """
+        <tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+        <p begin="17.948" end="23.010"><span>First</span> line</p>
+        <p begin="1:01.165" end="1:05.000">Second line</p>
+        </div></body></tt>
+        """
+    let lines = AppleMusicCachedLyrics.parseTTML(ttml, duration: 90)?.lines ?? []
+    expectEqual(lines.map(\.time), [17.948, 61.165], "reads decimal and clock timestamps in the same TTML")
+    expectEqual(lines.map(\.text), ["First line", "Second line"], "joins lyric spans into line text")
+    expectEqual(LyricsDisplayText.currentSyncedIndex(from: lines, elapsed: 61.164), 0, "holds the preceding line")
+    expectEqual(LyricsDisplayText.currentSyncedIndex(from: lines, elapsed: 61.165), 1, "switches on the TTML line time")
+    expectEqual(AppleMusicCachedLyrics.parseTTML(ttml, duration: 60)?.lines.count, nil, "rejects timestamps beyond the track")
+}
+
+func testAppleMusicCachedLyricsFollowsTimedSpans() {
+    let ttml = """
+        <tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+        <p begin="10.0" end="14.0"> <span begin="10.0" end="10.5">你</span><span begin="12.0" end="13.0"><span>好</span>啊</span> </p>
+        <p begin="20.0" end="21.0">下一句</p>
+        </div></body></tt>
+        """
+    let timeline = AppleMusicCachedLyrics.parseTTML(ttml, duration: 30)
+    expectEqual(timeline?.lines.map(\.text), ["你好啊", "下一句"], "preserves the text of timed spans")
+    expectEqual(timeline?.characterTimings.first?.map(\.start), [10, 12, 12.5], "uses the absolute span starts")
+    expectEqual(timeline?.characterTimings.first?.map(\.end), [10.5, 12.5, 13], "retains end times for the animation")
+    expectEqual(timeline?.characterTimings.last, [], "preserves line-only timing")
+
+    for (elapsed, expected) in [(10.25, 1.0 / 6), (11, 1.0 / 3), (12.5, 2.0 / 3), (13.1, 1), (11, 1.0 / 3)] {
+        let progress = LyricsDisplayText.activeLineProgress(
+            from: timeline?.lines ?? [],
+            characterTimings: timeline?.characterTimings ?? [],
+            elapsed: elapsed
+        )
+        expectEqual(progress.map { abs($0 - expected) < 0.001 }, true, "follows the playback position at \(elapsed) seconds")
+    }
+}
+
+func testLyricsDisplayTextChecksFallbackRecordingTiming() {
+    let official: [LyricsDisplayText.SyncedLine] = [(10, "第一句。"), (14, "第二句"), (22, "第三句")]
+    let sameRecording: [LyricsDisplayText.SyncedLine] = [(10.2, "第一句"), (14.1, "第二句"), (22.5, "第 三 句")]
+    let differentRecording = sameRecording.map { (time: $0.time + 2, text: $0.text) }
+
+    expectEqual(LyricsDisplayText.matchesPlaybackTimeline(sameRecording, reference: official), true, "accepts matching text and timing")
+    expectEqual(LyricsDisplayText.matchesPlaybackTimeline(differentRecording, reference: official), false, "rejects shifted recordings")
+    expectEqual(LyricsDisplayText.matchesPlaybackTimeline(Array(sameRecording.prefix(1)), reference: official), false, "requires more than one common line")
+}
+
+func testLyricsDisplayTextRejectsSameTitleWithDifferentWords() {
+    let official = "镜子里的微笑\n灯下看见你的名字\n还记得那年冬天\nLinda, Linda"
+    let differentVersion: [LyricsDisplayText.SyncedLine] = [
+        (12, "明月照街头"), (16, "风吹过窗边"), (20, "再会我的朋友"), (24, "LINDA LINDA")
+    ]
+    let sameVersion: [LyricsDisplayText.SyncedLine] = [
+        (12, "鏡子裡的微笑"), (16, "燈下看見妳的名字"), (20, "還記得那年冬天"), (24, "LINDA LINDA")
+    ]
+
+    expectEqual(LyricsDisplayText.matchesLyricText(differentVersion, reference: official), false, "rejects a shared title and different verses")
+    expectEqual(LyricsDisplayText.matchesLyricText(sameVersion, reference: official), true, "matches punctuation and traditional Chinese variants")
 }
 
 func testLyricsDisplayTextProvidesUnavailableFallback() {
@@ -272,6 +346,11 @@ enum SevenIslandFeatureTestRunner {
             testLyricsDisplayTextParsesEnhancedLRCCharacterTimestamps()
             testLyricsDisplayTextParsesQRCCharacterTimestamps()
             testLyricsDisplayTextProvidesUnavailableFallback()
+            testAppleMusicAccessibilityLyricsValidatesCompleteTiming()
+            testAppleMusicCachedLyricsParsesAppleTimestampFormats()
+            testAppleMusicCachedLyricsFollowsTimedSpans()
+            testLyricsDisplayTextChecksFallbackRecordingTiming()
+            testLyricsDisplayTextRejectsSameTitleWithDifferentWords()
             print("SevenIslandFeatureTests passed")
         } catch {
             fputs("FAIL: \(error.localizedDescription)\n", stderr)

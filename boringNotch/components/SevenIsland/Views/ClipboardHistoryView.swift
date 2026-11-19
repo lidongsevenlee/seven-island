@@ -20,10 +20,11 @@ struct ClipboardHistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: sevenIslandRowSpacing) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 12))
+                    .frame(width: sevenIslandRowIconWidth)
                 TextField("搜索剪贴板历史...", text: $vm.clipboardSearchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
@@ -40,9 +41,9 @@ struct ClipboardHistoryView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, sevenIslandRowInset)
             .padding(.vertical, 6)
-            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .background(sevenIslandContentBackground, in: RoundedRectangle(cornerRadius: 8))
 
             if store.items.isEmpty {
                 Spacer(minLength: 8)
@@ -70,13 +71,16 @@ struct ClipboardHistoryView: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
+        .task {
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            isSearchFocused = true
+        }
         .onChange(of: isSearchFocused) { _, focused in
-            vm.isSearchFocused = focused
+            vm.isTextInputFocused = focused
         }
         .onDisappear {
-            vm.isSearchFocused = false
+            vm.isTextInputFocused = false
         }
         .preferredColorScheme(.dark)
     }
@@ -92,10 +96,10 @@ private struct ClipboardItemRow: View {
 
     var body: some View {
         Button(action: onCopy) {
-            HStack(spacing: 10) {
+            HStack(spacing: sevenIslandRowSpacing) {
                 Image(systemName: item.isImage ? "photo" : "doc.on.doc")
                     .foregroundStyle(.secondary)
-                    .frame(width: 18)
+                    .frame(width: sevenIslandRowIconWidth)
 
                 if item.isImage {
                     if let nsImage = cachedImage {
@@ -114,10 +118,10 @@ private struct ClipboardItemRow: View {
 
                 Spacer(minLength: 8)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, sevenIslandRowInset)
             .padding(.vertical, 8)
             .background(
-                (isHovering ? Color.white.opacity(0.15) : Color.white.opacity(0.08)),
+                isHovering ? sevenIslandHoveredContentBackground : sevenIslandContentBackground,
                 in: RoundedRectangle(cornerRadius: 8)
             )
         }

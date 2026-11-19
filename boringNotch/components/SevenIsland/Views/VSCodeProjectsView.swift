@@ -24,10 +24,11 @@ struct VSCodeProjectsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+            HStack(spacing: sevenIslandRowSpacing) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .font(.system(size: 12))
+                    .frame(width: sevenIslandRowIconWidth)
                 TextField("搜索项目...", text: $vm.vscodeSearchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
@@ -51,9 +52,9 @@ struct VSCodeProjectsView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, sevenIslandRowInset)
             .padding(.vertical, 6)
-            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .background(sevenIslandContentBackground, in: RoundedRectangle(cornerRadius: 8))
 
             if service.projects.isEmpty {
                 Spacer(minLength: 8)
@@ -85,8 +86,6 @@ struct VSCodeProjectsView: View {
                 .frame(maxHeight: 300)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 6)
         .onAppear {
             service.refresh()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -94,10 +93,10 @@ struct VSCodeProjectsView: View {
             }
         }
         .onChange(of: isSearchFocused) { _, focused in
-            vm.isSearchFocused = focused
+            vm.isTextInputFocused = focused
         }
         .onDisappear {
-            vm.isSearchFocused = false
+            vm.isTextInputFocused = false
         }
         .preferredColorScheme(.dark)
     }
@@ -118,10 +117,10 @@ private struct VSCodeProjectRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: sevenIslandRowSpacing) {
             Image(systemName: iconName)
                 .foregroundStyle(iconColor)
-                .frame(width: 18)
+                .frame(width: sevenIslandRowIconWidth)
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
                     .font(.system(size: 12, weight: .medium))
@@ -134,10 +133,10 @@ private struct VSCodeProjectRow: View {
             }
             Spacer(minLength: 8)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, sevenIslandRowInset)
         .padding(.vertical, 7)
         .background(
-            (isHovering ? Color.white.opacity(0.15) : Color.white.opacity(0.08)),
+            isHovering ? sevenIslandHoveredContentBackground : sevenIslandContentBackground,
             in: RoundedRectangle(cornerRadius: 8)
         )
         .onHover { hovering in

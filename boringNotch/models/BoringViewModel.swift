@@ -30,7 +30,7 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
-    @Published var isSearchFocused: Bool = false
+    @Published var isTextInputFocused: Bool = false
     @Published var clipboardSearchText: String = ""
     @Published var vscodeSearchText: String = ""
 
@@ -204,7 +204,7 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     func closeAutomatically() {
-        guard !isSearchFocused else { return }
+        guard !isTextInputFocused else { return }
         close()
     }
 
@@ -221,7 +221,7 @@ class BoringViewModel: NSObject, ObservableObject {
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
         self.isBatteryPopoverActive = false
-        self.isSearchFocused = false
+        self.isTextInputFocused = false
         self.coordinator.sneakPeek.show = false
         self.edgeAutoOpenActive = false
 

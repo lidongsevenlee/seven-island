@@ -135,7 +135,7 @@ struct MusicControlsView: View {
     @Default(.musicControlSlotLimit) private var slotLimit
 
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 4) {
             songInfoAndSlider
             slotToolbar
         }
@@ -147,9 +147,16 @@ struct MusicControlsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 songInfo(width: geo.size.width)
                 musicSlider
+                MusicBarsView(
+                    isPlaying: musicManager.isPlaying,
+                    color: Defaults[.playerColorTinting]
+                        ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.8)
+                        : .white
+                )
+                .frame(maxHeight: MusicSpectrumBar.peakCeiling + 3)
             }
         }
-        .padding(.top, 10)
+        .padding(.top, 6)
         .padding(.leading, 5)
     }
 
@@ -439,8 +446,8 @@ private struct SyncedLyricsScrollView: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
-                TimelineView(.animation(minimumInterval: 0.05)) { timeline in
-                    let elapsed = estimatedElapsed(at: timeline.date)
+                TimelineView(.animation(minimumInterval: 0.05, paused: !musicManager.isPlaying)) { timeline in
+                    let elapsed = musicManager.estimatedPlaybackPosition(at: timeline.date)
                     let currentIdx = LyricsDisplayText.currentSyncedIndex(
                         from: musicManager.syncedLyrics, elapsed: elapsed) ?? 0
                     let highlightColor = karaokeHighlightColor
@@ -456,7 +463,7 @@ private struct SyncedLyricsScrollView: View {
                                 currentIndex: currentIdx,
                                 elapsed: elapsed,
                                 syncedLyrics: musicManager.syncedLyrics,
-                                characterTimes: musicManager.syncedLyricCharacterTimes,
+                                characterTimings: musicManager.syncedLyricCharacterTimings,
                                 highlightColor: highlightColor
                             )
                             .id(index)
@@ -466,7 +473,7 @@ private struct SyncedLyricsScrollView: View {
                     // anchor position instead of being pinned to the edge.
                     .padding(.vertical, 36)
                     .frame(maxWidth: .infinity)
-                    .onChange(of: currentIdx) { _, newIdx in
+                    .onChange(of: currentIdx, initial: true) { _, newIdx in
                         scrollTarget = newIdx
                     }
                 }
@@ -487,13 +494,6 @@ private struct SyncedLyricsScrollView: View {
             ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.85)
             : .white
     }
-
-    private func estimatedElapsed(at date: Date) -> Double {
-        guard musicManager.isPlaying else { return musicManager.elapsedTime }
-        let delta = date.timeIntervalSince(musicManager.timestampDate)
-        let progressed = musicManager.elapsedTime + (delta * musicManager.playbackRate)
-        return min(max(progressed, 0), musicManager.songDuration)
-    }
 }
 
 // MARK: - Karaoke line: dim base + bright progress mask
@@ -504,7 +504,7 @@ private struct KaraokeLineView: View {
     let currentIndex: Int
     let elapsed: Double
     let syncedLyrics: [(time: Double, text: String)]
-    let characterTimes: [[Double]]
+    let characterTimings: [[LyricsDisplayText.CharacterTiming]]
     let highlightColor: Color
 
     private var isCurrent: Bool { index == currentIndex }
@@ -512,17 +512,12 @@ private struct KaraokeLineView: View {
 
     /// 0…1 progress of the current line (0 for non-current lines).
     private var progress: Double {
-        guard isCurrent else { return 0 }
-        // Use per-character timing when available for smoother animation.
-        if characterTimes.indices.contains(index), !characterTimes[index].isEmpty {
-            return LyricsDisplayText.activeLineProgress(
-                from: syncedLyrics,
-                characterTimes: characterTimes,
-                elapsed: elapsed
-            ) ?? 0
-        }
+        guard isCurrent, syncedLyrics.indices.contains(index), elapsed >= syncedLyrics[index].time else { return 0 }
         return LyricsDisplayText.activeLineProgress(
-            from: syncedLyrics, elapsed: elapsed) ?? 0
+            from: syncedLyrics,
+            characterTimings: characterTimings,
+            elapsed: elapsed
+        ) ?? 1
     }
 
     var body: some View {
@@ -701,7 +696,7 @@ struct MusicHomeView: View {
 
     @ViewBuilder
     private var expandedLyricsPanel: some View {
-        if musicManager.lyricsSource == .appleMusicOfficial &&
+        if musicManager.lyricsSource == .appleMusicOfficial && musicManager.syncedLyrics.isEmpty &&
             !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             AppleMusicLyricsPageView()
                 .frame(width: 220, alignment: .center)

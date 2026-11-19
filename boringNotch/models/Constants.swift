@@ -124,6 +124,7 @@ extension Defaults.Keys {
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: false)
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
+    static let appleMusicLyricsCacheBookmark = Key<Data?>("appleMusicLyricsCacheBookmark", default: nil)
     static let musicControlSlots = Key<[MusicControlButton]>(
         "musicControlSlots",
         default: MusicControlButton.defaultLayout
@@ -178,6 +179,10 @@ extension Defaults.Keys {
     static let vscodePinnedFolders = Key<[URL]>("vscodePinnedFolders", default: [])
     static let vscodeIncludeHidden = Key<Bool>("vscodeIncludeHidden", default: false)
     static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
+
+    // MARK: Memo
+    static let memoText = Key<String>("sevenIslandMemoText", default: "")
+    static let memoLibrary = Key<MemoLibrary?>("sevenIslandMemoLibrary")
 
     // Helper to determine the default media controller based on NowPlaying deprecation status
     static var defaultMediaController: MediaControllerType {

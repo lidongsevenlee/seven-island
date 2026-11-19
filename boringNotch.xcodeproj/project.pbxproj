@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7E3001040000000000000004 /* AppleMusicAccessibilityLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */; };
+		7E3001040000000000000005 /* AppleMusicCachedLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */; };
+		7E3001030000000000000003 /* MusicSpectrumBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000030000000000000003 /* MusicSpectrumBar.swift */; };
+		7E3001020000000000000002 /* MusicAudioSpectrum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000020000000000000002 /* MusicAudioSpectrum.swift */; };
+		7E3001010000000000000001 /* AudioSpectrumAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000010000000000000001 /* AudioSpectrumAnalyzer.swift */; };
+		7E2001020000000000000002 /* MemoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2000020000000000000002 /* MemoStore.swift */; };
+		7E2001010000000000000001 /* MemoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2000010000000000000001 /* MemoItem.swift */; };
 		7E1001010000000000000001 /* ClipboardHistoryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000010000000000000001 /* ClipboardHistoryItem.swift */; };
 		7E1001020000000000000002 /* VSCodeProjectItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000020000000000000002 /* VSCodeProjectItem.swift */; };
 		7E1001040000000000000004 /* ClipboardHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000040000000000000004 /* ClipboardHistoryStore.swift */; };
@@ -16,9 +23,7 @@
 		7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000090000000000000009 /* VSCodeProjectsView.swift */; };
 		7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000C000000000000000C /* ClipboardSettingsView.swift */; };
 		7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* VSCodeSettingsView.swift */; };
-		7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000E000000000000000E /* MenuBarProxyItem.swift */; };
-		7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000F000000000000000F /* MenuBarItemMonitor.swift */; };
-		7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MenuBarItemsView.swift */; };
+		7E1001100000000000000010 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MemoView.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
 		111BE95D2ECD71E10079DD4E /* AsyncXPCConnection in Frameworks */ = {isa = PBXBuildFile; productRef = 111BE95C2ECD71E10079DD4E /* AsyncXPCConnection */; };
@@ -173,6 +178,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicAccessibilityLyrics.swift; sourceTree = "<group>"; };
+		7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicCachedLyrics.swift; sourceTree = "<group>"; };
+		7E3000030000000000000003 /* MusicSpectrumBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSpectrumBar.swift; sourceTree = "<group>"; };
+		7E3000020000000000000002 /* MusicAudioSpectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicAudioSpectrum.swift; sourceTree = "<group>"; };
+		7E3000010000000000000001 /* AudioSpectrumAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSpectrumAnalyzer.swift; sourceTree = "<group>"; };
+		7E2000020000000000000002 /* MemoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoStore.swift; sourceTree = "<group>"; };
+		7E2000010000000000000001 /* MemoItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoItem.swift; sourceTree = "<group>"; };
 		7E1000010000000000000001 /* ClipboardHistoryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryItem.swift; sourceTree = "<group>"; };
 		7E1000020000000000000002 /* VSCodeProjectItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectItem.swift; sourceTree = "<group>"; };
 		7E1000040000000000000004 /* ClipboardHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryStore.swift; sourceTree = "<group>"; };
@@ -182,9 +194,7 @@
 		7E1000090000000000000009 /* VSCodeProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectsView.swift; sourceTree = "<group>"; };
 		7E10000C000000000000000C /* ClipboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardSettingsView.swift; sourceTree = "<group>"; };
 		7E10000D000000000000000D /* VSCodeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeSettingsView.swift; sourceTree = "<group>"; };
-		7E10000E000000000000000E /* MenuBarProxyItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarProxyItem.swift; sourceTree = "<group>"; };
-		7E10000F000000000000000F /* MenuBarItemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemMonitor.swift; sourceTree = "<group>"; };
-		7E1000100000000000000010 /* MenuBarItemsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarItemsView.swift; sourceTree = "<group>"; };
+		7E1000100000000000000010 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
 		111BEA602ED09B1B0079DD4E /* NSScreen+UUID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+UUID.swift"; sourceTree = "<group>"; };
 		112B0EB32E30DD0F00562D6C /* mediaremote-adapter.pl */ = {isa = PBXFileReference; lastKnownFileType = text.script.perl; path = "mediaremote-adapter.pl"; sourceTree = "<group>"; };
 		112B0EB52E30DD0F00562D6C /* MediaRemoteAdapterTestClient */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = MediaRemoteAdapterTestClient; sourceTree = "<group>"; };
@@ -396,7 +406,10 @@
 				118EBE242E92DCCB00D54B5A /* AssociatedObject.swift */,
 				11A45C782E34E63100CEB175 /* MediaChecker.swift */,
 				1153BD972D9881F900979FB0 /* AppleScriptHelper.swift */,
+				7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */,
+				7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */,
 				14288DD62C6E015000B9F80C /* AudioPlayer.swift */,
+				7E3000010000000000000001 /* AudioSpectrumAnalyzer.swift */,
 				5955950C2E900ED800C66711 /* ApplicationRelauncher.swift */,
 				14288E0B2C6F8EC000B9F80C /* AppIcons.swift */,
 			);
@@ -458,8 +471,8 @@
 			isa = PBXGroup;
 			children = (
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
+				7E2000010000000000000001 /* MemoItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
-				7E10000E000000000000000E /* MenuBarProxyItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -468,9 +481,9 @@
 			isa = PBXGroup;
 			children = (
 				7E1000040000000000000004 /* ClipboardHistoryStore.swift */,
+				7E2000020000000000000002 /* MemoStore.swift */,
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
-				7E10000F000000000000000F /* MenuBarItemMonitor.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -480,7 +493,7 @@
 			children = (
 				7E1000080000000000000008 /* ClipboardHistoryView.swift */,
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
-				7E1000100000000000000010 /* MenuBarItemsView.swift */,
+				7E1000100000000000000010 /* MemoView.swift */,
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 			);
@@ -494,6 +507,7 @@
 				F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */,
 				112FB7342CCF16F70015238C /* NotchSpaceManager.swift */,
 				147163992C5D35FF0068B555 /* MusicManager.swift */,
+				7E3000020000000000000002 /* MusicAudioSpectrum.swift */,
 				149E0B962C737D00006418B1 /* WebcamManager.swift */,
 				14C08BB52C8DE42D000F8AA0 /* CalendarManager.swift */,
 				B1F0A0012E60000100000001 /* BrightnessManager.swift */,
@@ -663,6 +677,7 @@
 			children = (
 				B19424082CD0FEFE003E5DC2 /* LottieAnimationView.swift */,
 				147163972C5D35B70068B555 /* MusicVisualizer.swift */,
+				7E3000030000000000000003 /* MusicSpectrumBar.swift */,
 			);
 			path = Music;
 			sourceTree = "<group>";
@@ -881,14 +896,17 @@
 				7E1001090000000000000009 /* VSCodeProjectsView.swift in Sources */,
 				7E10010C000000000000000C /* ClipboardSettingsView.swift in Sources */,
 				7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */,
-				7E10010E000000000000000E /* MenuBarProxyItem.swift in Sources */,
-				7E10010F000000000000000F /* MenuBarItemMonitor.swift in Sources */,
-				7E1001100000000000000010 /* MenuBarItemsView.swift in Sources */,
+				7E1001100000000000000010 /* MemoView.swift in Sources */,
+				7E2001020000000000000002 /* MemoStore.swift in Sources */,
+				7E2001010000000000000001 /* MemoItem.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
 				147163982C5D35B70068B555 /* MusicVisualizer.swift in Sources */,
+				7E3001030000000000000003 /* MusicSpectrumBar.swift in Sources */,
+				7E3001020000000000000002 /* MusicAudioSpectrum.swift in Sources */,
+				7E3001010000000000000001 /* AudioSpectrumAnalyzer.swift in Sources */,
 				11CC44A22CEE614100C7244B /* BoringViewCoordinator.swift in Sources */,
 				B186543C2C6F49AE000B926A /* ShortcutConstants.swift in Sources */,
 				11A45C792E34E63100CEB175 /* MediaChecker.swift in Sources */,
@@ -967,6 +985,8 @@
 				112FB7352CCF16F70015238C /* NotchSpaceManager.swift in Sources */,
 				14FC6E502C7DED5600C7BEA5 /* DataTypes+Extensions.swift in Sources */,
 				1153BD982D9881F900979FB0 /* AppleScriptHelper.swift in Sources */,
+				7E3001040000000000000004 /* AppleMusicAccessibilityLyrics.swift in Sources */,
+				7E3001040000000000000005 /* AppleMusicCachedLyrics.swift in Sources */,
 				11CFC6612E097F6800748C80 /* PermissionsRequestView.swift in Sources */,
 				14D570D22C5F6C6A0011E668 /* BoringExtrasMenu.swift in Sources */,
 				11D58EA22E760AE100FA8377 /* ImageService.swift in Sources */,

@@ -15,6 +15,14 @@ let batterySneakSize: CGSize = .init(width: 160, height: 1)
 let shadowPadding: CGFloat = 20
 let openNotchSize: CGSize = .init(width: 640, height: 240)
 let sevenIslandFeatureNotchHeight: CGFloat = openNotchSize.height * 1.5
+let sevenIslandContentInset: CGFloat = 12
+let sevenIslandRowIconWidth: CGFloat = 18
+let sevenIslandRowSpacing: CGFloat = 10
+let sevenIslandRowInset: CGFloat = 10
+let sevenIslandContentBackground = Color.white.opacity(0.16)
+let sevenIslandHoveredContentBackground = Color.white.opacity(0.23)
+// Align the logo's visible edge, including its transparent asset padding.
+let sevenIslandHeaderTrailingInset: CGFloat = 6
 let windowSize: CGSize = .init(width: openNotchSize.width, height: max(openNotchSize.height, sevenIslandFeatureNotchHeight) + shadowPadding)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 

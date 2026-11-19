@@ -13,6 +13,16 @@ enum LyricsDisplayText {
 
     typealias SyncedLine = (time: Double, text: String)
 
+    struct CharacterTiming: Equatable, Sendable {
+        let start: Double
+        let end: Double?
+
+        init(start: Double, end: Double? = nil) {
+            self.start = start
+            self.end = end
+        }
+    }
+
     static func parseSyncedLyrics(_ lrc: String) -> (lines: [SyncedLine], characterTimes: [[Double]]) {
         var parsedLines: [SyncedLine] = []
         var parsedCharacterTimes: [[Double]] = []
@@ -175,29 +185,39 @@ enum LyricsDisplayText {
         return min(Double(characterCount - 1), progress * Double(characterCount))
     }
 
-    static func activeLineProgress(from syncedLyrics: [(time: Double, text: String)], elapsed: Double, leadTime: Double = 0) -> Double? {
-        guard let lineIndex = currentSyncedIndex(from: syncedLyrics, elapsed: elapsed) else {
-            return nil
-        }
+    static func matchesPlaybackTimeline(_ candidate: [SyncedLine], reference: [SyncedLine]) -> Bool {
+        guard !reference.isEmpty else { return false }
 
-        let text = syncedLyrics[lineIndex].text
-        let start = syncedLyrics[lineIndex].time
-        let nextStart: Double
-        if lineIndex + 1 < syncedLyrics.count {
-            nextStart = syncedLyrics[lineIndex + 1].time
-        } else {
-            nextStart = start + max(2.0, Double(text.count) * 0.18)
-        }
+        let candidatesByText = Dictionary(grouping: candidate, by: { normalizedLyricLine($0.text) })
+        let matched = reference.filter { line in
+            let text = normalizedLyricLine(line.text)
+            return !text.isEmpty && candidatesByText[text, default: []].contains {
+                abs($0.time - line.time) <= 1
+            }
+        }.count
+        return matched >= min(reference.count, 3) && matched * 3 >= reference.count * 2
+    }
 
-        let duration = max(nextStart - start, 0.6)
-        let adjustedElapsed = min(elapsed + leadTime, nextStart)
-        let rawProgress = min(max((adjustedElapsed - start) / duration, 0), 1)
-        return karaokeProgress(for: text, rawProgress: rawProgress, duration: duration)
+    static func matchesLyricText(_ candidate: [SyncedLine], reference: String) -> Bool {
+        let officialLines = Set(lines(fromPlainLyrics: reference).map(normalizedLyricLine).filter { !$0.isEmpty })
+        guard !officialLines.isEmpty else { return false }
+        let candidateLines = Set(candidate.map { normalizedLyricLine($0.text) }.filter { !$0.isEmpty })
+        let matches = officialLines.intersection(candidateLines).count
+        return matches >= min(officialLines.count, 3) &&
+            matches * 3 >= officialLines.count * 2 &&
+            matches * 3 >= candidateLines.count * 2
+    }
+
+    private static func normalizedLyricLine(_ text: String) -> String {
+        let simplified = text.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? text
+        return simplified.replacingOccurrences(of: "妳", with: "你")
+            .folding(options: [.caseInsensitive, .widthInsensitive], locale: nil)
+            .filter { $0.isLetter || $0.isNumber }
     }
 
     static func activeLineProgress(
         from syncedLyrics: [(time: Double, text: String)],
-        characterTimes: [[Double]],
+        characterTimings: [[CharacterTiming]],
         elapsed: Double,
         leadTime: Double = 0
     ) -> Double? {
@@ -215,10 +235,10 @@ enum LyricsDisplayText {
         }
 
         let adjustedElapsed = min(elapsed + leadTime, nextStart)
-        if characterTimes.indices.contains(lineIndex),
+        if characterTimings.indices.contains(lineIndex),
            let timedProgress = perCharacterProgress(
             text: text,
-            characterTimes: characterTimes[lineIndex],
+            timings: characterTimings[lineIndex],
             elapsed: adjustedElapsed,
             lineEnd: nextStart
            ) {
@@ -234,22 +254,25 @@ enum LyricsDisplayText {
 
     private static func perCharacterProgress(
         text: String,
-        characterTimes: [Double],
+        timings: [CharacterTiming],
         elapsed: Double,
         lineEnd: Double
     ) -> Double? {
         let characterCount = text.count
-        guard characterCount > 0, characterTimes.count == characterCount else {
+        guard characterCount > 0, timings.count == characterCount else {
             return nil
         }
 
-        if elapsed <= characterTimes[0] {
+        if elapsed <= timings[0].start {
             return 0
         }
 
-        for index in 0..<characterCount {
-            let start = characterTimes[index]
-            let end = index + 1 < characterTimes.count ? characterTimes[index + 1] : lineEnd
+        for (index, timing) in timings.enumerated() {
+            let start = timing.start
+            if elapsed < start { return Double(index) / Double(characterCount) }
+
+            let nextStart = index + 1 < timings.count ? timings[index + 1].start : lineEnd
+            let end = min(timing.end ?? nextStart, nextStart)
             guard end > start else { continue }
 
             if elapsed < end {

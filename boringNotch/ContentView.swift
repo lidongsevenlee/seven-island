@@ -16,6 +16,7 @@ import SwiftUIIntrospect
 @MainActor
 struct ContentView: View {
     @EnvironmentObject var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var webcamManager = WebcamManager.shared
 
     @ObservedObject var coordinator = BoringViewCoordinator.shared
@@ -25,6 +26,7 @@ struct ContentView: View {
     @ObservedObject var volumeManager = VolumeManager.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
+    @State private var spectrumClient = UUID()
 
     @State private var haptics: Bool = false
 
@@ -80,6 +82,23 @@ struct ContentView: View {
             && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled
             && !vm.hideOnClosed
+    }
+
+    private var shouldShowInlineHUD: Bool {
+        vm.notchState == .closed
+            && coordinator.sneakPeek.show
+            && Defaults[.inlineHUD]
+            && coordinator.sneakPeek.type != .music
+            && coordinator.sneakPeek.type != .battery
+    }
+
+    private var musicSpectrumSource: String? {
+        guard musicManager.isPlaying, !reduceMotion else { return nil }
+        let showsMusic = vm.notchState == .open && coordinator.currentView == .music && !coordinator.firstLaunch
+        let showsCompactSpectrum = shouldShowMusicLiveActivity && useMusicVisualizer
+            && !shouldShowInlineHUD && !coordinator.helloAnimationRunning
+            && vm.effectiveClosedNotchHeight > 12
+        return showsMusic || showsCompactSpectrum ? musicManager.bundleIdentifier : nil
     }
 
     var body: some View {
@@ -189,6 +208,10 @@ struct ContentView: View {
         .compositingGroup()
         .preferredColorScheme(.dark)
         .environmentObject(vm)
+        .onChange(of: musicSpectrumSource, initial: true) { _, source in
+            MusicAudioSpectrum.shared.setSource(source, for: spectrumClient)
+        }
+        .onDisappear { MusicAudioSpectrum.shared.setSource(nil, for: spectrumClient) }
     }
 
     @ViewBuilder
@@ -233,7 +256,7 @@ struct ContentView: View {
                             .frame(width: 76, alignment: .trailing)
                         }
                         .frame(height: vm.effectiveClosedNotchHeight, alignment: .center)
-                      } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
+                      } else if shouldShowInlineHUD {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering)
                               .transition(.opacity)
                       } else if shouldShowMusicLiveActivity {
@@ -299,10 +322,11 @@ struct ContentView: View {
                         ClipboardHistoryView()
                     case .vscodeProjects:
                         VSCodeProjectsView()
-                    case .menuBarItems:
-                        MenuBarItemsView()
+                    case .memo:
+                        MemoView()
                     }
                 }
+                .padding(.horizontal, coordinator.currentView == .music ? 0 : sevenIslandContentInset)
                 // .id() makes SwiftUI treat each tab as a distinct view identity,
                 // so insert/remove fires on every tab switch and triggers the transition.
                 // Without this the VStack is never removed — only its content changes
@@ -414,7 +438,7 @@ struct ContentView: View {
                         .frame(width: 50, alignment: .center)
                         .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
                         .mask {
-                            AudioSpectrumView(isPlaying: $musicManager.isPlaying)
+                            CompactMusicSpectrum(isPlaying: musicManager.isPlaying)
                                 .frame(width: 16, height: 12)
                         }
                 } else {

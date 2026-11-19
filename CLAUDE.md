@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-**Seven Island** is a macOS notch enhancement app with music controls, calendar, clipboard history, VS Code projects, menu bar controls, and volume/brightness HUD replacement. Written in SwiftUI for macOS 14+.
+**Seven Island** is a macOS notch enhancement app with music controls, calendar, clipboard history, VS Code projects, a memo pad, and volume/brightness HUD replacement. Written in SwiftUI for macOS 14+.
 
 The app uses a borderless, floating panel window positioned at the top-center of the screen, mimicking the notch. It has two visual states: **closed** (compact, lives in the notch area) and **open** (expanded, shows a tabbed interface).
 
@@ -78,7 +78,7 @@ NotchLayout()
         .music          → MusicHomeView
         .clipboard      → ClipboardHistoryView
         .vscodeProjects → VSCodeProjectsView
-        .menuBarItems   → MenuBarItemsView
+        .memo           → MemoView
 ```
 
 The closed state renders music, battery notifications, HUD indicators, and the face animation. Open/closed transitions use animated springs. Unknown persisted tab identifiers fall back to `.music`.
@@ -91,11 +91,17 @@ Features under `components/SevenIsland/` follow **Model → Service → View**:
 |---|---|---|---|
 | Clipboard | `Models/ClipboardHistoryItem.swift` | `Services/ClipboardHistoryStore.swift` | `Views/ClipboardHistoryView.swift` |
 | VS Code | `Models/VSCodeProjectItem.swift` | `Services/VSCodeRecentProjectsService.swift` | `Views/VSCodeProjectsView.swift` |
-| Menu bar | `Models/MenuBarProxyItem.swift` | `Services/MenuBarItemMonitor.swift` | `Views/MenuBarItemsView.swift` |
+| Memo | `Models/MemoItem.swift` | `Services/MemoStore.swift` | `Views/MemoView.swift` |
 
 `ClipboardHistoryStore` monitors `NSPasteboard` and persists history to the app's Application Support directory. Copying a history item updates its recency and saves the new order. `VSCodeRecentProjectsService` scans the configured project directory, includes pinned folders, and uses VS Code's recent-folder data for ordering.
 
-Search text lives in the per-window `BoringViewModel` through `clipboardSearchText` and `vscodeSearchText`, so it survives tab changes and notch closure during the app session. `closeAutomatically()` respects search focus. `closeAfterHoverExit(position:)` checks the actual mouse position because text entry can hide the cursor and end SwiftUI hover tracking.
+Search text lives in the per-window `BoringViewModel` through `clipboardSearchText` and `vscodeSearchText`, so it survives tab changes and notch closure during the app session. `closeAutomatically()` respects `isTextInputFocused`, shared by search fields and the memo editor. `closeAfterHoverExit(position:)` checks the actual mouse position because text entry can hide the cursor and end SwiftUI hover tracking.
+
+`MemoStore` persists ordered memos, the selected memo, and the next memo number in `Defaults.Keys.memoLibrary`. It migrates the legacy `memoText` into the first memo. `MemoView` uses horizontal tabs with titles from each memo’s first nonblank line, a new-memo button, and inline two-step deletion: the delete icon changes to a confirmation button before removal. The `.memo` tab retains `menuBarItems` as its persisted identifier.
+
+### Music audio spectrum
+
+`MusicBarsView` displays player audio through the shared `MusicAudioSpectrum` service. Its subscriptions follow visible, playing music views across windows. A serial worker owns Core Audio tap startup and teardown because system authorization can block device startup. Capture targets the current player's bundle and helper processes. `AudioSpectrumAnalyzer` converts PCM frequency energy into bottom-aligned bands. This feature requires macOS 14.2+ and `NSAudioCaptureUsageDescription`; audio buffers stay in memory during analysis.
 
 ### Adding a new tab/feature
 
@@ -115,5 +121,7 @@ Search text lives in the per-window `BoringViewModel` through `clipboardSearchTe
 ### Verification
 
 - Run `./script/run_clipboard_tests.sh` for clipboard ordering, deduplication, and persistence.
-- After building the Debug app, run `./script/run_notch_interaction_tests.sh` for search focus and dismissal behavior.
+- After building the Debug app, run `./script/run_notch_interaction_tests.sh` for input focus and dismissal behavior.
+- Run `./script/run_memo_tests.sh` for memo migration, independent editing, selection, deletion, and persistence.
 - Run `./script/run_feature_tests.sh` against the Debug app for clipboard, VS Code, and lyrics checks.
+- Run `./script/run_audio_spectrum_tests.sh` for frequency response, silence, sample rates, stereo phase, and interleaved/planar PCM decoding.

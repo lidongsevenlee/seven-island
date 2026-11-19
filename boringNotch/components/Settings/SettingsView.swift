@@ -511,6 +511,8 @@ struct Media: View {
     @Default(.sneakPeekStyles) var sneakPeekStyles
 
     @Default(.enableLyrics) var enableLyrics
+    @Default(.appleMusicLyricsCacheBookmark) private var appleMusicLyricsCacheBookmark
+    @State private var lyricsCacheError: String?
 
     var body: some View {
         Form {
@@ -599,6 +601,24 @@ struct Media: View {
                 .onChange(of: enableLyrics) { _, _ in
                     MusicManager.shared.refreshLyricsForCurrentTrack()
                 }
+                if enableLyrics {
+                    Button(appleMusicLyricsCacheBookmark == nil ? "授权读取 Apple Music 歌词缓存…" : "重新授权 Apple Music 歌词缓存…") {
+                        DispatchQueue.main.async {
+                            selectLyricsCache()
+                        }
+                    }
+                    if appleMusicLyricsCacheBookmark != nil {
+                        Button("移除歌词缓存授权") {
+                            appleMusicLyricsCacheBookmark = nil
+                            lyricsCacheError = nil
+                        }
+                    }
+                    if let lyricsCacheError {
+                        Text(lyricsCacheError)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } header: {
                 Text("媒体控制")
             }  footer: {
@@ -609,6 +629,32 @@ struct Media: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("媒体")
+        .onChange(of: appleMusicLyricsCacheBookmark) { _, _ in
+            MusicManager.shared.refreshLyricsForCurrentTrack()
+        }
+    }
+
+    private func selectLyricsCache() {
+        guard let window = SettingsWindowController.shared.window,
+              window.isVisible, window.attachedSheet == nil else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = false
+        panel.title = "授权读取 Apple Music 歌词缓存"
+        panel.directoryURL = AppleMusicCachedLyrics.directory
+        panel.message = "选择 ~/Library/Caches/com.apple.Music 来读取同步歌词。"
+        panel.prompt = "授权读取"
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                appleMusicLyricsCacheBookmark = try AppleMusicCachedLyrics.makeBookmark(for: url)
+                lyricsCacheError = nil
+            } catch {
+                lyricsCacheError = "无法保存目录授权。请选择 ~/Library/Caches/com.apple.Music。"
+            }
+        }
     }
 
     // Only show controller options that are available on this macOS version
