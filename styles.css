@@ -256,14 +256,15 @@ button { font: inherit; cursor: pointer; }
   padding: 72px 36px 0;
 }
 .requirements h2 { text-align: center; }
-.requirements-list {
+.requirements-list, .installation-steps {
   max-width: 768px;
-  margin: 44px auto 0;
+  margin-inline: auto;
   overflow: hidden;
   border: 1px solid var(--hairline);
   border-radius: 20px;
   background: var(--paper);
 }
+.requirements-list { margin-top: 44px; }
 .requirements-list > div {
   display: grid;
   grid-template-columns: 5.6em 1fr;
@@ -275,6 +276,22 @@ button { font: inherit; cursor: pointer; }
 .requirements-list > div + div { border-top: 1px solid var(--hairline); }
 .requirements-list dt { font-weight: 600; }
 .requirements-list dd { color: #565252; }
+.installation-steps {
+  margin-top: 14px;
+  padding: 22px 24px;
+  color: #565252;
+  font-size: 15px;
+}
+.installation-steps h3 {
+  margin-bottom: 10px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+.installation-steps ol { margin: 0 0 10px; padding-inline-start: 1.4em; }
+.installation-steps li + li { margin-top: 6px; }
+.installation-steps a { text-decoration: underline; text-underline-offset: 3px; }
+.installation-steps a:hover { color: var(--ink); }
 .site-footer {
   padding: 55px 16px 38px;
   text-align: center;
@@ -311,6 +328,7 @@ button { font: inherit; cursor: pointer; }
   .requirements { padding: 48px 16px 0; }
   .requirements-list { margin-top: 26px; }
   .requirements-list > div { grid-template-columns: 4em 1fr; gap: 8px; padding: 13px 12px; font-size: 14px; }
+  .installation-steps { padding: 16px 12px; font-size: 14px; }
   .site-footer { padding-block: 32px; }
 }
 @media (prefers-reduced-motion: reduce) {
