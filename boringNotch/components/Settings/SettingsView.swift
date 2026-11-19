@@ -116,11 +116,136 @@ struct SettingsView: View {
     }
 }
 
-struct GeneralSettings: View {
-    @State private var screens: [(uuid: String, name: String)] = NSScreen.screens.compactMap { screen in
-        guard let uuid = screen.displayUUID else { return nil }
-        return (uuid, screen.localizedName)
+private struct SettingsPicker<Value: Hashable>: View {
+    struct Option: Identifiable {
+        let value: Value
+        let title: String
+
+        var id: Value { value }
+
+        init(_ value: Value, _ title: String) {
+            self.value = value
+            self.title = title
+        }
     }
+
+    @Environment(\.isEnabled) private var isEnabled
+    @Binding private var selection: Value
+    @State private var isPresented = false
+    @State private var highlightedIndex = 0
+    @FocusState private var optionsFocused: Bool
+    private let title: LocalizedStringKey
+    private let options: [Option]
+    private let badge: String?
+
+    init(_ title: LocalizedStringKey, selection: Binding<Value>, options: [Option], badge: String? = nil) {
+        self.title = title
+        self._selection = selection
+        self.options = options
+        self.badge = badge
+    }
+
+    var body: some View {
+        let selectedTitle = options.first { $0.value == selection }.map { Text($0.title) }
+            ?? Text("请选择")
+
+        Button {
+            highlightedIndex = options.firstIndex { $0.value == selection } ?? 0
+            isPresented.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                if let badge {
+                    customBadge(text: badge)
+                }
+
+                Spacer(minLength: 12)
+
+                selectedTitle
+                    .lineLimit(1)
+                    .foregroundStyle(.tint)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.tint)
+            }
+            .padding(.vertical, 3)
+            .opacity(isEnabled ? 1 : 0.5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(selectedTitle)
+        .disabled(options.isEmpty)
+        .popover(isPresented: $isPresented, attachmentAnchor: .point(.bottomTrailing), arrowEdge: .top) {
+            optionList
+        }
+    }
+
+    private var optionList: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                Button {
+                    choose(option.value)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .opacity(option.value == selection ? 1 : 0)
+                            .accessibilityHidden(true)
+                        Text(option.title)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        highlightedIndex == index ? Color.accentColor.opacity(0.14) : .clear,
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(option.value == selection ? .isSelected : [])
+                .onHover { hovering in
+                    if hovering {
+                        highlightedIndex = index
+                    }
+                }
+            }
+        }
+        .padding(6)
+        .frame(minWidth: 150)
+        .fixedSize()
+        .focusable()
+        .focusEffectDisabled()
+        .focused($optionsFocused)
+        .defaultFocus($optionsFocused, true)
+        .onKeyPress(keys: [.upArrow, .downArrow]) { key in
+            let offset = key.key == .upArrow ? -1 : 1
+            highlightedIndex = min(max(highlightedIndex + offset, 0), options.count - 1)
+            return .handled
+        }
+        .onKeyPress(keys: [.return, .space]) { _ in
+            if options.indices.contains(highlightedIndex) {
+                choose(options[highlightedIndex].value)
+            }
+            return .handled
+        }
+        .onExitCommand {
+            isPresented = false
+        }
+    }
+
+    private func choose(_ value: Value) {
+        isPresented = false
+        if selection != value {
+            selection = value
+        }
+    }
+}
+
+struct GeneralSettings: View {
+    @State private var screens = NSScreen.screens
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
 
@@ -154,16 +279,16 @@ struct GeneralSettings: View {
                     NotificationCenter.default.post(
                         name: Notification.Name.showOnAllDisplaysChanged, object: nil)
                 }
-                Picker("首选显示器", selection: $coordinator.preferredScreenUUID) {
-                    ForEach(screens, id: \.uuid) { screen in
-                        Text(screen.name).tag(screen.uuid as String?)
-                    }
-                }
-                .onChange(of: NSScreen.screens) {
-                    screens = NSScreen.screens.compactMap { screen in
+                SettingsPicker(
+                    "首选显示器",
+                    selection: $coordinator.preferredScreenUUID,
+                    options: screens.compactMap { screen in
                         guard let uuid = screen.displayUUID else { return nil }
-                        return (uuid, screen.localizedName)
+                        return .init(uuid, screen.localizedName)
                     }
+                )
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+                    screens = NSScreen.screens
                 }
                 .disabled(showOnAllDisplays)
                 
@@ -180,18 +305,15 @@ struct GeneralSettings: View {
             }
 
             Section {
-                Picker(
+                SettingsPicker(
+                    "带刘海显示器上的刘海高度",
                     selection: $notchHeightMode,
-                    label:
-                        Text("带刘海显示器上的刘海高度")
-                ) {
-                    Text("匹配真实刘海高度")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("匹配菜单栏高度")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("自定义高度")
-                        .tag(WindowHeightMode.custom)
-                }
+                    options: [
+                        .init(.matchRealNotchSize, "匹配真实刘海高度"),
+                        .init(.matchMenuBar, "匹配菜单栏高度"),
+                        .init(.custom, "自定义高度"),
+                    ]
+                )
                 .onChange(of: notchHeightMode) {
                     switch notchHeightMode {
                     case .matchRealNotchSize:
@@ -213,14 +335,15 @@ struct GeneralSettings: View {
                             name: Notification.Name.notchHeightChanged, object: nil)
                     }
                 }
-                Picker("无刘海显示器上的刘海高度", selection: $nonNotchHeightMode) {
-                    Text("匹配菜单栏高度")
-                        .tag(WindowHeightMode.matchMenuBar)
-                    Text("匹配真实刘海高度")
-                        .tag(WindowHeightMode.matchRealNotchSize)
-                    Text("自定义高度")
-                        .tag(WindowHeightMode.custom)
-                }
+                SettingsPicker(
+                    "无刘海显示器上的刘海高度",
+                    selection: $nonNotchHeightMode,
+                    options: [
+                        .init(.matchMenuBar, "匹配菜单栏高度"),
+                        .init(.matchRealNotchSize, "匹配真实刘海高度"),
+                        .init(.custom, "自定义高度"),
+                    ]
+                )
                 .onChange(of: nonNotchHeightMode) {
                     switch nonNotchHeightMode {
                     case .matchMenuBar:
@@ -420,18 +543,16 @@ struct HUD: View {
             }
             
             Section {
-                Picker("Option 键行为", selection: $optionKeyAction) {
-                    ForEach(OptionKeyAction.allCases) { opt in
-                        Text(opt.rawValue).tag(opt)
-                    }
-                }
+                SettingsPicker(
+                    "Option 键行为",
+                    selection: $optionKeyAction,
+                    options: OptionKeyAction.allCases.map { .init($0, $0.rawValue) }
+                )
                 
-                Picker("进度条样式", selection: $enableGradient) {
-                    Text("分层")
-                        .tag(false)
-                    Text("渐变")
-                        .tag(true)
-                }
+                SettingsPicker("进度条样式", selection: $enableGradient, options: [
+                    .init(false, "分层"),
+                    .init(true, "渐变"),
+                ])
                 Defaults.Toggle(key: .systemEventIndicatorShadow) {
                     Text("启用发光效果")
                 }
@@ -460,14 +581,12 @@ struct HUD: View {
             .disabled(!hudReplacement)
             
             Section {
-                Picker("HUD 样式", selection: $inlineHUD) {
-                    Text("默认")
-                        .tag(false)
-                    Text("内联")
-                        .tag(true)
-                }
-                .onChange(of: Defaults[.inlineHUD]) {
-                    if Defaults[.inlineHUD] {
+                SettingsPicker("HUD 样式", selection: $inlineHUD, options: [
+                    .init(false, "默认"),
+                    .init(true, "内联"),
+                ])
+                .onChange(of: inlineHUD) { _, isInline in
+                    if isInline {
                         withAnimation {
                             Defaults[.systemEventIndicatorShadow] = false
                             Defaults[.enableGradient] = false
@@ -517,11 +636,11 @@ struct Media: View {
     var body: some View {
         Form {
             Section {
-                Picker("音乐源", selection: $mediaController) {
-                    ForEach(availableMediaControllers) { controller in
-                        Text(controller.rawValue).tag(controller)
-                    }
-                }
+                SettingsPicker(
+                    "音乐源",
+                    selection: $mediaController,
+                    options: availableMediaControllers.map { .init($0, $0.rawValue) }
+                )
                 .onChange(of: mediaController) { _, _ in
                     NotificationCenter.default.post(
                         name: Notification.Name.mediaControllerChanged,
@@ -562,11 +681,11 @@ struct Media: View {
                     isOn: $coordinator.musicLiveActivityEnabled.animation()
                 )
                 Toggle("播放变化时显示预览", isOn: $enableSneakPeek)
-                Picker("预览样式", selection: $sneakPeekStyles) {
-                    ForEach(SneakPeekStyle.allCases) { style in
-                        Text(style.rawValue).tag(style)
-                    }
-                }
+                SettingsPicker(
+                    "预览样式",
+                    selection: $sneakPeekStyles,
+                    options: SneakPeekStyle.allCases.map { .init($0, $0.rawValue) }
+                )
                 HStack {
                     Stepper(value: $waitInterval, in: 0...10, step: 1) {
                         HStack {
@@ -577,19 +696,16 @@ struct Media: View {
                         }
                     }
                 }
-                Picker(
+                SettingsPicker(
+                    "全屏行为",
                     selection: $hideNotchOption,
-                    label:
-                        HStack {
-                            Text("全屏行为")
-                            customBadge(text: "Beta")
-                        }
-                ) {
-                    Text("对所有应用隐藏").tag(HideNotchOption.always)
-                    Text("仅对媒体应用隐藏").tag(
-                        HideNotchOption.nowPlayingOnly)
-                    Text("从不隐藏").tag(HideNotchOption.never)
-                }
+                    options: [
+                        .init(.always, "对所有应用隐藏"),
+                        .init(.nowPlayingOnly, "仅对媒体应用隐藏"),
+                        .init(.never, "从不隐藏"),
+                    ],
+                    badge: "Beta"
+                )
             } header: {
                 Text("音乐播放实时活动")
             }
@@ -919,11 +1035,11 @@ struct Appearance: View {
                 Defaults.Toggle(key: .lightingEffect) {
                     Text("启用专辑封面后的模糊效果")
                 }
-                Picker("滑块颜色", selection: $sliderColor) {
-                    ForEach(SliderColorEnum.allCases, id: \.self) { option in
-                        Text(option.rawValue)
-                    }
-                }
+                SettingsPicker(
+                    "滑块颜色",
+                    selection: $sliderColor,
+                    options: SliderColorEnum.allCases.map { .init($0, $0.rawValue) }
+                )
             } header: {
                 Text("媒体")
             }
@@ -936,18 +1052,11 @@ struct Appearance: View {
                 .disabled(true)
                 if !useMusicVisualizer {
                     if customVisualizers.count > 0 {
-                        Picker(
+                        SettingsPicker(
                             "所选动画",
-                            selection: $selectedVisualizer
-                        ) {
-                            ForEach(
-                                customVisualizers,
-                                id: \.self
-                            ) { visualizer in
-                                Text(visualizer.name)
-                                    .tag(visualizer)
-                            }
-                        }
+                            selection: $selectedVisualizer,
+                            options: customVisualizers.map { .init($0, $0.name) }
+                        )
                     } else {
                         HStack {
                             Text("所选动画")
@@ -1107,12 +1216,10 @@ struct Appearance: View {
                     Text("启用镜像")
                 }
                     .disabled(!checkVideoInput())
-                Picker("镜像形状", selection: $mirrorShape) {
-                    Text("圆形")
-                        .tag(MirrorShapeEnum.circle)
-                    Text("方形")
-                        .tag(MirrorShapeEnum.rectangle)
-                }
+                SettingsPicker("镜像形状", selection: $mirrorShape, options: [
+                    .init(.circle, "圆形"),
+                    .init(.rectangle, "方形"),
+                ])
                 Defaults.Toggle(key: .showNotHumanFace) {
                     Text("空闲时显示趣味面部动画")
                 }
