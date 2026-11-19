@@ -54,7 +54,29 @@ enum NotchSearchInteractionTests {
         expect(otherWindow.notchState == .closed, "keeps search focus local to its window")
         expect(vm.notchState == .open, "preserves search in the focused window")
 
+        vm.isTextInputFocused = false
+        vm.isPinnedOpen = true
+        vm.closeAfterHoverExit(position: outsidePosition)
+        expect(vm.notchState == .open, "keeps the pinned panel open after hover exit")
+        vm.closeAutomatically()
+        expect(vm.notchState == .open, "keeps the pinned panel open after a timed dismissal")
+        vm.closeUnlessPinned()
+        expect(vm.notchState == .open, "keeps the pinned panel open after a tab action")
+
+        otherWindow.open()
+        otherWindow.closeAutomatically()
+        expect(otherWindow.notchState == .closed, "keeps the pin local to its panel")
+
+        vm.isPinnedOpen = false
+        vm.closeAfterHoverExit(position: outsidePosition)
+        expect(vm.notchState == .closed, "resumes hover dismissal after unpinning")
+
+        vm.open()
+        vm.isPinnedOpen = true
         vm.close()
+        expect(vm.notchState == .closed, "allows explicit dismissal of a pinned panel")
+        expect(!vm.isPinnedOpen, "clears the pin on explicit dismissal")
+
         vm.destroy()
         otherWindow.destroy()
         print("NotchSearchInteractionTests passed")

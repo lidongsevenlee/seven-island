@@ -15,9 +15,12 @@ let defaultImage: NSImage = .init(
 )!
 
 class MusicManager: ObservableObject {
+    typealias DesktopLyricsReader = @Sendable (PlayerLyricsCatalog.Recording, PlayerLyricsCatalog.Source) async -> DesktopLyricsCache.Entry?
+
     enum LyricsSource: Equatable {
         case none
         case appleMusicOfficial
+        case desktopPlayer
         case web
     }
 
@@ -55,7 +58,6 @@ class MusicManager: ObservableObject {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Published var usingAppIconForArtwork: Bool = false
     @Published var currentLyrics: String = ""
-    @Published var isFetchingLyrics: Bool = false
     @Published var syncedLyrics: [(time: Double, text: String)] = []
     @Published var syncedLyricCharacterTimings: [[LyricsDisplayText.CharacterTiming]] = []
     @Published var lyricsSource: LyricsSource = .none
@@ -68,16 +70,34 @@ class MusicManager: ObservableObject {
         let artist: String
         let album: String
         let bundleIdentifier: String?
+        let desktopCacheKey: DesktopLyricsCache.Key?
     }
 
+    var hasLyrics: Bool {
+        !syncedLyrics.isEmpty || !currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private let desktopLyricsCache: DesktopLyricsCache
+    private let readDesktopLyrics: DesktopLyricsReader
     private let maxLyricsFetchAttempts = 3
+    private static let desktopLyricRetryOffsets: [Duration] = [
+        .milliseconds(300), .milliseconds(850), .milliseconds(1600), .seconds(3), .seconds(5), .seconds(8),
+    ]
+    private static let desktopWebFallbackDelay: Duration = .milliseconds(400)
     private var completedLyricsFetchKey: LyricsTrackKey?
     private var activeLyricsFetchKey: LyricsTrackKey?
     private var lyricsFetchTask: Task<Void, Never>?
+
+    private enum DesktopLyricLookup: Sendable {
+        case local(DesktopLyricsCache.Entry?)
+        case web(Bool)
+    }
+
     private enum WebLyricsReference {
         case timeline([LyricsDisplayText.SyncedLine])
         case lyrics(String)
         case recording
+        case desktopRecording(PlayerLyricsCatalog.Recording)
     }
 
     private struct WebLyricsCandidate {
@@ -112,6 +132,11 @@ class MusicManager: ObservableObject {
             if !synced.isEmpty { return synced }
             return parsed.lines.map(\.text).joined(separator: "\n")
         }
+
+        var entry: DesktopLyricsCache.Entry {
+            .init(text: displayLyrics, lines: parsed.lines.map { .init(time: $0.time, text: $0.text) },
+                  characterTimings: hasCharacterTiming ? parsed.characterTimes.map { $0.map { .init(start: $0) } } : [])
+        }
     }
 
     // Track the last processed media item independently from artwork updates.
@@ -119,6 +144,7 @@ class MusicManager: ObservableObject {
     private var lastTrackArtist: String = "Me"
     private var lastTrackAlbum: String = "Self Love"
     private var lastTrackBundleIdentifier: String? = nil
+    private var lyricsSongID: String?
 
     @Published var isFlipping: Bool = false
     private var flipWorkItem: DispatchWorkItem?
@@ -127,7 +153,10 @@ class MusicManager: ObservableObject {
     private var transitionWorkItem: DispatchWorkItem?
 
     // MARK: - Initialization
-    init() {
+    init(desktopLyricsCache: DesktopLyricsCache = .shared,
+         readDesktopLyrics: @escaping DesktopLyricsReader = { await DesktopPlayerLyrics.read($0, source: $1) }) {
+        self.desktopLyricsCache = desktopLyricsCache
+        self.readDesktopLyrics = readDesktopLyrics
         // Listen for changes to the default controller preference
         NotificationCenter.default.publisher(for: Notification.Name.mediaControllerChanged)
             .sink { [weak self] _ in
@@ -156,6 +185,7 @@ class MusicManager: ObservableObject {
     
     public func destroy() {
         debounceIdleTask?.cancel()
+        lyricsFetchTask?.cancel()
         cancellables.removeAll()
         controllerCancellables.removeAll()
         flipWorkItem?.cancel()
@@ -176,10 +206,10 @@ class MusicManager: ObservableObject {
         let newController: (any MediaControllerProtocol)?
 
         switch type {
-        case .nowPlaying:
+        case .nowPlaying, .neteaseMusic, .qqMusic:
             // Only create NowPlayingController if not deprecated on this macOS version
             if !self.isNowPlayingDeprecated {
-                newController = NowPlayingController()
+                newController = NowPlayingController(sourceBundleIdentifier: type.systemPlayerBundleIdentifier)
             } else {
                 return nil
             }
@@ -211,7 +241,7 @@ class MusicManager: ObservableObject {
         print("Preferred Media Controller: \(preferredType)")
 
         // If NowPlaying is deprecated but that's the preference, use Apple Music instead
-        let controllerType = (self.isNowPlayingDeprecated && preferredType == .nowPlaying)
+        let controllerType = (self.isNowPlayingDeprecated && preferredType.usesSystemPlayback)
             ? .appleMusic
             : preferredType
 
@@ -239,6 +269,7 @@ class MusicManager: ObservableObject {
     // MARK: - Update Methods
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        let playbackStarted = state.isPlaying && !isPlaying
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
@@ -297,13 +328,18 @@ class MusicManager: ObservableObject {
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
                 self.updateSneakPeek()
             }
-
-            // Fetch lyrics on content change
-            self.fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title, artist: state.artist, album: state.album, duration: state.duration)
         }
 
         let timeChanged = state.currentTime != self.elapsedTime
         let durationChanged = state.duration != self.songDuration
+        let songIDChanged = state.lyricsSongID != lyricsSongID
+        lyricsSongID = state.lyricsSongID
+        let desktopLyricsChanged = PlayerLyricsCatalog.Source(bundleIdentifier: state.bundleIdentifier) != nil &&
+            (durationChanged || songIDChanged || (playbackStarted && !hasLyrics))
+        if hasContentChange || desktopLyricsChanged {
+            fetchLyricsIfAvailable(bundleIdentifier: state.bundleIdentifier, title: state.title,
+                                   artist: state.artist, album: state.album, duration: state.duration, songID: state.lyricsSongID)
+        }
         let playbackRateChanged = state.playbackRate != self.playbackRate
         let shuffleChanged = state.isShuffled != self.isShuffled
         let repeatModeChanged = state.repeatMode != self.repeatMode
@@ -407,65 +443,141 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Lyrics
+    @MainActor
     func refreshLyricsForCurrentTrack() {
-        fetchLyricsIfAvailable(bundleIdentifier: bundleIdentifier, title: songTitle, artist: artistName, album: album, duration: songDuration, force: true)
+        fetchLyricsIfAvailable(bundleIdentifier: bundleIdentifier, title: songTitle, artist: artistName, album: album,
+                               duration: songDuration, songID: lyricsSongID, force: true)
     }
 
-    private func lyricsTrackKey(bundleIdentifier: String?, title: String, artist: String, album: String) -> LyricsTrackKey {
+    private func lyricsTrackKey(bundleIdentifier: String?, title: String, artist: String, album: String,
+                                duration: Double, songID: String?) -> LyricsTrackKey {
         LyricsTrackKey(
             title: normalizedQuery(title).lowercased(),
             artist: normalizedQuery(artist).lowercased(),
             album: normalizedQuery(album).lowercased(),
-            bundleIdentifier: bundleIdentifier
+            bundleIdentifier: bundleIdentifier,
+            desktopCacheKey: DesktopLyricsCache.Key(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album,
+                                                     duration: duration, songID: songID)
         )
     }
 
-    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String, album: String, duration: Double = 0, force: Bool = false) {
+    @MainActor
+    private func fetchLyricsIfAvailable(bundleIdentifier: String?, title: String, artist: String, album: String,
+                                        duration: Double = 0, songID: String? = nil, force: Bool = false) {
         guard Defaults[.enableLyrics], !title.isEmpty else {
             lyricsFetchTask?.cancel()
             activeLyricsFetchKey = nil
             completedLyricsFetchKey = nil
-            DispatchQueue.main.async {
-                self.isFetchingLyrics = false
-                self.currentLyrics = ""
-                self.syncedLyrics = []
-                self.syncedLyricCharacterTimings = []
-                self.lyricsSource = .none
-            }
+            applyLyrics("", synced: [], source: .none)
             return
         }
 
-        let key = lyricsTrackKey(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album)
+        let key = lyricsTrackKey(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album,
+                                 duration: duration, songID: songID)
         guard force || activeLyricsFetchKey != key else { return }
         guard force || completedLyricsFetchKey != key else { return }
 
         lyricsFetchTask?.cancel()
         completedLyricsFetchKey = nil
         activeLyricsFetchKey = key
+        applyLyrics("", synced: [], source: .none)
         lyricsFetchTask = Task { @MainActor in
-            guard !Task.isCancelled else { return }
-            self.isFetchingLyrics = true
-            self.currentLyrics = ""
-            self.syncedLyrics = []
-            self.syncedLyricCharacterTimings = []
-            self.lyricsSource = .none
-
-            for attempt in 0..<self.maxLyricsFetchAttempts {
+            let recording = PlayerLyricsCatalog.Recording(title: title, artist: artist, album: album, duration: duration, songID: songID)
+            let foundLyrics: Bool
+            if let cacheKey = key.desktopCacheKey, let entry = await self.desktopLyricsCache.load(for: cacheKey) {
                 guard !Task.isCancelled else { return }
-                if await self.fetchLyricsOnce(bundleIdentifier: bundleIdentifier, title: title, artist: artist, album: album, duration: duration) { break }
-                if attempt + 1 < self.maxLyricsFetchAttempts { try? await Task.sleep(for: .milliseconds(450)) }
+                self.applyDesktopLyrics(entry, source: .web)
+                foundLyrics = true
+            } else if let source = PlayerLyricsCatalog.Source(bundleIdentifier: bundleIdentifier), recording.canMatchLocalLyrics {
+                foundLyrics = await self.fetchDesktopLyricsWithPolling(recording, source: source,
+                                                                       bundleIdentifier: bundleIdentifier, cacheKey: key.desktopCacheKey)
+            } else {
+                foundLyrics = await self.fetchLyricsWithRetries(bundleIdentifier: bundleIdentifier, recording: recording,
+                                                               cacheKey: key.desktopCacheKey)
             }
 
             if !Task.isCancelled, self.activeLyricsFetchKey == key {
-                self.completedLyricsFetchKey = key
+                self.completedLyricsFetchKey = foundLyrics ? key : nil
                 self.activeLyricsFetchKey = nil
-                self.isFetchingLyrics = false
             }
         }
     }
 
     @MainActor
-    private func fetchLyricsOnce(bundleIdentifier: String?, title: String, artist: String, album: String, duration: Double) async -> Bool {
+    private func fetchDesktopLyricsWithPolling(_ recording: PlayerLyricsCatalog.Recording, source: PlayerLyricsCatalog.Source,
+                                               bundleIdentifier: String?, cacheKey: DesktopLyricsCache.Key?) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        let reader = readDesktopLyrics
+        let initial = await reader(recording, source)
+        guard !Task.isCancelled else { return false }
+        if let initial {
+            applyDesktopLyrics(initial, source: .desktopPlayer)
+            await cacheDisplayedLyrics(for: cacheKey)
+            return true
+        }
+
+        return await withTaskGroup(of: DesktopLyricLookup.self) { group in
+            group.addTask { .local(await Self.pollDesktopLyrics(recording, source: source, reader: reader)) }
+            group.addTask { @MainActor in
+                do {
+                    try await Task.sleep(for: Self.desktopWebFallbackDelay)
+                } catch {
+                    return .web(false)
+                }
+                return .web(await self.fetchLyricsWithRetries(bundleIdentifier: bundleIdentifier, recording: recording, cacheKey: cacheKey))
+            }
+
+            var webFound = false
+            for await result in group {
+                guard !Task.isCancelled else { return false }
+                switch result {
+                case .local(let lyrics):
+                    guard let lyrics, lyrics.quality >= displayedLyricsEntry.quality else { continue }
+                    group.cancelAll()
+                    applyDesktopLyrics(lyrics, source: .desktopPlayer)
+                    await cacheDisplayedLyrics(for: cacheKey)
+                    return true
+                case .web(let found):
+                    webFound = found
+                }
+            }
+            return webFound
+        }
+    }
+
+    private static func pollDesktopLyrics(_ recording: PlayerLyricsCatalog.Recording, source: PlayerLyricsCatalog.Source,
+                                         reader: DesktopLyricsReader) async -> DesktopLyricsCache.Entry? {
+        let clock = ContinuousClock()
+        let started = clock.now
+        for offset in desktopLyricRetryOffsets {
+            do {
+                try await clock.sleep(until: started.advanced(by: offset))
+            } catch {
+                return nil
+            }
+            guard !Task.isCancelled else { return nil }
+            if let entry = await reader(recording, source) { return entry }
+        }
+        return nil
+    }
+
+    @MainActor
+    private func fetchLyricsWithRetries(bundleIdentifier: String?, recording: PlayerLyricsCatalog.Recording,
+                                        cacheKey: DesktopLyricsCache.Key?) async -> Bool {
+        for attempt in 0..<maxLyricsFetchAttempts {
+            guard !Task.isCancelled else { return false }
+            if await fetchLyricsOnce(bundleIdentifier: bundleIdentifier, recording: recording, cacheKey: cacheKey) {
+                return true
+            }
+            if attempt + 1 < maxLyricsFetchAttempts { try? await Task.sleep(for: .milliseconds(450)) }
+        }
+        return false
+    }
+
+    @MainActor
+    private func fetchLyricsOnce(bundleIdentifier: String?, recording: PlayerLyricsCatalog.Recording,
+                                 cacheKey: DesktopLyricsCache.Key?) async -> Bool {
+        let (title, artist, album, duration) = (recording.title, recording.artist, recording.album, recording.duration)
         if let bundleIdentifier = bundleIdentifier, bundleIdentifier.contains("com.apple.Music") {
             if let bookmark = Defaults[.appleMusicLyricsCacheBookmark] {
                 let timeline = await AppleMusicCachedLyrics.read(
@@ -473,13 +585,12 @@ class MusicManager: ObservableObject {
                 )
                 guard !Task.isCancelled else { return false }
                 if let timeline {
-                    applyAppleMusicLyrics(
+                    applyLyrics(
                         timeline.lines.map(\.text).joined(separator: "\n"),
                         synced: timeline.lines,
-                        characterTimings: timeline.characterTimings
+                        characterTimings: timeline.characterTimings, source: .appleMusicOfficial
                     )
                     if timeline.characterTimings.allSatisfy(\.isEmpty) {
-                        isFetchingLyrics = false
                         _ = await fetchLyricsFromWeb(
                             title: title, artist: artist, album: album, duration: duration, matching: .timeline(timeline.lines)
                         )
@@ -491,13 +602,13 @@ class MusicManager: ObservableObject {
                 let accessibleLyrics = await AppleMusicAccessibilityLyrics.read(pid: music.processIdentifier, title: title, duration: duration)
                 guard !Task.isCancelled else { return false }
                 if let accessibleLyrics, !accessibleLyrics.syncedLines.isEmpty {
-                    applyAppleMusicLyrics(accessibleLyrics.text, synced: accessibleLyrics.syncedLines)
+                    applyLyrics(accessibleLyrics.text, synced: accessibleLyrics.syncedLines, source: .appleMusicOfficial)
                     return true
                 }
                 do {
                     if let lyrics = try await fetchLyricsFromAppleMusic(), !lyrics.isEmpty {
                         guard !Task.isCancelled else { return false }
-                        applyAppleMusicLyrics(lyrics, synced: [])
+                        applyLyrics(lyrics, synced: [], source: .appleMusicOfficial)
                         return true
                     }
                 } catch {
@@ -505,8 +616,7 @@ class MusicManager: ObservableObject {
                 }
                 guard !Task.isCancelled else { return false }
                 if let accessibleLyrics {
-                    applyAppleMusicLyrics(accessibleLyrics.text, synced: [])
-                    isFetchingLyrics = false
+                    applyLyrics(accessibleLyrics.text, synced: [], source: .appleMusicOfficial)
                     _ = await fetchLyricsFromWeb(
                         title: title, artist: artist, album: album, duration: duration, matching: .lyrics(accessibleLyrics.text)
                     )
@@ -516,19 +626,132 @@ class MusicManager: ObservableObject {
             return await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration, matching: .recording)
         }
 
+        if let source = PlayerLyricsCatalog.Source(bundleIdentifier: bundleIdentifier) {
+            if let id = recording.songID, let lyrics = await Self.desktopLyricsByID(id, recording: recording, source: source),
+               !Task.isCancelled {
+                applyDesktopLyrics(lyrics, source: .web)
+                await cacheDisplayedLyrics(for: cacheKey)
+                return true
+            }
+            if await fetchDesktopLyrics(recording, preferredSource: source, cacheKey: cacheKey) { return true }
+            let found = await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration,
+                                                 matching: .desktopRecording(recording))
+            if found { await cacheDisplayedLyrics(for: cacheKey) }
+            return found
+        }
+
         return await fetchLyricsFromWeb(title: title, artist: artist, album: album, duration: duration)
     }
 
+    private static func desktopLyricsByID(_ id: String, recording: PlayerLyricsCatalog.Recording,
+                                          source: PlayerLyricsCatalog.Source) async -> DesktopLyricsCache.Entry? {
+        switch source {
+        case .qq:
+            guard let number = Int(id) else { return nil }
+            return await PlayerLyricsCatalog.qqWordLyrics(id: number)
+        case .netease:
+            guard let lyric = await PlayerLyricsCatalog.netEaseLyric(id: id), let entry = desktopLyricsEntry(lyric) else { return nil }
+            if PlayerLyricsCatalog.Recording.isPreviewDuration(recording.duration) {
+                return .init(text: entry.text, lines: [], characterTimings: [])
+            }
+            return entry
+        }
+    }
+
     @MainActor
-    private func applyAppleMusicLyrics(
+    private func fetchDesktopLyrics(_ recording: PlayerLyricsCatalog.Recording, preferredSource: PlayerLyricsCatalog.Source,
+                                    cacheKey: DesktopLyricsCache.Key?) async -> Bool {
+        for source in [preferredSource, preferredSource.alternate] {
+            guard !Task.isCancelled else { return false }
+            let songs = await PlayerLyricsCatalog.search(recording, in: source, allowPreview: preferredSource == .netease,
+                                                         allowQQAliases: preferredSource == .qq)
+            for song in songs.prefix(2) {
+                guard !Task.isCancelled else { return false }
+                if source == .qq {
+                    if await fetchQQDesktopLyrics(for: song, cacheKey: cacheKey) { return true }
+                } else if let candidate = await Self.desktopLyricsCandidate(for: song, in: source), !Task.isCancelled {
+                    let isPreview = preferredSource == .netease && recording.matchesNetEasePreview(song)
+                    let lyrics = isPreview
+                        ? DesktopLyricsCache.Entry(text: candidate.text, lines: [], characterTimings: [])
+                        : candidate
+                    applyDesktopLyrics(lyrics, source: .web)
+                    await cacheDisplayedLyrics(for: cacheKey)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private static func desktopLyricsCandidate(
+        for song: PlayerLyricsCatalog.Song, in source: PlayerLyricsCatalog.Source
+    ) async -> DesktopLyricsCache.Entry? {
+        guard let lyric = await PlayerLyricsCatalog.lyric(for: song, in: source) else { return nil }
+        return desktopLyricsEntry(lyric)
+    }
+
+    private static func desktopLyricsEntry(_ lyric: PlayerLyricsCatalog.Lyric) -> DesktopLyricsCache.Entry? {
+        if let words = lyric.words, let entry = DesktopPlayerLyrics.netEaseTimeline(words) { return entry }
+        return DesktopPlayerLyrics.lrcTimeline(lyric.lines)
+    }
+
+    @MainActor
+    private func fetchQQDesktopLyrics(for song: PlayerLyricsCatalog.Song, cacheKey: DesktopLyricsCache.Key?) async -> Bool {
+        await withTaskGroup(of: DesktopLyricsCache.Entry?.self) { group in
+            group.addTask { await Self.desktopLyricsCandidate(for: song, in: .qq) }
+            group.addTask {
+                if let primary = await PlayerLyricsCatalog.qqWordLyrics(for: song) { return primary }
+                guard !Task.isCancelled else { return nil }
+                return await Self.fetchQQMusicLyricByID(song.id)?.entry
+            }
+            var displayedLyrics = false
+            for await result in group {
+                guard !Task.isCancelled else { return false }
+                guard let result else { continue }
+                applyDesktopLyrics(result, source: .web)
+                await cacheDisplayedLyrics(for: cacheKey)
+                if result.characterTimings.contains(where: { !$0.isEmpty }) {
+                    group.cancelAll()
+                    return true
+                }
+                displayedLyrics = true
+            }
+            return displayedLyrics
+        }
+    }
+
+    @MainActor
+    private func applyDesktopLyrics(_ entry: DesktopLyricsCache.Entry, source: LyricsSource) {
+        applyLyrics(entry.text, synced: entry.lines.map { ($0.time, $0.text) },
+                    characterTimings: entry.characterTimings, source: source)
+    }
+
+    @MainActor
+    private func cacheDisplayedLyrics(for key: DesktopLyricsCache.Key?) async {
+        guard let key, !Task.isCancelled, hasLyrics else { return }
+        await desktopLyricsCache.store(displayedLyricsEntry, for: key)
+    }
+
+    @MainActor
+    private var displayedLyricsEntry: DesktopLyricsCache.Entry {
+        DesktopLyricsCache.Entry(
+            text: currentLyrics,
+            lines: syncedLyrics.map { .init(time: $0.time, text: $0.text) },
+            characterTimings: syncedLyricCharacterTimings
+        )
+    }
+
+    @MainActor
+    private func applyLyrics(
         _ text: String,
         synced: [LyricsDisplayText.SyncedLine],
-        characterTimings: [[LyricsDisplayText.CharacterTiming]] = []
+        characterTimings: [[LyricsDisplayText.CharacterTiming]] = [],
+        source: LyricsSource
     ) {
         currentLyrics = text
         syncedLyrics = synced
         syncedLyricCharacterTimings = characterTimings
-        lyricsSource = .appleMusicOfficial
+        lyricsSource = source
     }
 
     @MainActor
@@ -634,6 +857,10 @@ class MusicManager: ObservableObject {
                 return normalizedQuery(recording.title).caseInsensitiveCompare(cleanTitle) == .orderedSame &&
                     normalizedQuery(recording.artist).caseInsensitiveCompare(cleanArtist) == .orderedSame &&
                     normalizedQuery(recording.album).caseInsensitiveCompare(cleanAlbum) == .orderedSame
+            case .desktopRecording(let target):
+                guard let recording = candidate.recording else { return false }
+                return target.matches(title: recording.title, artists: [recording.artist], album: recording.album,
+                                      duration: candidate.lrclibDuration)
             case nil:
                 return true
             }
@@ -692,10 +919,11 @@ class MusicManager: ObservableObject {
 
         guard !Task.isCancelled else { return false }
         let allowsQQMusic = switch reference {
-        case .recording: false
+        case .recording, .desktopRecording: false
         default: true
         }
-        if allowsQQMusic, let enhanced = await fetchEnhancedLyricsFromAdditionalWebProviders(title: title, artist: artist),
+        let recording = PlayerLyricsCatalog.Recording(title: title, artist: artist, album: album, duration: duration)
+        if allowsQQMusic, let enhanced = await fetchEnhancedLyricsFromQQMusic(recording),
            matchesReference(enhanced) {
             guard !Task.isCancelled else { return false }
             applyWebLyricsCandidate(enhanced)
@@ -732,20 +960,14 @@ class MusicManager: ObservableObject {
 
     @MainActor
     private func applyWebLyricsCandidate(_ candidate: WebLyricsCandidate) {
-        self.currentLyrics = candidate.displayLyrics
-        self.syncedLyrics = candidate.parsed.lines
-        self.syncedLyricCharacterTimings = candidate.hasCharacterTiming
+        let timings: [[LyricsDisplayText.CharacterTiming]] = candidate.hasCharacterTiming
             ? candidate.parsed.characterTimes.map { $0.map { .init(start: $0) } }
             : []
-        self.lyricsSource = .web
+        applyLyrics(candidate.displayLyrics, synced: candidate.parsed.lines, characterTimings: timings, source: .web)
     }
 
-    private func fetchEnhancedLyricsFromAdditionalWebProviders(title: String, artist: String) async -> WebLyricsCandidate? {
-        await fetchEnhancedLyricsFromQQMusic(title: title, artist: artist)
-    }
-
-    private func fetchEnhancedLyricsFromQQMusic(title: String, artist: String) async -> WebLyricsCandidate? {
-        let query = [normalizedQuery(title), normalizedQuery(artist)]
+    private func fetchEnhancedLyricsFromQQMusic(_ recording: PlayerLyricsCatalog.Recording) async -> WebLyricsCandidate? {
+        let query = [normalizedQuery(recording.title), normalizedQuery(recording.artist)]
             .filter { !$0.isEmpty }
             .joined(separator: " ")
         guard !query.isEmpty,
@@ -769,16 +991,12 @@ class MusicManager: ObservableObject {
                 return nil
             }
 
-            if let candidate = qrcCandidate(from: json) {
+            if let candidate = Self.qrcCandidate(from: json) {
                 return candidate
             }
 
-            if let results = json["data"] as? [[String: Any]] {
-                for result in results.prefix(5) {
-                    guard let id = lyricSearchResultID(from: result),
-                          let candidate = await fetchQQMusicLyricByID(id) else {
-                        continue
-                    }
+            for song in PlayerLyricsCatalog.qqProxySongs(from: json, for: recording).prefix(3) {
+                if let candidate = await Self.fetchQQMusicLyricByID(song.id) {
                     return candidate
                 }
             }
@@ -789,7 +1007,7 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private func fetchQQMusicLyricByID(_ id: String) async -> WebLyricsCandidate? {
+    private static func fetchQQMusicLyricByID(_ id: String) async -> WebLyricsCandidate? {
         guard var components = URLComponents(string: "https://oiapi.net/api/QQMusicLyric") else {
             return nil
         }
@@ -803,7 +1021,7 @@ class MusicManager: ObservableObject {
         guard let url = components.url else { return nil }
 
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 5))
             guard let http = response as? HTTPURLResponse,
                   (200..<300).contains(http.statusCode),
                   let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -816,7 +1034,7 @@ class MusicManager: ObservableObject {
         }
     }
 
-    private func qrcCandidate(from json: [String: Any]) -> WebLyricsCandidate? {
+    private static func qrcCandidate(from json: [String: Any]) -> WebLyricsCandidate? {
         if let lyric = lyricPayloadText(from: json) {
             let parsed = LyricsDisplayText.parseQQMusicQRC(lyric)
             let candidate = WebLyricsCandidate(plain: "", synced: lyric, parsed: parsed)
@@ -833,20 +1051,7 @@ class MusicManager: ObservableObject {
         return nil
     }
 
-    private func lyricSearchResultID(from result: [String: Any]) -> String? {
-        let keys = ["id", "mid", "songmid", "songMid", "song_id"]
-        for key in keys {
-            if let value = result[key] as? String, !value.isEmpty {
-                return value
-            }
-            if let value = result[key] as? Int {
-                return String(value)
-            }
-        }
-        return nil
-    }
-
-    private func lyricPayloadText(from dictionary: [String: Any]) -> String? {
+    private static func lyricPayloadText(from dictionary: [String: Any]) -> String? {
         let keys = ["conteng", "content", "lyric", "lyrics", "qrc", "lrc"]
         for key in keys {
             if let value = dictionary[key] as? String,
@@ -1023,9 +1228,12 @@ class MusicManager: ObservableObject {
         }
     }
 
+    var supportsSeeking: Bool { activeController?.supportsSeeking ?? false }
+
     func seek(to position: TimeInterval) {
         Task {
-            await activeController?.seek(to: position)
+            guard let controller = activeController, controller.supportsSeeking else { return }
+            await controller.seek(to: position)
         }
     }
     func skip(seconds: TimeInterval) {

@@ -38,7 +38,7 @@ struct VSCodeProjectsView: View {
                         guard let first = filteredProjects.first else { return }
                         service.open(first)
                         withAnimation(.smooth(duration: 0.2)) {
-                            vm.close()
+                            vm.closeUnlessPinned()
                         }
                     }
                 if !vm.vscodeSearchText.isEmpty {
@@ -73,7 +73,7 @@ struct VSCodeProjectsView: View {
                             Button {
                                 service.open(project)
                                 withAnimation(.smooth(duration: 0.2)) {
-                                    vm.close()
+                                    vm.closeUnlessPinned()
                                 }
                             } label: {
                                 VSCodeProjectRow(project: project)

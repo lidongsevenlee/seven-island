@@ -45,10 +45,28 @@ extension Notification.Name {
 enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializable {
     case nowPlaying = "Now Playing"
     case appleMusic = "Apple Music"
+    case neteaseMusic = "网易云音乐"
+    case qqMusic = "QQ 音乐"
     case spotify = "Spotify"
     case youtubeMusic = "YouTube Music"
     
     var id: String { self.rawValue }
+
+    var systemPlayerBundleIdentifier: String? {
+        switch self {
+        case .neteaseMusic: "com.netease.163music"
+        case .qqMusic: "com.tencent.QQMusicMac"
+        default: nil
+        }
+    }
+
+    var usesSystemPlayback: Bool {
+        self == .nowPlaying || systemPlayerBundleIdentifier != nil
+    }
+
+    static func available(systemPlayback: Bool) -> [Self] {
+        allCases.filter { systemPlayback || !$0.usesSystemPlayback }
+    }
 }
 
 // Sneak peek styles for selection in settings

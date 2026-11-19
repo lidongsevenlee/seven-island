@@ -11,6 +11,7 @@ import SwiftUI
 struct BoringHeader: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @State private var isLockHovered = false
     @State private var isSettingsHovered = false
     var body: some View {
         HStack(spacing: 0) {
@@ -57,6 +58,7 @@ struct BoringHeader: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
+                        panelLockToggle
                         if Defaults[.settingsIconInNotch] {
                             Button(action: {
                                 DispatchQueue.main.async {
@@ -91,6 +93,26 @@ struct BoringHeader: View {
         }
         .foregroundColor(.gray)
         .environmentObject(vm)
+    }
+
+    private var panelLockToggle: some View {
+        Toggle(isOn: $vm.isPinnedOpen) {
+            Image(systemName: vm.isPinnedOpen ? "lock.fill" : "lock.open")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(vm.isPinnedOpen || isLockHovered ? 0.98 : 0.72))
+                .frame(width: 24, height: 24)
+                .background {
+                    Capsule()
+                        .fill(Color(nsColor: .secondarySystemFill))
+                        .opacity(vm.isPinnedOpen || isLockHovered ? 1 : 0)
+                }
+                .contentShape(Rectangle())
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.plain)
+        .accessibilityLabel("面板常驻")
+        .help(vm.isPinnedOpen ? "取消面板常驻" : "保持面板常驻")
+        .onHover { isLockHovered = $0 }
     }
 
     func isHUDType(_ type: SneakContentType) -> Bool {

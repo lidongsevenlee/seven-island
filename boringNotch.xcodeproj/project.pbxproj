@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		7E3001040000000000000004 /* AppleMusicAccessibilityLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */; };
+		7E3001040000000000000006 /* PlayerLyricsCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000006 /* PlayerLyricsCatalog.swift */; };
+		7E3001040000000000000007 /* DesktopLyricsCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000007 /* DesktopLyricsCache.swift */; };
+		7E3001040000000000000008 /* QRCCodec.c in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000008 /* QRCCodec.c */; };
+		7E3001040000000000000009 /* DesktopPlayerLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000009 /* DesktopPlayerLyrics.swift */; };
 		7E3001040000000000000005 /* AppleMusicCachedLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */; };
 		7E3001030000000000000003 /* MusicSpectrumBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000030000000000000003 /* MusicSpectrumBar.swift */; };
 		7E3001020000000000000002 /* MusicAudioSpectrum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000020000000000000002 /* MusicAudioSpectrum.swift */; };
@@ -179,6 +183,10 @@
 
 /* Begin PBXFileReference section */
 		7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicAccessibilityLyrics.swift; sourceTree = "<group>"; };
+		7E3000040000000000000006 /* PlayerLyricsCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLyricsCatalog.swift; sourceTree = "<group>"; };
+		7E3000040000000000000007 /* DesktopLyricsCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopLyricsCache.swift; sourceTree = "<group>"; };
+		7E3000040000000000000008 /* QRCCodec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = QRC/QRCCodec.c; sourceTree = "<group>"; };
+		7E3000040000000000000009 /* DesktopPlayerLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPlayerLyrics.swift; sourceTree = "<group>"; };
 		7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicCachedLyrics.swift; sourceTree = "<group>"; };
 		7E3000030000000000000003 /* MusicSpectrumBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSpectrumBar.swift; sourceTree = "<group>"; };
 		7E3000020000000000000002 /* MusicAudioSpectrum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicAudioSpectrum.swift; sourceTree = "<group>"; };
@@ -407,6 +415,10 @@
 				11A45C782E34E63100CEB175 /* MediaChecker.swift */,
 				1153BD972D9881F900979FB0 /* AppleScriptHelper.swift */,
 				7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */,
+				7E3000040000000000000006 /* PlayerLyricsCatalog.swift */,
+				7E3000040000000000000007 /* DesktopLyricsCache.swift */,
+				7E3000040000000000000008 /* QRCCodec.c */,
+				7E3000040000000000000009 /* DesktopPlayerLyrics.swift */,
 				7E3000040000000000000005 /* AppleMusicCachedLyrics.swift */,
 				14288DD62C6E015000B9F80C /* AudioPlayer.swift */,
 				7E3000010000000000000001 /* AudioSpectrumAnalyzer.swift */,
@@ -986,6 +998,10 @@
 				14FC6E502C7DED5600C7BEA5 /* DataTypes+Extensions.swift in Sources */,
 				1153BD982D9881F900979FB0 /* AppleScriptHelper.swift in Sources */,
 				7E3001040000000000000004 /* AppleMusicAccessibilityLyrics.swift in Sources */,
+				7E3001040000000000000006 /* PlayerLyricsCatalog.swift in Sources */,
+				7E3001040000000000000007 /* DesktopLyricsCache.swift in Sources */,
+				7E3001040000000000000008 /* QRCCodec.c in Sources */,
+				7E3001040000000000000009 /* DesktopPlayerLyrics.swift in Sources */,
 				7E3001040000000000000005 /* AppleMusicCachedLyrics.swift in Sources */,
 				11CFC6612E097F6800748C80 /* PermissionsRequestView.swift in Sources */,
 				14D570D22C5F6C6A0011E668 /* BoringExtrasMenu.swift in Sources */,
@@ -1231,6 +1247,7 @@
 				PRODUCT_NAME = "Seven Island";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/boringNotch/helpers/QRC";
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.0;
 				SYSTEM_FRAMEWORK_SEARCH_PATHS = (
@@ -1284,6 +1301,7 @@
 				PRODUCT_NAME = "Seven Island";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INCLUDE_PATHS = "$(SRCROOT)/boringNotch/helpers/QRC";
 				SWIFT_STRICT_CONCURRENCY = targeted;
 				SWIFT_VERSION = 5.0;
 				SYSTEM_FRAMEWORK_SEARCH_PATHS = (

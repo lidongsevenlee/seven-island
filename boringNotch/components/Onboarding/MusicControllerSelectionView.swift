@@ -15,11 +15,7 @@ struct MusicControllerSelectionView: View {
     @Default(.mediaController) var mediaController
     
     private var availableMediaControllers: [MediaControllerType] {
-        if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
-        } else {
-            return MediaControllerType.allCases
-        }
+        MediaControllerType.available(systemPlayback: !MusicManager.shared.isNowPlayingDeprecated)
     }
     
     @State private var selectedMediaController: MediaControllerType = Defaults[.mediaController]
@@ -128,6 +124,8 @@ extension MediaControllerType {
             return "直接连接到 Spotify 应用。"
         case .appleMusic:
             return "直接连接到 Apple Music 应用。"
+        case .neteaseMusic, .qqMusic:
+            return "在这个播放器中开始播放后，Seven Island 会显示曲目与播放控制。"
         case .youtubeMusic:
             return "需要启用 API 插件的第三方客户端。"
         }

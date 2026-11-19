@@ -168,6 +168,11 @@ struct ContentView: View {
                             vm.setOpenNotchHeight(openNotchSize.height)
                         }
                     }
+                    .onChange(of: vm.isPinnedOpen) { _, isPinned in
+                        if !isPinned {
+                            vm.closeAfterHoverExit()
+                        }
+                    }
                     .onChange(of: vm.isBatteryPopoverActive) {
                         if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open {
                             hoverTask?.cancel()

@@ -543,6 +543,10 @@ struct Media: View {
                         .font(.caption)
                         .foregroundColor(.blue)  // Ensures it's visibly a link
                     }
+                } else if mediaController.systemPlayerBundleIdentifier != nil {
+                    Text(mediaController.description)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                 } else {
                     Text(
                         "「正在播放」在之前的版本中是唯一选项，适用于所有媒体应用。"
@@ -659,11 +663,7 @@ struct Media: View {
 
     // Only show controller options that are available on this macOS version
     private var availableMediaControllers: [MediaControllerType] {
-        if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
-        } else {
-            return MediaControllerType.allCases
-        }
+        MediaControllerType.available(systemPlayback: !MusicManager.shared.isNowPlayingDeprecated)
     }
 }
 

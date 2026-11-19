@@ -21,6 +21,7 @@ xcrun swiftc \
   -target "$(uname -m)-apple-macos14.0" \
   -module-cache-path "$ROOT_DIR/build/module-cache" \
   -I "$PRODUCTS" \
+  -I "$ROOT_DIR/boringNotch/helpers/QRC" \
   -F "$PRODUCTS/PackageFrameworks" \
   -F "$ROOT_DIR/mediaremote-adapter" \
   "$TEST_SOURCE" \

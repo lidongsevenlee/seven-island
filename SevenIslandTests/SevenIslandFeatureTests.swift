@@ -329,9 +329,142 @@ func testLyricsDisplayTextProvidesUnavailableFallback() {
     )
 }
 
+func testSystemPlaybackUpdatesKeepPlayerMetadataSeparate() throws {
+    let netease = try JSONDecoder().decode(NowPlayingUpdate.self, from: Data("""
+        {"payload":{"bundleIdentifier":"com.netease.163music","title":"晚风测试曲","artist":"示例歌手",
+        "playing":true,"duration":169,"elapsedTime":12,"artworkData":"Y292ZXI="},"diff":false}
+        """.utf8)).applying(to: .idle(bundleIdentifier: ""))
+    let position = try JSONDecoder().decode(NowPlayingUpdate.self, from: Data("""
+        {"payload":{"elapsedTime":25},"diff":true}
+        """.utf8)).applying(to: netease)
+
+    expectEqual(netease.isFrom(MediaControllerType.neteaseMusic.systemPlayerBundleIdentifier), true, "matches the NetEase source")
+    expectEqual(netease.usesAdapterTransport, true, "routes NetEase controls through the adapter")
+    expectEqual(position.title, "晚风测试曲", "keeps the Chinese title on a progress update")
+    expectEqual(position.artwork, Data("cover".utf8), "keeps artwork on a progress update")
+    expectEqual(position.currentTime, 25, "applies the new progress")
+
+    let qq = try JSONDecoder().decode(NowPlayingUpdate.self, from: Data("""
+        {"payload":{"bundleIdentifier":"com.tencent.QQMusicMac","title":"Test Track","playing":true},"diff":true}
+        """.utf8)).applying(to: position)
+
+    expectEqual(qq.isFrom(MediaControllerType.qqMusic.systemPlayerBundleIdentifier), true, "matches the QQ Music source")
+    expectEqual(qq.usesAdapterTransport, true, "routes QQ Music controls through the adapter")
+    expectEqual(qq.isFrom(MediaControllerType.neteaseMusic.systemPlayerBundleIdentifier), false, "matches only the active player")
+    expectEqual(qq.title, "Test Track", "applies the new player's song")
+    expectEqual(qq.artist, "", "starts the new player with empty artist metadata")
+    expectEqual(qq.currentTime, 0, "starts the new player at its own progress")
+    expectEqual(qq.artwork, nil, "clears the prior player's artwork")
+}
+
+func testQRCUsesProviderWordTimestampsOnThePlaybackTimeline() {
+    let parsed = LyricsDisplayText.parseQQMusicQRC("[6051,3062](6051,100)星(6151,200)光")
+    expectEqual(parsed.lines.map(\.text), ["星光"], "reads the provider's lyric text")
+    expectEqual(parsed.characterTimes, [[6.051, 6.151]], "uses absolute provider timestamps")
+}
+
+func testDesktopLyricCatalogMatchesThePlayingRecording() throws {
+    let payload = Data("""
+        {"data":{"items":[
+          {"mid":"alternate","name":"夜色 (现场版)","singer":["歌手"],"album":"现场","duration":"200"},
+          {"mid":"short","name":"夜色","singer":["歌手"],"album":"夜色","duration":"45"},
+          {"mid":"studio","name":"夜色","singer":["歌手Artist"],"album":"夜色","duration":"200"}
+        ]}}
+        """.utf8)
+    let response = try JSONSerialization.jsonObject(with: payload) as? [String: Any] ?? [:]
+    let recording = PlayerLyricsCatalog.Recording(title: "夜色", artist: "歌手", album: "夜色", duration: 200)
+    expectEqual(PlayerLyricsCatalog.qqProxySongs(from: response, for: recording).map(\.id), ["studio"],
+                "matches the nested search result with the correct recording length")
+
+    let duet = PlayerLyricsCatalog.Recording(title: "合唱", artist: "歌手甲/歌手乙", album: "合唱", duration: 150)
+    expectEqual(duet.matches(title: "合唱", artists: ["歌手乙", "歌手甲"], album: "合唱", duration: 150), true,
+                "recognizes both credits regardless of ordering")
+    expectEqual(duet.matches(title: "合唱", artists: ["歌手甲"], album: "合唱", duration: 150), false,
+                "requires every credited artist")
+}
+
+func testDesktopLyricsCachePersistsRecordingVersions() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let writer = DesktopLyricsCache(directory: directory)
+    let reader = DesktopLyricsCache(directory: directory)
+    let studio = DesktopLyricsCache.Key(bundleIdentifier: "com.netease.163music", title: "夜色",
+                                       artist: "歌手", album: "专辑", duration: 200.1)!
+    let sameRecording = DesktopLyricsCache.Key(bundleIdentifier: "com.netease.163music", title: "夜色",
+                                               artist: "歌手", album: " 专辑 ", duration: 200)!
+    let differentVersion = DesktopLyricsCache.Key(bundleIdentifier: "com.netease.163music", title: "夜色",
+                                                   artist: "歌手", album: "专辑", duration: 201)!
+    let preview = DesktopLyricsCache.Key(bundleIdentifier: "com.netease.163music", title: "夜色",
+                                        artist: "歌手", album: "专辑", duration: 30)!
+    let plain = DesktopLyricsCache.Entry(text: "星光", lines: [], characterTimings: [])
+    let timed = DesktopLyricsCache.Entry(text: "星光", lines: [.init(time: 6, text: "星光")],
+                                        characterTimings: [[.init(start: 6, end: 6.3), .init(start: 6.3)]])
+
+    await writer.store(timed, for: studio)
+    await writer.store(plain, for: studio)
+    await writer.store(plain, for: preview)
+    let restored = await reader.load(for: sameRecording)
+    expectEqual(restored?.lines.first?.time, 6, "restores line timing from disk")
+    expectEqual(restored?.characterTimings, timed.characterTimings, "retains the richer lyric timestamps")
+    let missingVersion = await reader.load(for: differentVersion)
+    expectEqual(missingVersion?.text, nil, "keeps distinct recording durations separate")
+    let restoredPreview = await reader.load(for: preview)
+    expectEqual(restoredPreview?.lines.count, 0, "restores preview lyrics in plain text mode")
+    expectEqual(restoredPreview?.text, plain.text, "persists plain lyrics")
+}
+
+func testNativeDesktopLyricsKeepWordStartAndEndTimes() {
+    let encrypted = "ee7befb746f93831d42dcdf2e21f0d5d924943e250c9b32f6d731ce7c8a4cd011e1d0670eb609a569e12e878068bc7f76f8af13c375c0612329533e9ae0058998511241f0e86d4598a3a437092d05f3fd65bd1c7281ab3e3b550ab427b904fcc37c30ecf4069f4d9737e7f3504932264"
+    let qrc = DesktopPlayerLyrics.decodedQRC(encrypted).flatMap(DesktopPlayerLyrics.qqTimeline)
+    let yrc = DesktopPlayerLyrics.netEaseTimeline("[6000,2000](6000,550,0)星(6550,700,0)光")
+    let expectedTiming: [[LyricsDisplayText.CharacterTiming]] = [
+        [.init(start: 6, end: 6.55), .init(start: 6.55, end: 7.25)],
+    ]
+    expectEqual(qrc?.lines.first?.text, "星光", "decrypts and parses QQ's native postfix QRC")
+    expectEqual(qrc?.characterTimings, expectedTiming, "keeps the native QRC timeline")
+    expectEqual(yrc?.lines.first?.text, "星光", "parses NetEase's native prefix YRC")
+    expectEqual(yrc?.characterTimings, expectedTiming, "keeps the native YRC timeline")
+    expectEqual(DesktopPlayerLyrics.decodedQRC("broken"), nil, "rejects malformed QRC payloads")
+}
+
+func testDesktopLyricsMatchPreviewAndQQMetadataAliases() {
+    let sample = PlayerLyricsCatalog.Recording(title: "这样爱你对不对", artist: "陈淑桦", album: "爱的进行式", duration: 35.03)
+    let full = PlayerLyricsCatalog.Song(id: "211225", title: sample.title, artists: [sample.artist], album: sample.album, duration: 236.333)
+    let alternate = PlayerLyricsCatalog.Song(id: "2", title: sample.title, artists: [sample.artist], album: "演唱会", duration: 236.333)
+    expectEqual(sample.matchesNetEasePreview(full), true, "allows a 35-second preview to find the same album recording")
+    expectEqual(sample.matchesNetEasePreview(alternate), false, "keeps preview matching specific to the album")
+
+    let duet = PlayerLyricsCatalog.Recording(title: "Fight as ONE", artist: "陈奕迅", album: "Fight as ONE", duration: 222)
+    expectEqual(duet.matchesQQLyricsMetadata(title: "Fight as One", artists: ["陈奕迅,蔡依林"], album: duet.album),
+                true, "matches a QQ track when one co-artist is omitted")
+    expectEqual(duet.matchesQQLyricsMetadata(title: "Fight as One", artists: ["蔡依林"], album: duet.album),
+                false, "requires the artist reported by the player")
+    let album = "I Knew You Were Trouble (Tribute to Taylor Swift)"
+    let cover = PlayerLyricsCatalog.Recording(title: "I Knew You Were Trouble", artist: "Party Hit Kings", album: album, duration: 220)
+    expectEqual(cover.matchesQQLyricsMetadata(title: album, artists: [cover.artist], album: album),
+                true, "matches the QQ tribute suffix with the matching album")
+    expectEqual(cover.matchesQQLyricsMetadata(title: "I Knew You Were Trouble", artists: ["Taylor Swift"], album: "Red"),
+                false, "rejects the original recording for the cover")
+    expectEqual(cover.matchesQQLyricsMetadata(title: "I Knew You Were Trouble (Live)", artists: [cover.artist], album: album),
+                false, "preserves the identity of live recordings")
+}
+
+func testPlaybackSongIDsTrackTheCurrentRecording() throws {
+    let decoder = JSONDecoder()
+    let first = try decoder.decode(NowPlayingUpdate.self, from: Data(#"{"payload":{"bundleIdentifier":"com.tencent.QQMusicMac","title":"First","contentItemIdentifier":"256962630"}}"#.utf8))
+    let initial = first.applying(to: .idle(bundleIdentifier: ""))
+    expectEqual(initial.lyricsSongID, "256962630", "retains the player's numeric song identifier")
+    let tick = try decoder.decode(NowPlayingUpdate.self, from: Data(#"{"diff":true,"payload":{"elapsedTime":4}}"#.utf8))
+    expectEqual(tick.applying(to: initial).lyricsSongID, "256962630", "retains song ID during progress updates")
+    let next = try decoder.decode(NowPlayingUpdate.self, from: Data(#"{"diff":true,"payload":{"title":"Next"}}"#.utf8))
+    expectEqual(next.applying(to: initial).lyricsSongID, nil, "clears the previous ID on a metadata-only track transition")
+    expectEqual(PlayerLyricsCatalog.Source.numericSongID("254CD19A-FD3C-4AA1-9698-92F33C20AB61"), nil,
+                "skips the media session UUID")
+}
+
 @main
 enum SevenIslandFeatureTestRunner {
-    static func main() {
+    static func main() async {
         do {
             testClipboardHistoryDeduplicatesAndFiltersSensitiveText()
             testClipboardHistoryRespectsMaximumItemLimit()
@@ -351,6 +484,13 @@ enum SevenIslandFeatureTestRunner {
             testAppleMusicCachedLyricsFollowsTimedSpans()
             testLyricsDisplayTextChecksFallbackRecordingTiming()
             testLyricsDisplayTextRejectsSameTitleWithDifferentWords()
+            try testSystemPlaybackUpdatesKeepPlayerMetadataSeparate()
+            testQRCUsesProviderWordTimestampsOnThePlaybackTimeline()
+            try testDesktopLyricCatalogMatchesThePlayingRecording()
+            try await testDesktopLyricsCachePersistsRecordingVersions()
+            testNativeDesktopLyricsKeepWordStartAndEndTimes()
+            testDesktopLyricsMatchPreviewAndQQMetadataAliases()
+            try testPlaybackSongIDsTrackTheCurrentRecording()
             print("SevenIslandFeatureTests passed")
         } catch {
             fputs("FAIL: \(error.localizedDescription)\n", stderr)

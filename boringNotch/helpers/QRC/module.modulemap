@@ -1,0 +1,5 @@
+module QRCCodec {
+    header "QRCCodec.h"
+    link "z"
+    export *
+}

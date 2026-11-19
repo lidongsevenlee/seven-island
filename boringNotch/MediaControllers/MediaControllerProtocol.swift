@@ -13,6 +13,7 @@ protocol MediaControllerProtocol: ObservableObject {
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> { get }
     var supportsVolumeControl: Bool { get }
     var supportsFavorite: Bool { get }
+    var supportsSeeking: Bool { get }
     
     func setFavorite(_ favorite: Bool) async
     func play() async
@@ -26,4 +27,8 @@ protocol MediaControllerProtocol: ObservableObject {
     func setVolume(_ level: Double) async
     func isActive() -> Bool
     func updatePlaybackInfo() async
+}
+
+extension MediaControllerProtocol {
+    var supportsSeeking: Bool { true }
 }

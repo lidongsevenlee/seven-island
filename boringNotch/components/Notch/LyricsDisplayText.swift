@@ -13,7 +13,7 @@ enum LyricsDisplayText {
 
     typealias SyncedLine = (time: Double, text: String)
 
-    struct CharacterTiming: Equatable, Sendable {
+    struct CharacterTiming: Codable, Equatable, Sendable {
         let start: Double
         let end: Double?
 
@@ -63,7 +63,7 @@ enum LyricsDisplayText {
         )
     }
 
-    static func parseQQMusicQRC(_ qrc: String) -> (lines: [SyncedLine], characterTimes: [[Double]]) {
+    static func parseQQMusicQRC(_ qrc: String, absoluteWordTimes: Bool = false) -> (lines: [SyncedLine], characterTimes: [[Double]]) {
         var parsedLines: [SyncedLine] = []
         var parsedCharacterTimes: [[Double]] = []
 
@@ -82,7 +82,7 @@ enum LyricsDisplayText {
 
             let bodyStart = line.index(after: close)
             let body = String(line[bodyStart...])
-            let segments = qrcTimedSegments(from: body, lineStart: lineStartMS / 1000)
+            let segments = qrcTimedSegments(from: body, lineStartMS: lineStartMS, absoluteWordTimes: absoluteWordTimes)
             let text = segments.map(\.text).joined()
             let times = segments.map(\.time)
 
@@ -366,9 +366,10 @@ enum LyricsDisplayText {
         return times
     }
 
-    private static func qrcTimedSegments(from body: String, lineStart: Double) -> [InlineTimedSegment] {
+    private static func qrcTimedSegments(from body: String, lineStartMS: Double, absoluteWordTimes: Bool) -> [InlineTimedSegment] {
         var segments: [InlineTimedSegment] = []
         var cursor = body.startIndex
+        var timestampsAreAbsolute = absoluteWordTimes
 
         while cursor < body.endIndex {
             guard body[cursor] == "(",
@@ -391,7 +392,10 @@ enum LyricsDisplayText {
 
             let text = String(body[textStart..<nextTiming])
             if !text.isEmpty {
-                let segmentStart = lineStart + (offsetMS / 1000)
+                if segments.isEmpty, offsetMS == lineStartMS {
+                    timestampsAreAbsolute = true
+                }
+                let segmentStart = (offsetMS + (timestampsAreAbsolute ? 0 : lineStartMS)) / 1000
                 let characters = Array(text)
                 for index in characters.indices {
                     segments.append(InlineTimedSegment(time: segmentStart, text: String(characters[index])))

@@ -190,7 +190,8 @@ struct MusicControlsView: View {
                 timestampDate: musicManager.timestampDate,
                 elapsedTime: musicManager.elapsedTime,
                 playbackRate: musicManager.playbackRate,
-                isPlaying: musicManager.isPlaying
+                isPlaying: musicManager.isPlaying,
+                allowsSeeking: musicManager.supportsSeeking
             ) { newValue in
                 MusicManager.shared.seek(to: newValue)
             }
@@ -412,78 +413,61 @@ struct MusicLyricsDisplayView: View {
 
     var body: some View {
         Group {
-            if musicManager.isFetchingLyrics {
-                statusLabel("Loading lyrics...")
-            } else if !musicManager.syncedLyrics.isEmpty {
+            if !musicManager.syncedLyrics.isEmpty {
                 SyncedLyricsScrollView()
             } else {
-                let plainLines = LyricsDisplayText.lines(
-                    fromPlainLyrics: musicManager.currentLyrics)
-                if plainLines.isEmpty {
-                    statusLabel("无歌词")
-                } else {
-                    PlainLyricsScrollView(lines: plainLines)
-                }
+                PlainLyricsScrollView(lines: LyricsDisplayText.lines(fromPlainLyrics: musicManager.currentLyrics))
             }
         }
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
-    private func statusLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
 
-// MARK: - Synced lyrics: auto-scroll + karaoke progress
+// MARK: - Synced lyrics
 
 private struct SyncedLyricsScrollView: View {
     @ObservedObject private var musicManager = MusicManager.shared
-    @State private var scrollTarget: Int? = nil
+    @State private var scrollTarget: Int?
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                TimelineView(.animation(minimumInterval: 0.05, paused: !musicManager.isPlaying)) { timeline in
-                    let elapsed = musicManager.estimatedPlaybackPosition(at: timeline.date)
-                    let currentIdx = LyricsDisplayText.currentSyncedIndex(
-                        from: musicManager.syncedLyrics, elapsed: elapsed) ?? 0
-                    let highlightColor = karaokeHighlightColor
+            GeometryReader { viewport in
+                ScrollView(.vertical, showsIndicators: false) {
+                    TimelineView(.animation(minimumInterval: 0.05, paused: !musicManager.isPlaying)) { timeline in
+                        let elapsed = musicManager.estimatedPlaybackPosition(at: timeline.date)
+                        let currentIdx = LyricsDisplayText.currentSyncedIndex(
+                            from: musicManager.syncedLyrics, elapsed: elapsed) ?? 0
+                        let highlightColor = karaokeHighlightColor
 
-                    LazyVStack(alignment: .center, spacing: 8) {
-                        ForEach(
-                            Array(musicManager.syncedLyrics.enumerated()),
-                            id: \.offset
-                        ) { index, line in
-                            KaraokeLineView(
-                                text: line.text,
-                                index: index,
-                                currentIndex: currentIdx,
-                                elapsed: elapsed,
-                                syncedLyrics: musicManager.syncedLyrics,
-                                characterTimings: musicManager.syncedLyricCharacterTimings,
-                                highlightColor: highlightColor
-                            )
-                            .id(index)
+                        LazyVStack(alignment: .center, spacing: 8) {
+                            ForEach(
+                                Array(musicManager.syncedLyrics.enumerated()),
+                                id: \.offset
+                            ) { index, line in
+                                KaraokeLineView(
+                                    text: line.text,
+                                    index: index,
+                                    currentIndex: currentIdx,
+                                    elapsed: elapsed,
+                                    syncedLyrics: musicManager.syncedLyrics,
+                                    characterTimings: musicManager.syncedLyricCharacterTimings,
+                                    highlightColor: highlightColor
+                                )
+                                .id(index)
+                            }
                         }
-                    }
-                    // Vertical padding so the first/last lines can scroll to the
-                    // anchor position instead of being pinned to the edge.
-                    .padding(.vertical, 36)
-                    .frame(maxWidth: .infinity)
-                    .onChange(of: currentIdx, initial: true) { _, newIdx in
-                        scrollTarget = newIdx
+                        // Give the first and last lines room to reach the center.
+                        .padding(.vertical, viewport.size.height / 2)
+                        .frame(maxWidth: .infinity)
+                        .onChange(of: currentIdx, initial: true) { _, newIdx in
+                            scrollTarget = newIdx
+                        }
                     }
                 }
             }
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
-                // Keep current line at ~35 % from the top so upcoming lines
-                // are visible below.
                 withAnimation(.spring(response: 0.48, dampingFraction: 0.82)) {
-                    proxy.scrollTo(target, anchor: UnitPoint(x: 0.5, y: 0.35))
+                    proxy.scrollTo(target, anchor: .center)
                 }
             }
         }
@@ -507,12 +491,13 @@ private struct KaraokeLineView: View {
     let characterTimings: [[LyricsDisplayText.CharacterTiming]]
     let highlightColor: Color
 
-    private var isCurrent: Bool { index == currentIndex }
-    private var isPast: Bool    { index < currentIndex }
+    private var isCurrent: Bool {
+        index == currentIndex && syncedLyrics.indices.contains(index) && elapsed >= syncedLyrics[index].time
+    }
 
     /// 0…1 progress of the current line (0 for non-current lines).
     private var progress: Double {
-        guard isCurrent, syncedLyrics.indices.contains(index), elapsed >= syncedLyrics[index].time else { return 0 }
+        guard isCurrent else { return 0 }
         return LyricsDisplayText.activeLineProgress(
             from: syncedLyrics,
             characterTimings: characterTimings,
@@ -522,27 +507,21 @@ private struct KaraokeLineView: View {
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // ── Base layer: always-visible dim text ──────────────────────────
             Text(text.isEmpty ? " " : text)
-                .foregroundStyle(baseColor)
+                .foregroundStyle(.white.opacity(isCurrent ? 0.55 : 0.40))
                 .opacity(text.isEmpty ? 0 : 1)
 
-            // ── Highlight layer: revealed left-to-right as the line plays ────
-            // Past lines are fully revealed; the current line uses `progress`.
-            if isCurrent || isPast {
+            if isCurrent {
                 Text(text.isEmpty ? " " : text)
                     .foregroundStyle(highlightColor)
                     .mask(alignment: .leading) {
                         GeometryReader { geo in
                             Rectangle()
-                                .frame(
-                                    width: isPast
-                                        ? geo.size.width
-                                        : max(0, geo.size.width * progress)
-                                )
+                                .frame(width: max(0, geo.size.width * progress))
                         }
                     }
                     .opacity(text.isEmpty ? 0 : 1)
+                    .accessibilityHidden(true)
             }
         }
         .font(lyricFont)
@@ -550,24 +529,14 @@ private struct KaraokeLineView: View {
         .lineLimit(2)
         .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, alignment: .center)
-        // Grow current line slightly; shrink future ones more than past ones.
-        .scaleEffect(isCurrent ? 1.0 : (isPast ? 0.90 : 0.85), anchor: .center)
         .animation(.easeInOut(duration: 0.28), value: isCurrent)
-        .animation(.easeInOut(duration: 0.28), value: isPast)
-    }
-
-    private var baseColor: Color {
-        if isCurrent { return .white.opacity(0.22) }
-        if isPast    { return .clear }
-        return .white.opacity(0.18)
     }
 
     private var lyricFont: Font {
-        LyricsDisplayText.containsPersianScript(text)
-            ? .custom(
-                "Vazirmatn-Regular",
-                size: NSFont.preferredFont(forTextStyle: .subheadline).pointSize)
-            : .subheadline
+        let isPersian = LyricsDisplayText.containsPersianScript(text)
+        if !isCurrent && !isPersian { return .subheadline }
+        let size = NSFont.preferredFont(forTextStyle: .subheadline).pointSize + (isCurrent ? 4 : 0)
+        return isPersian ? .custom("Vazirmatn-Regular", size: size) : .system(size: size)
     }
 }
 
@@ -631,12 +600,14 @@ struct AppleMusicLyricsPageView: View {
 
 struct MusicHomeView: View {
     @EnvironmentObject var vm: BoringViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var webcamManager = WebcamManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @ObservedObject var musicManager = MusicManager.shared
     @Default(.enableLyrics) var enableLyrics
     @State private var albumArtHeight: CGFloat = 0
+    private let lyricsPanelSpacing: CGFloat = 12
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
@@ -655,18 +626,16 @@ struct MusicHomeView: View {
 
     private var mainContent: some View {
         HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 0) {
                 MusicPlayerView(albumArtNamespace: albumArtNamespace)
                     .onPreferenceChange(AlbumArtSizePreferenceKey.self) { size in
                         guard size.height > 0 else { return }
                         albumArtHeight = size.height
                     }
 
-                if shouldShowExpandedLyrics {
-                    expandedLyricsPanel
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
-                }
+                lyricsPanelSlot
             }
+            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: lyricsPanelWidth)
 
             if Defaults[.showCalendar] {
                 CalendarView()
@@ -691,22 +660,41 @@ struct MusicHomeView: View {
     }
 
     private var shouldShowExpandedLyrics: Bool {
-        enableLyrics && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+        enableLyrics && musicManager.hasLyrics && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+    }
+
+    private var usesAppleMusicLyricsPage: Bool {
+        musicManager.lyricsSource == .appleMusicOfficial && musicManager.syncedLyrics.isEmpty &&
+            !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var expandedLyricsWidth: CGFloat { usesAppleMusicLyricsPage ? 220 : 200 }
+
+    private var lyricsPanelWidth: CGFloat {
+        shouldShowExpandedLyrics ? expandedLyricsWidth + lyricsPanelSpacing : 0
+    }
+
+    private var lyricsPanelSlot: some View {
+        ZStack(alignment: .trailing) {
+            if shouldShowExpandedLyrics {
+                expandedLyricsPanel
+                    .frame(width: expandedLyricsWidth, height: expandedLyricsHeight)
+                    .padding(.leading, lyricsPanelSpacing)
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: lyricsPanelWidth, alignment: .trailing)
+        .clipped()
+        .allowsHitTesting(shouldShowExpandedLyrics)
+        .accessibilityHidden(!shouldShowExpandedLyrics)
     }
 
     @ViewBuilder
     private var expandedLyricsPanel: some View {
-        if musicManager.lyricsSource == .appleMusicOfficial && musicManager.syncedLyrics.isEmpty &&
-            !musicManager.currentLyrics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if usesAppleMusicLyricsPage {
             AppleMusicLyricsPageView()
-                .frame(width: 220, alignment: .center)
-                .frame(height: expandedLyricsHeight, alignment: .center)
         } else {
             MusicLyricsDisplayView()
-                .frame(width: 200, alignment: .center)
-                .frame(height: expandedLyricsHeight, alignment: .center)
-                // Clip so lyrics don't overflow into the album art or calendar
-                .clipped()
         }
     }
 
@@ -726,6 +714,7 @@ struct MusicSliderView: View {
     let elapsedTime: Double
     let playbackRate: Double
     let isPlaying: Bool
+    let allowsSeeking: Bool
     var onValueChange: (Double) -> Void
 
 
@@ -742,6 +731,7 @@ struct MusicSliderView: View {
                 onValueChange: onValueChange
             )
             .frame(height: 10, alignment: .center)
+            .allowsHitTesting(allowsSeeking)
 
             HStack {
                 Text(timeString(from: sliderValue))
@@ -758,6 +748,11 @@ struct MusicSliderView: View {
         .onChange(of: currentDate) {
            guard !dragging, timestampDate.timeIntervalSince(lastDragged) > -1 else { return }
             sliderValue = MusicManager.shared.estimatedPlaybackPosition(at: currentDate)
+        }
+        .onChange(of: allowsSeeking) {
+            guard !allowsSeeking else { return }
+            dragging = false
+            lastDragged = .distantPast
         }
     }
 

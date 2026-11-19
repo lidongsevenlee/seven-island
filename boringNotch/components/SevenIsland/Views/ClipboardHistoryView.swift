@@ -62,7 +62,7 @@ struct ClipboardHistoryView: View {
                             ClipboardItemRow(item: item) {
                                 store.copyToPasteboard(item)
                                 withAnimation(.smooth(duration: 0.2)) {
-                                    vm.close()
+                                    vm.closeUnlessPinned()
                                 }
                             }
                         }

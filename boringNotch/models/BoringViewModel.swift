@@ -22,6 +22,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published var contentType: ContentType = .normal
     @Published private(set) var notchState: NotchState = .closed
+    @Published var isPinnedOpen = false
 
     var cancellables: Set<AnyCancellable> = []
     
@@ -205,7 +206,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func closeAutomatically() {
         guard !isTextInputFocused else { return }
-        close()
+        closeUnlessPinned()
     }
 
     func closeAfterHoverExit(position: NSPoint = NSEvent.mouseLocation) {
@@ -213,6 +214,11 @@ class BoringViewModel: NSObject, ObservableObject {
         guard notchState == .open,
               !isMouseHovering(position: position),
               !isBatteryPopoverActive else { return }
+        closeUnlessPinned()
+    }
+
+    func closeUnlessPinned() {
+        guard !isPinnedOpen else { return }
         close()
     }
 
@@ -220,6 +226,7 @@ class BoringViewModel: NSObject, ObservableObject {
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
+        self.isPinnedOpen = false
         self.isBatteryPopoverActive = false
         self.isTextInputFocused = false
         self.coordinator.sneakPeek.show = false
