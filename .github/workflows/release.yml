@@ -45,7 +45,10 @@ jobs:
           fi
 
       - name: Build App
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
         run: |
+          xcodebuild -version
           xcodebuild \
             -project boringNotch.xcodeproj \
             -scheme boringNotch \
