@@ -1,3 +1,5 @@
+import AppKit
+import CoreGraphics
 import Foundation
 import Defaults
 @testable import Seven_Island
@@ -508,6 +510,117 @@ func testPlaybackSongIDsTrackTheCurrentRecording() throws {
                 "skips the media session UUID")
 }
 
+@MainActor
+func testScreenshotSelectionUsesBackingPixelsAndSavesPNG() throws {
+    let context = CGContext(data: nil, width: 200, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    let window = CGRect(x: 8, y: 6, width: 60, height: 36)
+    let display = ScreenshotDisplay(frame: CGRect(x: -100, y: 0, width: 100, height: 50),
+                                    image: context.makeImage()!, windowRegions: [window], frontmostWindowRegion: window)
+    expectEqual(display.suggestedRegion(at: CGPoint(x: 20, y: 20)), window, "defaults to the window at the pointer")
+    expectEqual(display.suggestedRegion(at: CGPoint(x: 90, y: 20)), display.bounds, "defaults to the current display outside windows")
+    expectEqual(display.pixel(at: CGPoint(x: 10.4, y: 4.6)), CGPoint(x: 20, y: 9), "samples an exact Retina pixel")
+    expectEqual(display.pixel(at: CGPoint(x: 100, y: 50)), CGPoint(x: 199, y: 99), "clamps pixels at the display edge")
+    expectEqual(display.pixelRect(for: CGRect(x: 10.25, y: 4.5, width: 9, height: 6)),
+                CGRect(x: 20, y: 9, width: 19, height: 12), "includes every selected Retina backing pixel")
+    expectEqual(display.pixelRect(for: CGRect(x: 95, y: 47, width: 20, height: 6)),
+                CGRect(x: 190, y: 94, width: 10, height: 6), "clips selection to the captured display")
+
+    let handles = ScreenshotResizeHandle.all
+    expectEqual(handles.map { $0.position(in: window) }, [
+        CGPoint(x: 8, y: 6), CGPoint(x: 38, y: 6), CGPoint(x: 68, y: 6), CGPoint(x: 68, y: 24),
+        CGPoint(x: 68, y: 42), CGPoint(x: 38, y: 42), CGPoint(x: 8, y: 42), CGPoint(x: 8, y: 24)
+    ], "puts handles at all four corners and four edge midpoints")
+    expectEqual(handles[1].resize(window, by: CGVector(dx: 30, dy: 4), within: display.bounds),
+                CGRect(x: 8, y: 10, width: 60, height: 32), "top handle resizes only vertically")
+    expectEqual(handles[3].resize(window, by: CGVector(dx: 50, dy: 18), within: display.bounds),
+                CGRect(x: 8, y: 6, width: 92, height: 36), "right handle resizes only horizontally and clips to the display")
+    expectEqual(handles[6].resize(window, by: CGVector(dx: -10, dy: 4), within: display.bounds),
+                CGRect(x: 0, y: 6, width: 68, height: 40), "corner handle resizes both axes")
+
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("screenshot-tests-\(UUID())")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let first = folder.appendingPathComponent("first.png")
+    let image = display.image.cropping(to: display.pixelRect(for: CGRect(x: 10, y: 5, width: 20, height: 12)))!
+    let screenshot = CapturedScreenshot(image: image, size: CGSize(width: 20, height: 12))!
+    try screenshot.save(to: first)
+    expectEqual(try Data(contentsOf: first), screenshot.png, "saves the selected PNG bytes")
+}
+
+@MainActor
+func testScreenshotAnnotationOutputAndHistory() {
+    let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    let source = CGContext(data: nil, width: 160, height: 120, bitsPerComponent: 8, bytesPerRow: 0,
+                           space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    source.setFillColor(NSColor.blue.cgColor)
+    source.fill(CGRect(x: 0, y: 60, width: 160, height: 60))
+    source.setFillColor(NSColor.green.cgColor)
+    source.fill(CGRect(x: 0, y: 0, width: 160, height: 60))
+    source.setFillColor(NSColor.white.cgColor)
+    for x in stride(from: 20, to: 120, by: 2) {
+        source.fill(CGRect(x: x, y: 0, width: 1, height: 120))
+    }
+    let display = ScreenshotDisplay(frame: CGRect(x: 240, y: -200, width: 80, height: 60),
+                                    image: source.makeImage()!, windowRegions: [], frontmostWindowRegion: nil)
+    let selection = CGRect(x: 4, y: 4, width: 62, height: 44)
+    let renderer = ScreenshotAnnotationRenderer(display: display)
+    var history = ScreenshotAnnotationHistory()
+    var style = ScreenshotAnnotation.Style()
+    style.color = .red
+
+    func sample(_ image: CGImage, x: Int, y: Int) -> [UInt8] {
+        var rgba = [UInt8](repeating: 0, count: 4)
+        let pixel = image.cropping(to: CGRect(x: x, y: y, width: 1, height: 1))!
+        rgba.withUnsafeMutableBytes { bytes in
+            let context = CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                                    space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        return rgba
+    }
+
+    func render() -> CGImage {
+        renderer.capture(selection, annotations: history.visible)!
+    }
+
+    let unedited = render()
+    expectEqual([unedited.width, unedited.height], [124, 88], "retains 2x crop resolution")
+    let point = CGPoint(x: 18, y: 13)
+    let pencil = ScreenshotAnnotation(tool: .pencil, style: style, points: [point, CGPoint(x: 40, y: 13)])
+    history.append(pencil)
+    let painted = render()
+    let x = 35
+    let y = 18
+    expectEqual(sample(painted, x: x, y: y), [255, 0, 0, 255], "draws at the top-down screenshot coordinates")
+    expectEqual(sample(painted, x: 4, y: 67), sample(unedited, x: 4, y: 67), "keeps background pixels at the crop offset")
+
+    let eraser = ScreenshotAnnotation(tool: .eraser, style: style, points: [CGPoint(x: 22, y: 13)])
+    history.append(eraser)
+    expectEqual(sample(render(), x: x, y: y), sample(unedited, x: x, y: y), "erases annotation without making a hole in the image")
+    history.undo()
+    expectEqual(sample(render(), x: x, y: y), sample(painted, x: x, y: y), "undo restores the erased stroke")
+    history.redo()
+    expectEqual(sample(render(), x: x, y: y), sample(unedited, x: x, y: y), "redo reapplies the eraser")
+    history.undo()
+
+    style.usesArea = true
+    let area = [CGPoint(x: 15, y: 20), CGPoint(x: 45, y: 40)]
+    history.append(ScreenshotAnnotation(tool: .mosaic, style: style, points: area))
+    expectEqual(history.canRedo, false, "a new edit discards the previous redo branch")
+    let mosaic = render()
+    let originalTexture = (40...49).map { sample(unedited, x: $0, y: 41) }
+    let pixelatedTexture = (40...49).map { sample(mosaic, x: $0, y: 41) }
+    expectEqual(Set(pixelatedTexture).count < Set(originalTexture).count || pixelatedTexture != originalTexture,
+                true, "flattens mosaic into the selected area")
+    expectEqual(sample(mosaic, x: 12, y: 40), sample(unedited, x: 12, y: 40), "mosaic leaves adjacent areas intact")
+    history.undo()
+    history.append(ScreenshotAnnotation(tool: .blur, style: style, points: area))
+    let blurred = render()
+    expectEqual(sample(blurred, x: 40, y: 41) != sample(unedited, x: 40, y: 41), true, "flattens gaussian blur")
+    expectEqual(sample(blurred, x: 12, y: 40), sample(unedited, x: 12, y: 40), "blur stays inside its drawn area")
+}
+
 @main
 enum SevenIslandFeatureTestRunner {
     static func main() async {
@@ -538,6 +651,8 @@ enum SevenIslandFeatureTestRunner {
             testNativeDesktopLyricsKeepWordStartAndEndTimes()
             testDesktopLyricsMatchPreviewAndQQMetadataAliases()
             try testPlaybackSongIDsTrackTheCurrentRecording()
+            try testScreenshotSelectionUsesBackingPixelsAndSavesPNG()
+            testScreenshotAnnotationOutputAndHistory()
             print("SevenIslandFeatureTests passed")
         } catch {
             fputs("FAIL: \(error.localizedDescription)\n", stderr)

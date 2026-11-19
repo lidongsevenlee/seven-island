@@ -25,46 +25,14 @@ struct ScreenColorSample: Equatable {
 }
 
 struct ToolboxView: View {
-    private enum Tool: CaseIterable {
-        case colorPicker
-
-        var name: String {
-            switch self {
-            case .colorPicker: "取色器"
-            }
-        }
-    }
-
-    @State private var selectedTool: Tool = .colorPicker
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(Tool.allCases, id: \.self) { tool in
-                        Button {
-                            selectedTool = tool
-                        } label: {
-                            Text(tool.name)
-                                .font(.system(size: 12, weight: .semibold))
-                                .padding(.horizontal, 10)
-                                .frame(height: 28)
-                                .background(
-                                    selectedTool == tool ? sevenIslandHoveredContentBackground : sevenIslandContentBackground,
-                                    in: RoundedRectangle(cornerRadius: 7)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(selectedTool == tool ? .isSelected : [])
-                    }
-                }
-            }
-            .frame(height: 28)
-
-            switch selectedTool {
-            case .colorPicker:
-                ScreenColorPickerView()
-            }
+            Text("取色器")
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(sevenIslandHoveredContentBackground, in: RoundedRectangle(cornerRadius: 7))
+            ScreenColorPickerView()
         }
     }
 }

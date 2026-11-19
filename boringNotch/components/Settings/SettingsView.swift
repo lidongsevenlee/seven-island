@@ -8,6 +8,7 @@
 import ApplicationServices
 import AVFoundation
 import Defaults
+import KeyboardShortcuts
 import LaunchAtLogin
 import Sparkle
 import SwiftUI
@@ -307,6 +308,19 @@ struct GeneralSettings: View {
                     .disabled(showOnAllDisplays)
             } header: {
                 Text("系统功能")
+            }
+
+            Section {
+                KeyboardShortcuts.Recorder("区域截图", name: .captureScreenshot)
+                Button("开始截图") {
+                    ScreenshotTool.shared.startCapture()
+                }
+            } header: {
+                Text("快捷键")
+            } footer: {
+                Text("默认使用 Fn + F1。键盘设为标准功能键时，直接按 F1。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

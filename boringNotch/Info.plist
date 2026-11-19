@@ -6,6 +6,8 @@
 	<string>读取你选定的 Apple Music 缓存目录，以同步歌词时间轴。</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>读取音乐播放器的声音以显示实时频谱，音频在本机即时分析。</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>读取屏幕画面以框选截图，截图可复制、保存或悬浮。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

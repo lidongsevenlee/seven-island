@@ -24,6 +24,8 @@
 		7E1001010000000000000001 /* ClipboardHistoryItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000010000000000000001 /* ClipboardHistoryItem.swift */; };
 		7E1001020000000000000002 /* VSCodeProjectItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000020000000000000002 /* VSCodeProjectItem.swift */; };
 		7E1001040000000000000004 /* ClipboardHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000040000000000000004 /* ClipboardHistoryStore.swift */; };
+		8954922D23234813AB241B93 /* ScreenshotTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F463368277941AFB926D6E9 /* ScreenshotTool.swift */; };
+		4D45DC175FA64776ABD8A734 /* ScreenshotAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439E0F941E6249519EF21250 /* ScreenshotAnnotations.swift */; };
 		7E1001050000000000000005 /* VSCodeRecentProjectsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */; };
 		7E1001060000000000000006 /* AppLauncherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000060000000000000006 /* AppLauncherService.swift */; };
 		7E1001080000000000000008 /* ClipboardHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000080000000000000008 /* ClipboardHistoryView.swift */; };
@@ -32,6 +34,7 @@
 		7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* VSCodeSettingsView.swift */; };
 		7E1001100000000000000010 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MemoView.swift */; };
 		7E1001110000000000000011 /* ToolboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000110000000000000011 /* ToolboxView.swift */; };
+		BDF2306F5FF34A48A17EFF82 /* ScreenshotSelectionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1469A34DDEC4477EBCB7402E /* ScreenshotSelectionPanel.swift */; };
 		7E1001120000000000000012 /* AppLauncherItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000120000000000000012 /* AppLauncherItem.swift */; };
 		7E1001130000000000000013 /* AppLauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* AppLauncherView.swift */; };
 		7E1001140000000000000014 /* AppLauncherSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000140000000000000014 /* AppLauncherSettingsView.swift */; };
@@ -209,6 +212,8 @@
 		7E1000010000000000000001 /* ClipboardHistoryItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryItem.swift; sourceTree = "<group>"; };
 		7E1000020000000000000002 /* VSCodeProjectItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeProjectItem.swift; sourceTree = "<group>"; };
 		7E1000040000000000000004 /* ClipboardHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryStore.swift; sourceTree = "<group>"; };
+		9F463368277941AFB926D6E9 /* ScreenshotTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotTool.swift; sourceTree = "<group>"; };
+		439E0F941E6249519EF21250 /* ScreenshotAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotAnnotations.swift; sourceTree = "<group>"; };
 		7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeRecentProjectsService.swift; sourceTree = "<group>"; };
 		7E1000060000000000000006 /* AppLauncherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherService.swift; sourceTree = "<group>"; };
 		7E1000080000000000000008 /* ClipboardHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardHistoryView.swift; sourceTree = "<group>"; };
@@ -217,6 +222,7 @@
 		7E10000D000000000000000D /* VSCodeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeSettingsView.swift; sourceTree = "<group>"; };
 		7E1000100000000000000010 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
 		7E1000110000000000000011 /* ToolboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxView.swift; sourceTree = "<group>"; };
+		1469A34DDEC4477EBCB7402E /* ScreenshotSelectionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSelectionPanel.swift; sourceTree = "<group>"; };
 		7E1000120000000000000012 /* AppLauncherItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherItem.swift; sourceTree = "<group>"; };
 		7E1000130000000000000013 /* AppLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherView.swift; sourceTree = "<group>"; };
 		7E1000140000000000000014 /* AppLauncherSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherSettingsView.swift; sourceTree = "<group>"; };
@@ -517,6 +523,8 @@
 			isa = PBXGroup;
 			children = (
 				7E1000040000000000000004 /* ClipboardHistoryStore.swift */,
+				9F463368277941AFB926D6E9 /* ScreenshotTool.swift */,
+				439E0F941E6249519EF21250 /* ScreenshotAnnotations.swift */,
 				7E2000020000000000000002 /* MemoStore.swift */,
 				7E1000050000000000000005 /* VSCodeRecentProjectsService.swift */,
 				7E1000060000000000000006 /* AppLauncherService.swift */,
@@ -531,6 +539,7 @@
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
 				7E1000100000000000000010 /* MemoView.swift */,
 				7E1000110000000000000011 /* ToolboxView.swift */,
+				1469A34DDEC4477EBCB7402E /* ScreenshotSelectionPanel.swift */,
 				7E1000130000000000000013 /* AppLauncherView.swift */,
 				7E1000140000000000000014 /* AppLauncherSettingsView.swift */,
 				7E1000150000000000000015 /* SevenIslandLaunchList.swift */,
@@ -932,6 +941,8 @@
 				7E1001010000000000000001 /* ClipboardHistoryItem.swift in Sources */,
 				7E1001020000000000000002 /* VSCodeProjectItem.swift in Sources */,
 				7E1001040000000000000004 /* ClipboardHistoryStore.swift in Sources */,
+				8954922D23234813AB241B93 /* ScreenshotTool.swift in Sources */,
+				4D45DC175FA64776ABD8A734 /* ScreenshotAnnotations.swift in Sources */,
 				7E1001050000000000000005 /* VSCodeRecentProjectsService.swift in Sources */,
 				7E1001060000000000000006 /* AppLauncherService.swift in Sources */,
 				7E1001080000000000000008 /* ClipboardHistoryView.swift in Sources */,
@@ -940,6 +951,7 @@
 				7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */,
 				7E1001100000000000000010 /* MemoView.swift in Sources */,
 				7E1001110000000000000011 /* ToolboxView.swift in Sources */,
+				BDF2306F5FF34A48A17EFF82 /* ScreenshotSelectionPanel.swift in Sources */,
 				7E1001120000000000000012 /* AppLauncherItem.swift in Sources */,
 				7E1001130000000000000013 /* AppLauncherView.swift in Sources */,
 				7E1001140000000000000014 /* AppLauncherSettingsView.swift in Sources */,

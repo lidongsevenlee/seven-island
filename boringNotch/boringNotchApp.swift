@@ -36,6 +36,9 @@ struct DynamicNotchApp: App {
                 }
             }
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
+            Button("区域截图") {
+                ScreenshotTool.shared.startCapture()
+            }
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
             Button("Restart Seven Island") {
@@ -88,6 +91,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func onScreenLocked() {
+        ScreenshotTool.shared.cancelCapture()
         unlockTask?.cancel()
         unlockTask = nil
         isScreenLocked = true
@@ -163,6 +167,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        KeyboardShortcuts.onKeyUp(for: .captureScreenshot) { [weak self] in
+            Task { @MainActor in
+                guard self?.isScreenLocked == false else { return }
+                ScreenshotTool.shared.toggleCapture()
+            }
+        }
+
         refreshNotchWindows()
 
         if coordinator.firstLaunch {
@@ -197,6 +208,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func notchConfigurationDidChange(_ notification: Notification) {
         Task { @MainActor [weak self] in
+            if notification.name == NSApplication.didChangeScreenParametersNotification {
+                ScreenshotTool.shared.cancelCapture()
+            }
             self?.refreshNotchWindows()
         }
     }
