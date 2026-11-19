@@ -21,7 +21,51 @@ enum LyricsResolverTests {
         await testNetEasePreview()
         await testQQRecordingAliases()
         await testAppleMusicEnrichment()
+        testLXMusicLyrics()
         print("LyricsResolverTests passed")
+    }
+
+    private static func testLXMusicLyrics() {
+        let log = Updates()
+        let resolver = LyricsResolver(readers: readers(request: { _ in
+            fail("LX Music lyrics should come from the player snapshot")
+        })) { log.record($0) }
+
+        let json = #"{"status":"playing","name":"月光","singer":"歌手","duration":190,"progress":12.2,"playbackRate":1.25,"lyric":"[00:12.00]月光","lxlyric":"[00:12.00]<100,300>月<450,200>光"}"#
+        let snapshot = try! JSONDecoder().decode(LXMusicController.Snapshot.self, from: Data(json.utf8))
+        var track = snapshot.playback
+        resolver.updatePlayback(track, lyricsEnabled: true)
+        check(track.currentTime == 12.2 && track.playbackRate == 1.25, "uses LX Music's playback clock")
+        let line = log.results.last?.entry
+        check(line?.text == "月光" && line?.quality == 3, "uses matching enhanced lyrics")
+        check(line?.characterTimings.first?.first == .init(start: 12.1, end: 12.4),
+              "converts word offsets to absolute playback time")
+
+        track.title = "潮汐"
+        track.lxMusicLyrics = LXMusicLyrics(lrc: "[00:12.00]潮汐", wordTimed: track.lxMusicLyrics?.wordTimed)
+        resolver.updatePlayback(track, lyricsEnabled: true)
+        check(log.results.last?.entry.text == "潮汐" && log.results.last?.entry.quality == 2,
+              "uses new LRC while LX Music replaces the previous track's enhanced lyrics")
+
+        track.lxMusicLyrics = LXMusicLyrics(lrc: "[00:12.00]潮汐", wordTimed: "[00:12.00]<0,200>潮<200,300>汐")
+        resolver.updatePlayback(track, lyricsEnabled: true)
+        check(log.results.last?.entry.text == "潮汐" && log.results.last?.entry.quality == 3,
+              "upgrades the same track when enhanced lyrics arrive")
+
+        track.currentTime += 1
+        resolver.updatePlayback(track, lyricsEnabled: true)
+        check(log.results.count == 3, "keeps the timeline stable while playback progresses")
+
+        track.title = "纯音乐"
+        track.lxMusicLyrics = LXMusicLyrics(lrc: "", wordTimed: track.lxMusicLyrics?.wordTimed)
+        resolver.updatePlayback(track, lyricsEnabled: true)
+        check(log.clears == 3, "clears lyrics for an instrumental even when the desktop app has stale enhanced lyrics")
+
+        let lrc = "[offset:1500]\n[00:12.00]月光"
+        let lineOnly = LXMusicLyrics(lrc: lrc, wordTimed: nil).timeline
+        let enhanced = LXMusicLyrics(lrc: lrc, wordTimed: "[00:12.00]<0,300>月<300,200>光").timeline
+        check(lineOnly?.lines.first?.time == 10.5 && enhanced?.characterTimings.first?.first?.start == 10.5,
+              "applies the LX Music lyric offset to line and word timing")
     }
 
     private static func testDesktopResultsAndCache() async {

@@ -126,6 +126,8 @@ extension MediaControllerType {
             return "直接连接到 Apple Music 应用。"
         case .neteaseMusic, .qqMusic:
             return "在这个播放器中开始播放后，Seven Island 会显示曲目与播放控制。"
+        case .lxMusic:
+            return "在 LX Music 的设置中启用「开放 API 服务」（端口 23330），即可同步播放进度和歌词。"
         case .youtubeMusic:
             return "需要启用 API 插件的第三方客户端。"
         }

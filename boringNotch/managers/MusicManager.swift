@@ -136,6 +136,8 @@ class MusicManager: ObservableObject {
             }
         case .appleMusic:
             newController = AppleMusicController()
+        case .lxMusic:
+            newController = LXMusicController()
         case .spotify:
             newController = SpotifyController()
         case .youtubeMusic:

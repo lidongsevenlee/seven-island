@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		7E300104000000000000000B /* WebLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E300004000000000000000B /* WebLyrics.swift */; };
+		E0204A95BE594460A4B50B3A /* LXMusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753D40D626A541A9A5415E3B /* LXMusicController.swift */; };
 		7E300104000000000000000A /* LyricsResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E300004000000000000000A /* LyricsResolver.swift */; };
 		7E3001040000000000000004 /* AppleMusicAccessibilityLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */; };
 		7E3001040000000000000006 /* PlayerLyricsCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E3000040000000000000006 /* PlayerLyricsCatalog.swift */; };
@@ -193,6 +194,7 @@
 /* Begin PBXFileReference section */
 		7E300004000000000000000B /* WebLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebLyrics.swift; sourceTree = "<group>"; };
 		7E300004000000000000000A /* LyricsResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsResolver.swift; sourceTree = "<group>"; };
+		753D40D626A541A9A5415E3B /* LXMusicController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LXMusicController.swift; sourceTree = "<group>"; };
 		7E3000040000000000000004 /* AppleMusicAccessibilityLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicAccessibilityLyrics.swift; sourceTree = "<group>"; };
 		7E3000040000000000000006 /* PlayerLyricsCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLyricsCatalog.swift; sourceTree = "<group>"; };
 		7E3000040000000000000007 /* DesktopLyricsCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopLyricsCache.swift; sourceTree = "<group>"; };
@@ -403,6 +405,7 @@
 				1132E5232E78D6DA0068732D /* YouTube Music Controller */,
 				1153BD8D2D986B1F00979FB0 /* MediaControllerProtocol.swift */,
 				1153BD922D986E4300979FB0 /* AppleMusicController.swift */,
+				753D40D626A541A9A5415E3B /* LXMusicController.swift */,
 				1153BD992D98824300979FB0 /* SpotifyController.swift */,
 				1153BD9B2D98853B00979FB0 /* NowPlayingController.swift */,
 			);
@@ -1009,6 +1012,7 @@
 				1443E7F32C609DCE0027C1FC /* matters.swift in Sources */,
 				11C5E3162DFE88510065821E /* SettingsView.swift in Sources */,
 				1153BD932D986E4300979FB0 /* AppleMusicController.swift in Sources */,
+				E0204A95BE594460A4B50B3A /* LXMusicController.swift in Sources */,
 				11C5E3132DFE85970065821E /* SettingsWindowController.swift in Sources */,
 				11CFC6652E09C7B300748C80 /* OnboardingFinishView.swift in Sources */,
 				507266DB2C908E2E00A2D00D /* HoverButton.swift in Sources */,

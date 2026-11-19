@@ -172,11 +172,17 @@ final class LyricsResolver {
 
         let metadataChanged = state.title != previous?.title || state.artist != previous?.artist
             || state.album != previous?.album || state.bundleIdentifier != previous?.bundleIdentifier
+        if let lyrics = state.lxMusicLyrics {
+            if enabledChanged || metadataChanged || state.lxMusicLyrics != previous?.lxMusicLyrics {
+                displayLXMusicLyrics(lyrics)
+            }
+            return nil
+        }
         let artworkChanged = state.artwork != nil && state.artwork != previous?.artwork
         let desktopChanged = PlayerLyricsCatalog.Source(bundleIdentifier: state.bundleIdentifier) != nil
             && (state.duration != previous?.duration || state.lyricsSongID != previous?.lyricsSongID
                 || (state.isPlaying && previous?.isPlaying != true && result == nil))
-        guard enabledChanged || metadataChanged || artworkChanged || desktopChanged else { return nil }
+        guard enabledChanged || metadataChanged || artworkChanged || desktopChanged || previous?.lxMusicLyrics != nil else { return nil }
         return start(state, force: enabledChanged)
     }
 
@@ -185,6 +191,10 @@ final class LyricsResolver {
         enabled = lyricsEnabled
         guard lyricsEnabled, let playback, !playback.title.isEmpty else {
             reset()
+            return nil
+        }
+        if let lyrics = playback.lxMusicLyrics {
+            displayLXMusicLyrics(lyrics)
             return nil
         }
         return start(playback, force: true)
@@ -205,6 +215,14 @@ final class LyricsResolver {
             result = nil
             publish(nil)
         }
+    }
+
+    private func displayLXMusicLyrics(_ lyrics: LXMusicLyrics) {
+        reset()
+        guard let entry = lyrics.timeline else { return }
+        let result = Result(entry: entry, source: .desktopPlayer)
+        self.result = result
+        publish(result)
     }
 
     private func start(_ state: PlaybackState, force: Bool) -> Task<Void, Never>? {

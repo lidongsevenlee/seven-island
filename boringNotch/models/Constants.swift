@@ -47,6 +47,7 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     case appleMusic = "Apple Music"
     case neteaseMusic = "网易云音乐"
     case qqMusic = "QQ 音乐"
+    case lxMusic = "LX Music"
     case spotify = "Spotify"
     case youtubeMusic = "YouTube Music"
     

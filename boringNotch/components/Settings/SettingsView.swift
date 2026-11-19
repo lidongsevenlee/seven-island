@@ -655,7 +655,11 @@ struct Media: View {
             } header: {
                 Text("音乐源")
             } footer: {
-                if MusicManager.shared.isNowPlayingDeprecated {
+                if mediaController == .lxMusic {
+                    Text(mediaController.description)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                } else if MusicManager.shared.isNowPlayingDeprecated {
                     HStack {
                         Text("YouTube Music 需要安装此第三方应用：")
                             .foregroundStyle(.secondary)

@@ -170,12 +170,12 @@ enum DesktopPlayerLyrics {
         return .init(text: lines.map(\.text).joined(separator: "\n"), lines: lines, characterTimings: result.map(\.1))
     }
 
-    static func lrcTimeline(_ lyric: String) -> DesktopLyricsCache.Entry? {
+    static func lrcTimeline(_ lyric: String, offset: Double = 0) -> DesktopLyricsCache.Entry? {
         let parsed = LyricsDisplayText.parseSyncedLyrics(lyric.trimmingCharacters(in: CharacterSet(charactersIn: "\u{FEFF}")))
-        let lines = parsed.lines.map { DesktopLyricsCache.Entry.Line(time: $0.time, text: $0.text) }
+        let lines = parsed.lines.map { DesktopLyricsCache.Entry.Line(time: max(0, $0.time - offset), text: $0.text) }
         guard !lines.isEmpty else { return nil }
         return .init(text: lines.map(\.text).joined(separator: "\n"), lines: lines,
-                     characterTimings: parsed.characterTimes.map { $0.map { .init(start: $0) } })
+                     characterTimings: parsed.characterTimes.map { $0.map { .init(start: $0 - offset) } })
     }
 
     private static func fitsPlayback(_ entry: DesktopLyricsCache.Entry, duration: Double) -> Bool {

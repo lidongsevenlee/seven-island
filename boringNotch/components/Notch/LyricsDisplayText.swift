@@ -23,6 +23,60 @@ enum LyricsDisplayText {
         }
     }
 
+    private static let lxWordTiming = try! NSRegularExpression(pattern: #"<(\d+),(\d+)>"#)
+
+    static func lxMusicOffset(_ lyric: String) -> Double? {
+        for line in lyric.split(whereSeparator: \.isNewline) {
+            let row = line.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\u{FEFF}")))
+            if row.lowercased().hasPrefix("[offset:"), row.hasSuffix("]"),
+               let milliseconds = Int(row.dropFirst(8).dropLast()) {
+                return Double(milliseconds) / 1000
+            }
+        }
+        return nil
+    }
+
+    static func lxMusicTimeline(_ lyric: String, offset: Double) -> DesktopLyricsCache.Entry? {
+        let rows = lyric.trimmingCharacters(in: CharacterSet(charactersIn: "\u{FEFF}")).split(whereSeparator: \.isNewline)
+        var entries: [(line: DesktopLyricsCache.Entry.Line, timings: [CharacterTiming])] = []
+
+        for row in rows {
+            guard row.first == "[", let close = row.firstIndex(of: "]"),
+                  let timestamp = timestampValue(from: String(row[row.index(after: row.startIndex)..<close])),
+                  timestamp.isFinite else { continue }
+
+            let lineStart = timestamp - offset
+            let body = String(row[row.index(after: close)...])
+            let matches = lxWordTiming.matches(in: body, range: NSRange(body.startIndex..., in: body))
+            var text = ""
+            var timings: [CharacterTiming] = []
+
+            for (index, match) in matches.enumerated() {
+                guard let marker = Range(match.range, in: body),
+                      let relative = Range(match.range(at: 1), in: body).flatMap({ Double(body[$0]) }),
+                      let length = Range(match.range(at: 2), in: body).flatMap({ Double(body[$0]) }),
+                      (relative + length).isFinite else { continue }
+                let next = index + 1 < matches.count ? Range(matches[index + 1].range, in: body)?.lowerBound : nil
+                let word = body[marker.upperBound..<(next ?? body.endIndex)]
+                let start = lineStart + relative / 1000
+                let step = length / 1000 / Double(max(word.count, 1))
+                text += word
+                timings.append(contentsOf: word.indices.enumerated().map { index, _ in
+                    .init(start: start + Double(index) * step, end: start + Double(index + 1) * step)
+                })
+            }
+
+            if matches.isEmpty { text = body.trimmingCharacters(in: .whitespaces) }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            entries.append((.init(time: max(0, lineStart), text: text), timings))
+        }
+
+        guard entries.contains(where: { !$0.timings.isEmpty }) else { return nil }
+        entries.sort { $0.line.time < $1.line.time }
+        return .init(text: entries.map(\.line.text).joined(separator: "\n"), lines: entries.map(\.line),
+                     characterTimings: entries.map(\.timings))
+    }
+
     static func parseSyncedLyrics(_ lrc: String) -> (lines: [SyncedLine], characterTimes: [[Double]]) {
         var parsedLines: [SyncedLine] = []
         var parsedCharacterTimes: [[Double]] = []
