@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录和屏幕取色。">
+  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录、应用启动、屏幕取色和截图标注。">
   <meta name="theme-color" content="#fbfbfb">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island">
   <meta property="og:description" content="Seven Island 的原生界面操作录屏与 macOS 下载。">
   <meta property="og:url" content="https://lidongsevenlee.github.io/seven-island/">
-  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-showcase.jpg">
+  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-200.jpg">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=toolbox-153">
+  <link rel="stylesheet" href="styles.css?v=200">
   <script src="demo.js?v=expand" defer></script>
   <title>Seven Island</title>
 </head>
@@ -29,19 +29,22 @@
           <div class="capture-frame">
             <div class="capture-viewport">
               <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
-                <video muted playsinline preload="none" poster="assets/seven-island-music-expand.jpg" data-src="assets/seven-island-music-expand.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-music-200.jpg" data-src="assets/seven-island-music-200.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
               </div>
               <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-153.jpg" data-src="assets/seven-island-clipboard-153.mp4" aria-label="剪贴板录屏。展开刘海后依次筛选文本、图片和文件，再搜索文件名。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-200.jpg" data-src="assets/seven-island-clipboard-200.mp4" aria-label="剪贴板录屏。展开刘海后依次筛选文本、图片和文件，再搜索文件名。"></video>
               </div>
               <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-vscode-expand.jpg" data-src="assets/seven-island-vscode-expand.mp4" aria-label="VS Code 录屏。展开刘海后输入 Orbit，定位 OrbitApp 项目。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-vscode-200.jpg" data-src="assets/seven-island-vscode-200.mp4" aria-label="VS Code 录屏。从折叠态展开，搜索 Island Demo，点击条目后在 VS Code 打开项目。"></video>
               </div>
               <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-memo-expand.jpg" data-src="assets/seven-island-memo-expand.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-memo-200.jpg" data-src="assets/seven-island-memo-200.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
+              </div>
+              <div id="panel-launcher" role="tabpanel" aria-labelledby="tab-launcher" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-launcher-200.jpg" data-src="assets/seven-island-launcher-200.mp4" aria-label="应用启动器录屏。从折叠态展开，搜索 Focus Timer 并打开示例应用。"></video>
               </div>
               <div id="panel-toolbox" role="tabpanel" aria-labelledby="tab-toolbox" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-toolbox-153.jpg" data-src="assets/seven-island-toolbox-153.mp4" aria-label="工具集录屏。展开刘海并打开工具集，使用取色器在屏幕上选色，查看自动复制的 HEX 和对应的 RGB。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-toolbox-200.jpg" data-src="assets/seven-island-toolbox-200.mp4" aria-label="工具集录屏。展开刘海并打开工具集，从折叠态展开工具集，查看取色结果和截图标注效果。"></video>
               </div>
             </div>
           </div>
@@ -54,6 +57,7 @@
           <button id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
           <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
           <button id="tab-memo" type="button" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
+          <button id="tab-launcher" type="button" role="tab" aria-selected="false" aria-controls="panel-launcher" tabindex="-1">应用启动器</button>
           <button id="tab-toolbox" type="button" role="tab" aria-selected="false" aria-controls="panel-toolbox" tabindex="-1">工具集</button>
         </div>
         <button id="motion-toggle" class="motion-toggle" type="button" aria-label="播放录屏" title="播放录屏">
@@ -88,9 +92,14 @@
           <p>用标签切换多份备忘录，编辑内容自动保存在本机。</p>
         </li>
         <li>
+          <div class="capability-icon launcher-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3>应用启动器</h3>
+          <p>搜索并打开应用程序，也可在设置中添加扫描目录。</p>
+        </li>
+        <li>
           <div class="capability-icon toolbox-icon" aria-hidden="true"></div>
           <h3>工具集</h3>
-          <p>用取色器在屏幕上选色，自动复制 HEX，也可查看 RGB。</p>
+          <p>屏幕取色自动复制 HEX。按 Fn + F1 截图，支持标注、复制、保存和悬浮。</p>
         </li>
       </ul>
     </section>
@@ -101,6 +110,10 @@
         <div>
           <dt>系统版本</dt>
           <dd>macOS 14 Sonoma 及以上。</dd>
+        </div>
+        <div>
+          <dt>截图</dt>
+          <dd>在「隐私与安全性」中允许屏幕录制。</dd>
         </div>
         <div>
           <dt>实时频谱</dt>

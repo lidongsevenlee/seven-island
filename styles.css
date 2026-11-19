@@ -148,7 +148,7 @@ button { font: inherit; cursor: pointer; }
 }
 .capture-tabs {
   --active-index: 0;
-  --tab-count: 5;
+  --tab-count: 6;
   max-width: 100%;
   position: relative;
   isolation: isolate;
@@ -211,7 +211,7 @@ button { font: inherit; cursor: pointer; }
 }
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 24px;
   margin: 52px 0 0;
   padding: 0;
@@ -347,4 +347,10 @@ button { font: inherit; cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; }
+}
+
+@media (max-width: 480px) {
+  .capture-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; border-radius: 18px; }
+  .capture-tabs::before { display: none; }
+  .capture-tabs button[aria-selected="true"] { background: var(--paper); }
 }
