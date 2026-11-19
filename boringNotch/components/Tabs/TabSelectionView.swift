@@ -8,12 +8,13 @@
 import SwiftUI
 
 struct TabModel: Identifiable {
-    let id = UUID()
     let label: String
     let view: NotchViews
+
+    var id: NotchViews { view }
 }
 
-let tabs = [
+private let mainTabs = [
     TabModel(label: "音乐", view: .music),
     TabModel(label: "剪贴板", view: .clipboard),
     TabModel(label: "VS Code", view: .vscodeProjects),
@@ -21,6 +22,7 @@ let tabs = [
 ]
 
 struct TabSelectionView: View {
+    var tabs: [TabModel] = mainTabs
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Namespace var animation
     @State private var hoveredTab: NotchViews? = nil
@@ -34,24 +36,24 @@ struct TabSelectionView: View {
                         coordinator.currentView = tab.view
                     }
                 } label: {
-                    ZStack {
-                        if isSelected {
-                            Capsule()
-                                .fill(Color(nsColor: .secondarySystemFill))
-                                .matchedGeometryEffect(id: "selectedTabCapsule", in: animation)
-                        } else if hoveredTab == tab.view {
-                            Capsule()
-                                .fill(Color(nsColor: .secondarySystemFill))
+                    iconView(for: tab.view, isSelected: isSelected)
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(width: 32, height: 26)
+                        .background {
+                            if isSelected {
+                                Capsule()
+                                    .fill(Color(nsColor: .secondarySystemFill))
+                                    .matchedGeometryEffect(id: "selectedTabCapsule", in: animation)
+                            } else if hoveredTab == tab.view {
+                                Capsule()
+                                    .fill(Color(nsColor: .secondarySystemFill))
+                            }
                         }
-
-                        iconView(for: tab.view, isSelected: isSelected)
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(width: 32, height: 26)
-                    }
-                    .frame(width: 32, height: 26)
-                    .contentShape(Capsule())
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(tab.label)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
                 .help(tab.label)
                 .zIndex(isSelected ? 1 : 0)
                 .onHover { hovering in
@@ -59,8 +61,6 @@ struct TabSelectionView: View {
                 }
             }
         }
-        .padding(.leading, 2)
-        .padding(.trailing, 12)
         .clipShape(Capsule())
     }
 
@@ -86,6 +86,9 @@ struct TabSelectionView: View {
                 .offset(y: -0.15)
         case .memo:
             Image(systemName: "note.text")
+                .foregroundStyle(color)
+        case .toolbox:
+            Image(systemName: "cube")
                 .foregroundStyle(color)
         }
     }

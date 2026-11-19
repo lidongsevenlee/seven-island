@@ -6,6 +6,7 @@ final class NotchInteraction {
         var isPinnedOpen = false
         var isTextInputFocused = false
         var isBatteryPopoverActive = false
+        var isSamplingScreenColor = false
     }
 
     typealias Schedule = @MainActor (Duration, @escaping @MainActor () -> Void) -> Task<Void, Never>
@@ -18,7 +19,7 @@ final class NotchInteraction {
     private var hoverTask: Task<Void, Never>?
     private var shortcutTask: Task<Void, Never>?
     private var shortcutCloseDeferredForFocus = false
-    private var awaitingPointerEntryAfterMove = false
+    private var awaitingPointerEntry = false
 
     private(set) var state = State() {
         didSet {
@@ -52,9 +53,10 @@ final class NotchInteraction {
     }
 
     func hoverChanged(_ hovering: Bool) {
-        if awaitingPointerEntryAfterMove {
+        guard !state.isSamplingScreenColor else { return }
+        if awaitingPointerEntry {
             guard hovering, pointerIsInside() else { return }
-            awaitingPointerEntryAfterMove = false
+            awaitingPointerEntry = false
         }
         cancelHoverTransition()
         if hovering {
@@ -72,10 +74,24 @@ final class NotchInteraction {
     }
 
     func panelMoved() {
+        resetPointerTracking()
+    }
+
+    func setScreenColorSampling(_ sampling: Bool) {
+        guard state.notchState == .open, state.isSamplingScreenColor != sampling else { return }
+        if sampling {
+            cancelPendingTransitions()
+        }
+        state.isSamplingScreenColor = sampling
+        if !sampling {
+            resetPointerTracking()
+        }
+    }
+
+    private func resetPointerTracking() {
         cancelHoverTransition()
         let inside = pointerIsInside()
-        // AppKit can report a hover exit when the window moves away from the pointer.
-        awaitingPointerEntryAfterMove = state.notchState == .open && !inside
+        awaitingPointerEntry = state.notchState == .open && !inside
         state.isHovering = inside
     }
 
@@ -133,7 +149,7 @@ final class NotchInteraction {
 
     func close() {
         cancelPendingTransitions()
-        awaitingPointerEntryAfterMove = false
+        awaitingPointerEntry = false
         state = State()
     }
 
@@ -162,6 +178,7 @@ final class NotchInteraction {
         // Typing can cause SwiftUI to report a hover exit while the pointer is still inside.
         let inside = pointerIsInside()
         if !inside && state.notchState == .open && !state.isPinnedOpen && !state.isBatteryPopoverActive
+            && !state.isSamplingScreenColor
             && (!respectingTextFocus || !state.isTextInputFocused) {
             close()
         } else {

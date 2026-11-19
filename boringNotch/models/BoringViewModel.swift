@@ -58,7 +58,12 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
     @Published var clipboardSearchText: String = ""
+    @Published var clipboardFilter: ClipboardHistoryItem.Kind?
     @Published var vscodeSearchText: String = ""
+    @Published private(set) var screenColorSample: ScreenColorSample?
+    private var screenColorSampler: NSColorSampler?
+
+    var isSamplingScreenColor: Bool { interactionState.isSamplingScreenColor }
 
     @Published private(set) var display: NotchDisplay?
     @Published private var openHeight = openNotchSize.height
@@ -230,6 +235,26 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func hoverChanged(_ hovering: Bool) {
         interaction.hoverChanged(hovering)
+    }
+
+    func pickScreenColor() {
+        guard notchState == .open, screenColorSampler == nil else { return }
+        let sampler = NSColorSampler()
+        screenColorSampler = sampler
+        interaction.setScreenColorSampling(true)
+        sampler.show { [weak self] color in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let color, let sample = ScreenColorSample(color) {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(sample.hex, forType: .string)
+                    self.screenColorSample = sample
+                }
+                self.screenColorSampler = nil
+                self.interaction.setScreenColorSampling(false)
+            }
+        }
     }
 
     func cancelPanelTimers() {

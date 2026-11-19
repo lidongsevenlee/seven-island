@@ -307,6 +307,8 @@ struct ContentView: View {
                         VSCodeProjectsView()
                     case .memo:
                         MemoView()
+                    case .toolbox:
+                        ToolboxView()
                     }
                 }
                 .padding(.horizontal, coordinator.currentView == .music ? 0 : sevenIslandContentInset)

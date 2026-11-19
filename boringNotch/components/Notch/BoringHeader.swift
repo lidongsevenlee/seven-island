@@ -18,6 +18,8 @@ struct BoringHeader: View {
             HStack {
                 if coordinator.alwaysShowTabs {
                     TabSelectionView()
+                        .padding(.leading, 2)
+                        .padding(.trailing, 12)
                 } else if vm.notchState == .open {
                     EmptyView()
                 }
@@ -38,6 +40,9 @@ struct BoringHeader: View {
 
             HStack(spacing: 4) {
                 if vm.notchState == .open {
+                    if coordinator.alwaysShowTabs {
+                        TabSelectionView(tabs: [TabModel(label: "工具集", view: .toolbox)])
+                    }
                     if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                             .transition(.scale(scale: 0.8).combined(with: .opacity))
@@ -74,9 +79,17 @@ struct BoringHeader: View {
                                             .aspectRatio(contentMode: .fit)
                                             .frame(width: 16, height: 16)
                                             .opacity(isSettingsHovered ? 0.98 : 0.82)
+                                            .overlay(alignment: .bottomTrailing) {
+                                                Image(systemName: "gearshape.fill")
+                                                    .font(.system(size: 6, weight: .semibold))
+                                                    .foregroundStyle(.white)
+                                                    .frame(width: 8, height: 8)
+                                                    .background(.black, in: Circle())
+                                            }
                                     }
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .accessibilityLabel("设置")
                             .onHover { hovering in
                                 isSettingsHovered = hovering
                             }

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 @testable import Seven_Island
 
 @main
@@ -8,6 +8,8 @@ enum NotchSearchInteractionTests {
         testHoverOpensAfterDwell()
         testHoverExitUsesPointerLocation()
         testWindowMovePreservesExpansion()
+        testScreenColorSamplingPreservesExpansion()
+        testScreenColorFormats()
         testShortcutTimeoutUsesPointerLocation()
         testShortcutTimeoutWaitsForBlur()
         testPinControlsDismissal()
@@ -104,6 +106,34 @@ enum NotchSearchInteractionTests {
         panel.interaction.hoverChanged(false)
         panel.clock.advance(.milliseconds(100))
         expect(panel.isClosed, "hover dismissal resumes after entering the moved panel")
+    }
+
+    private static func testScreenColorSamplingPreservesExpansion() {
+        let panel = Panel()
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setScreenColorSampling(true)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "sampling keeps the panel open past pointer exit and shortcut timeout")
+
+        panel.interaction.setScreenColorSampling(false)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "sampling leaves the result visible outside the panel")
+
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover dismissal resumes after entering the panel")
+    }
+
+    private static func testScreenColorFormats() {
+        let color = NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1)
+        let sample = ScreenColorSample(color)
+        expect(sample?.hex == "#FF8000", "formats a sampled color as six-digit sRGB HEX")
+        expect(sample?.rgb == "rgb(255, 128, 0)", "formats a sampled color as sRGB byte values")
     }
 
     private static func testShortcutTimeoutWaitsForBlur() {

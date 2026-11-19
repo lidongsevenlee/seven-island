@@ -48,7 +48,11 @@ final class ClipboardHistoryStore: ObservableObject {
 
     func copyToPasteboard(_ item: ClipboardHistoryItem) {
         pasteboard.clearContents()
-        if let imageData = item.imageData {
+        if let fileURLs = item.fileURLs, !fileURLs.isEmpty {
+            if pasteboard.writeObjects(fileURLs.map { $0 as NSURL }) {
+                items = Self.nextItems(insertingFileURLs: fileURLs, into: items, limit: maxItemCount)
+            }
+        } else if let imageData = item.imageData {
             pasteboard.setData(imageData, forType: .png)
             items = Self.nextItems(insertingImageData: imageData, into: items, limit: maxItemCount)
         } else if let text = item.content {
@@ -99,6 +103,23 @@ final class ClipboardHistoryStore: ObservableObject {
     }
 
     static func nextItems(
+        insertingFileURLs input: [URL],
+        into currentItems: [ClipboardHistoryItem],
+        limit: Int
+    ) -> [ClipboardHistoryItem] {
+        var seen = Set<URL>()
+        let files = input.filter(\.isFileURL).map(\.standardizedFileURL).filter { seen.insert($0).inserted }
+        guard !files.isEmpty else { return currentItems }
+
+        var next = currentItems.filter { item in
+            guard let existingFiles = item.fileURLs else { return true }
+            return Set(existingFiles) != seen
+        }
+        next.insert(ClipboardHistoryItem(fileURLs: files), at: 0)
+        return Array(next.prefix(max(1, limit)))
+    }
+
+    static func nextItems(
         insertingImageData data: Data,
         into currentItems: [ClipboardHistoryItem],
         limit: Int
@@ -145,10 +166,18 @@ final class ClipboardHistoryStore: ObservableObject {
         guard pasteboard.changeCount != lastChangeCount else { return }
         lastChangeCount = pasteboard.changeCount
 
-        if let string = pasteboard.string(forType: .string) {
-            record(string)
+        if pasteboard.types?.contains(.fileURL) == true,
+           let files = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           !files.isEmpty {
+            items = Self.nextItems(insertingFileURLs: files, into: items, limit: maxItemCount)
+            scheduleSave()
+        } else if let pngData = pasteboard.data(forType: .png) {
+            items = Self.nextItems(insertingImageData: pngData, into: items, limit: maxItemCount)
+            scheduleSave()
         } else if let tiffData = pasteboard.data(forType: .tiff) {
             recordImage(from: tiffData)
+        } else if let string = pasteboard.string(forType: .string) {
+            record(string)
         }
     }
 

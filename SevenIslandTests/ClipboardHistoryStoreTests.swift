@@ -9,6 +9,8 @@ enum ClipboardHistoryStoreTests {
         try testCopyingExistingTextPromotesAndPersistsIt()
         try testCopyingExistingImagePromotesIt()
         try testRecordingExistingTextPromotesIt()
+        try testFileURLsAreCapturedCopiedAndPersisted()
+        try testPNGIsCapturedAsImage()
         testHistoryLimitAndSensitiveTextFiltering()
         guard failures == 0 else { exit(1) }
         print("ClipboardHistoryStoreTests passed")
@@ -80,6 +82,67 @@ enum ClipboardHistoryStoreTests {
         expect(limited.compactMap(\.content) == ["first", "second"], "respects the history limit")
         let filtered = ClipboardHistoryStore.nextItems(inserting: "sk-proj-example", into: items, limit: 2)
         expect(filtered == items, "retains sensitive text filtering")
+    }
+
+    private static func testFileURLsAreCapturedCopiedAndPersisted() throws {
+        let folder = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let url = folder.appendingPathComponent("history.json")
+        let files = [
+            folder.appendingPathComponent("report.pdf"),
+            folder.appendingPathComponent("photo.png"),
+        ]
+        let store = ClipboardHistoryStore(pasteboard: pasteboard, persistenceURL: url)
+        store.record("file:///copied-as-text.txt")
+        expect(store.items.first?.kind == .text, "file paths copied as text stay in the text category")
+
+        pasteboard.clearContents()
+        pasteboard.writeObjects(files.map { $0 as NSURL })
+        waitForPasteboard { store.items.first?.kind == .files }
+        guard let item = store.items.first, item.kind == .files else {
+            expect(false, "captures Finder-style file URLs as a file entry")
+            return
+        }
+        expect(item.fileURLs == files.map(\.standardizedFileURL), "captures all copied file URLs")
+        expect(item.matches("PHOTO.png"), "file searches match names case-insensitively")
+        expect(item.preview == "report.pdf、photo.png", "shows the names in a multiple-file selection")
+
+        store.record("newer text")
+        store.copyToPasteboard(item)
+        expect(store.items.first?.kind == .files, "copying a file entry promotes it")
+        let copied = pasteboard.readObjects(
+            forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL]
+        expect(copied == item.fileURLs, "copies native file URLs for pasting back into Finder")
+        let saved = waitForSavedItems(store.items, at: url)
+        expect(saved.first?.fileURLs == item.fileURLs, "persists the file references")
+
+        let reverseOrder = ClipboardHistoryStore.nextItems(
+            insertingFileURLs: files.reversed(), into: store.items, limit: 100
+        )
+        expect(reverseOrder.filter { $0.kind == .files }.count == 1, "deduplicates the same file selection across ordering")
+    }
+
+    private static func testPNGIsCapturedAsImage() throws {
+        let folder = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let store = ClipboardHistoryStore(pasteboard: pasteboard, persistenceURL: folder.appendingPathComponent("history.json"))
+        let pngData = Data([0x89, 0x50, 0x4E, 0x47])
+        pasteboard.clearContents()
+        pasteboard.setData(pngData, forType: .png)
+        waitForPasteboard { store.items.first?.kind == .image }
+        expect(store.items.first?.imageData == pngData, "captures a pasteboard item that supplies PNG")
+    }
+
+    private static func waitForPasteboard(_ condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(2)
+        while !condition() && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
     }
 
     private static func makeTemporaryDirectory() throws -> URL {
