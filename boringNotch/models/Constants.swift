@@ -197,6 +197,7 @@ extension Defaults.Keys {
     static let vscodePinnedFolders = Key<[URL]>("vscodePinnedFolders", default: [])
     static let vscodeIncludeHidden = Key<Bool>("vscodeIncludeHidden", default: false)
     static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
+    static let appLauncherExtraDirectories = Key<[URL]>("appLauncherExtraDirectories", default: [])
 
     // MARK: Memo
     static let memoText = Key<String>("sevenIslandMemoText", default: "")

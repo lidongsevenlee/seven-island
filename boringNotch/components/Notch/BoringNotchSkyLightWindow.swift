@@ -122,6 +122,7 @@ extension BoringNotchSkyLightWindow: NotchPanelWindow {
             backing: .buffered,
             defer: false
         )
+        viewModel.panelWindow = self
         contentView = NSHostingView(rootView: ContentView().environmentObject(viewModel))
     }
 

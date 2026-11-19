@@ -41,6 +41,15 @@ class BoringViewModel: NSObject, ObservableObject {
         set { interaction.setTextInputFocused(newValue) }
     }
 
+    weak var panelWindow: NSWindow?
+    private var didMakePanelKeyForTextInput = false
+
+    func makePanelKeyForTextInput() {
+        guard notchState == .open, let panelWindow, panelWindow.isVisible, !panelWindow.isKeyWindow else { return }
+        panelWindow.makeKey()
+        didMakePanelKeyForTextInput = panelWindow.isKeyWindow
+    }
+
     private lazy var interaction = NotchInteraction(
         pointerIsInside: { [weak self] in self?.isMouseHovering() ?? false },
         hoverOpenDelay: { [weak self] in
@@ -60,6 +69,7 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var clipboardSearchText: String = ""
     @Published var clipboardFilter: ClipboardHistoryItem.Kind?
     @Published var vscodeSearchText: String = ""
+    @Published var appLauncherSearchText: String = ""
     @Published private(set) var screenColorSample: ScreenColorSample?
     private var screenColorSampler: NSColorSampler?
 
@@ -293,9 +303,21 @@ class BoringViewModel: NSObject, ObservableObject {
             }
         }
         interactionState = state
-        if visibilityChanged && state.notchState == .open {
+        guard visibilityChanged else { return }
+        if state.notchState == .open {
             MusicManager.shared.forceUpdate()
+        } else {
+            releasePanelKeyForTextInput()
         }
+    }
+
+    private func releasePanelKeyForTextInput() {
+        guard didMakePanelKeyForTextInput else { return }
+        didMakePanelKeyForTextInput = false
+        guard let panelWindow, panelWindow.isKeyWindow else { return }
+        panelWindow.makeFirstResponder(nil)
+        panelWindow.orderOut(nil)
+        panelWindow.orderFrontRegardless()
     }
 
     private func applyClosedEffects() {

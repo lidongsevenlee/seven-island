@@ -90,6 +90,52 @@ func testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly() throws {
     expectEqual(projects.first?.name, "Alpha", "uses folder name as display name")
 }
 
+func testAppLauncherScansMultipleDirectories() throws {
+    let files = FileManager.default
+    let root = files.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try files.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? files.removeItem(at: root) }
+
+    func makeApp(at url: URL, name: String) throws {
+        let contents = url.appendingPathComponent("Contents", isDirectory: true)
+        let binaries = contents.appendingPathComponent("MacOS", isDirectory: true)
+        try files.createDirectory(at: binaries, withIntermediateDirectories: true)
+        let info: [String: String] = [
+            "CFBundleIdentifier": "test.seven-island.\(UUID().uuidString)",
+            "CFBundleDisplayName": name,
+            "CFBundleExecutable": "TestApp",
+            "CFBundlePackageType": "APPL",
+        ]
+        let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+        try data.write(to: contents.appendingPathComponent("Info.plist"))
+        let executable = binaries.appendingPathComponent("TestApp")
+        try "#!/bin/sh\nexit 0\n".write(to: executable, atomically: true, encoding: .utf8)
+        try files.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+    }
+
+    let applications = root.appendingPathComponent("Applications", isDirectory: true)
+    let utilities = applications.appendingPathComponent("Utilities", isDirectory: true)
+    let extra = root.appendingPathComponent("Tools", isDirectory: true)
+    let first = utilities.appendingPathComponent("Alpha Tool.app", isDirectory: true)
+    let second = extra.appendingPathComponent("Beta.app", isDirectory: true)
+    try makeApp(at: first, name: "Alpha")
+    try makeApp(at: second, name: "Beta Display Name")
+    try makeApp(at: second.appendingPathComponent("Contents/Helpers/Embedded.app"), name: "Embedded Helper")
+    try "document".write(to: extra.appendingPathComponent("Not an app.app"), atomically: true, encoding: .utf8)
+    try files.createSymbolicLink(at: extra.appendingPathComponent("Alpha Shortcut.app"), withDestinationURL: first)
+
+    let items = AppLauncherService.loadApplications(from: [applications, utilities, extra])
+    expectEqual(items.map(\.url.path), [first, second].map { $0.resolvingSymlinksInPath().path },
+                "finds app bundles across directories and keeps one entry per path")
+    expectEqual(items.map(\.name), ["Alpha", "Beta Display Name"], "uses app display names")
+    expectEqual(items.first?.matches(query: "alpha tool"), true, "searches the app filename")
+    expectEqual(items.first?.matches(query: "UTILITIES"), true, "searches the app directory")
+    let configured = AppLauncherService.applicationDirectories(adding: [extra, extra])
+    expectEqual(configured.last?.path, extra.resolvingSymlinksInPath().path, "adds custom directories after defaults")
+    expectEqual(configured.count, AppLauncherService.defaultApplicationDirectories.count + 1,
+                "keeps one entry per configured directory")
+}
+
 func testLyricsDisplayTextBuildsSingleAndMultilineLyrics() {
     let plainLyrics = """
 
@@ -469,6 +515,7 @@ enum SevenIslandFeatureTestRunner {
             testClipboardHistoryDeduplicatesAndFiltersSensitiveText()
             testClipboardHistoryRespectsMaximumItemLimit()
             try testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly()
+            try testAppLauncherScansMultipleDirectories()
             testLyricsDisplayTextBuildsSingleAndMultilineLyrics()
             testLyricsDisplayTextCentersCurrentSyncedLyricInWindow()
             testLyricsDisplayTextEstimatesActiveCharacter()

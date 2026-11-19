@@ -31,6 +31,10 @@
 		7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E10000D000000000000000D /* VSCodeSettingsView.swift */; };
 		7E1001100000000000000010 /* MemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000100000000000000010 /* MemoView.swift */; };
 		7E1001110000000000000011 /* ToolboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000110000000000000011 /* ToolboxView.swift */; };
+		7E1001120000000000000012 /* AppLauncherItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000120000000000000012 /* AppLauncherItem.swift */; };
+		7E1001130000000000000013 /* AppLauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000130000000000000013 /* AppLauncherView.swift */; };
+		7E1001140000000000000014 /* AppLauncherSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000140000000000000014 /* AppLauncherSettingsView.swift */; };
+		7E1001150000000000000015 /* SevenIslandLaunchList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1000150000000000000015 /* SevenIslandLaunchList.swift */; };
 		9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB0C6BB2C73C9CB00F7CD30 /* MusicHomeView.swift */; };
 
 		111BE95D2ECD71E10079DD4E /* AsyncXPCConnection in Frameworks */ = {isa = PBXBuildFile; productRef = 111BE95C2ECD71E10079DD4E /* AsyncXPCConnection */; };
@@ -211,6 +215,10 @@
 		7E10000D000000000000000D /* VSCodeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VSCodeSettingsView.swift; sourceTree = "<group>"; };
 		7E1000100000000000000010 /* MemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoView.swift; sourceTree = "<group>"; };
 		7E1000110000000000000011 /* ToolboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxView.swift; sourceTree = "<group>"; };
+		7E1000120000000000000012 /* AppLauncherItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherItem.swift; sourceTree = "<group>"; };
+		7E1000130000000000000013 /* AppLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherView.swift; sourceTree = "<group>"; };
+		7E1000140000000000000014 /* AppLauncherSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLauncherSettingsView.swift; sourceTree = "<group>"; };
+		7E1000150000000000000015 /* SevenIslandLaunchList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SevenIslandLaunchList.swift; sourceTree = "<group>"; };
 		111BEA602ED09B1B0079DD4E /* NSScreen+UUID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSScreen+UUID.swift"; sourceTree = "<group>"; };
 		112B0EB32E30DD0F00562D6C /* mediaremote-adapter.pl */ = {isa = PBXFileReference; lastKnownFileType = text.script.perl; path = "mediaremote-adapter.pl"; sourceTree = "<group>"; };
 		112B0EB52E30DD0F00562D6C /* MediaRemoteAdapterTestClient */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = MediaRemoteAdapterTestClient; sourceTree = "<group>"; };
@@ -497,6 +505,7 @@
 				7E1000010000000000000001 /* ClipboardHistoryItem.swift */,
 				7E2000010000000000000001 /* MemoItem.swift */,
 				7E1000020000000000000002 /* VSCodeProjectItem.swift */,
+				7E1000120000000000000012 /* AppLauncherItem.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -519,6 +528,9 @@
 				7E1000090000000000000009 /* VSCodeProjectsView.swift */,
 				7E1000100000000000000010 /* MemoView.swift */,
 				7E1000110000000000000011 /* ToolboxView.swift */,
+				7E1000130000000000000013 /* AppLauncherView.swift */,
+				7E1000140000000000000014 /* AppLauncherSettingsView.swift */,
+				7E1000150000000000000015 /* SevenIslandLaunchList.swift */,
 				7E10000C000000000000000C /* ClipboardSettingsView.swift */,
 				7E10000D000000000000000D /* VSCodeSettingsView.swift */,
 			);
@@ -925,6 +937,10 @@
 				7E10010D000000000000000D /* VSCodeSettingsView.swift in Sources */,
 				7E1001100000000000000010 /* MemoView.swift in Sources */,
 				7E1001110000000000000011 /* ToolboxView.swift in Sources */,
+				7E1001120000000000000012 /* AppLauncherItem.swift in Sources */,
+				7E1001130000000000000013 /* AppLauncherView.swift in Sources */,
+				7E1001140000000000000014 /* AppLauncherSettingsView.swift in Sources */,
+				7E1001150000000000000015 /* SevenIslandLaunchList.swift in Sources */,
 				7E2001020000000000000002 /* MemoStore.swift in Sources */,
 				7E2001010000000000000001 /* MemoItem.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* MusicHomeView.swift in Sources */,

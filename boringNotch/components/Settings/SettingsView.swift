@@ -47,6 +47,9 @@ struct SettingsView: View {
                 NavigationLink(value: "VS Code") {
                     Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
+                NavigationLink(value: "App Launcher") {
+                    Label("App 快捷启动器", systemImage: "square.grid.2x2")
+                }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
                 // }
@@ -76,6 +79,8 @@ struct SettingsView: View {
                     ClipboardSettingsView()
                 case "VS Code":
                     VSCodeSettingsView()
+                case "App Launcher":
+                    AppLauncherSettingsView()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":

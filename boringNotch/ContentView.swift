@@ -305,6 +305,8 @@ struct ContentView: View {
                         ClipboardHistoryView()
                     case .vscodeProjects:
                         VSCodeProjectsView()
+                    case .appLauncher:
+                        AppLauncherView()
                     case .memo:
                         MemoView()
                     case .toolbox:

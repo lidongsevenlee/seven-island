@@ -87,6 +87,9 @@ struct TabSelectionView: View {
         case .memo:
             Image(systemName: "note.text")
                 .foregroundStyle(color)
+        case .appLauncher:
+            Image(systemName: "square.grid.2x2")
+                .foregroundStyle(color)
         case .toolbox:
             Image(systemName: "cube")
                 .foregroundStyle(color)
