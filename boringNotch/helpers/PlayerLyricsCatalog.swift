@@ -1,7 +1,9 @@
 import Foundation
 
-enum PlayerLyricsCatalog {
-    enum Source {
+struct PlayerLyricsCatalog: Sendable {
+    let request: LyricsHTTPRequest
+
+    enum Source: Sendable {
         case netease
         case qq
 
@@ -27,7 +29,7 @@ enum PlayerLyricsCatalog {
         }
     }
 
-    struct Recording {
+    struct Recording: Sendable {
         let title: String
         let artist: String
         let album: String
@@ -94,7 +96,7 @@ enum PlayerLyricsCatalog {
         }
     }
 
-    struct Song {
+    struct Song: Sendable {
         let id: String
         let title: String
         let artists: [String]
@@ -103,26 +105,26 @@ enum PlayerLyricsCatalog {
         var qqSongNumber: Int? = nil
     }
 
-    struct Lyric {
+    struct Lyric: Sendable {
         let lines: String
         let words: String?
     }
 
-    static func search(_ recording: Recording, in source: Source, allowPreview: Bool = false,
-                       allowQQAliases: Bool = false) async -> [Song] {
+    func search(_ recording: Recording, in source: Source, allowPreview: Bool = false,
+                allowQQAliases: Bool = false) async -> [Song] {
         let songs = await catalogSearch(recording.searchTerm, in: source)
-        let matches = ranked(songs, for: recording, allowQQAliases: allowQQAliases)
+        let matches = Self.ranked(songs, for: recording, allowQQAliases: allowQQAliases)
         if matches.isEmpty, source == .qq, allowQQAliases,
-           qqTitleWithoutTribute(recording.album) == normalized(recording.title) {
+           Self.qqTitleWithoutTribute(recording.album) == Self.normalized(recording.title) {
             let albumResults = await catalogSearch(recording.album, in: source)
-            return ranked(albumResults, for: recording, allowQQAliases: true)
+            return Self.ranked(albumResults, for: recording, allowQQAliases: true)
         }
         guard matches.isEmpty, source == .netease, allowPreview else { return matches }
         let previews = songs.filter(recording.matchesNetEasePreview)
         return previews.count == 1 ? previews : []
     }
 
-    private static func catalogSearch(_ query: String, in source: Source) async -> [Song] {
+    private func catalogSearch(_ query: String, in source: Source) async -> [Song] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         var request: URLRequest
         switch source {
@@ -164,10 +166,10 @@ enum PlayerLyricsCatalog {
             let body = payload?["body"] as? [String: Any]
             records = (body?["song"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
         }
-        return records.compactMap { catalogSong($0, source: source) }
+        return records.compactMap { Self.catalogSong($0, source: source) }
     }
 
-    static func lyric(for song: Song, in source: Source) async -> Lyric? {
+    func lyric(for song: Song, in source: Source) async -> Lyric? {
         if source == .netease {
             return await netEaseLyric(id: song.id)
         }
@@ -185,7 +187,7 @@ enum PlayerLyricsCatalog {
         return Lyric(lines: lyric, words: nil)
     }
 
-    static func netEaseLyric(id: String) async -> Lyric? {
+    func netEaseLyric(id: String) async -> Lyric? {
         for path in ["/api/song/lyric/v1", "/api/song/lyric"] {
             guard !Task.isCancelled else { return nil }
             if let lyrics = await netEaseLyric(id: id, path: path) { return lyrics }
@@ -193,7 +195,7 @@ enum PlayerLyricsCatalog {
         return nil
     }
 
-    private static func netEaseLyric(id: String, path: String) async -> Lyric? {
+    private func netEaseLyric(id: String, path: String) async -> Lyric? {
         var endpoint = URLComponents(string: "https://music.163.com")!
         endpoint.path = path
         endpoint.queryItems = [.init(name: "id", value: id)] + ["lv", "tv", "rv", "yv"].map { .init(name: $0, value: "-1") }
@@ -206,12 +208,12 @@ enum PlayerLyricsCatalog {
         return lines.isEmpty && (words?.isEmpty ?? true) ? nil : Lyric(lines: lines, words: words)
     }
 
-    static func qqWordLyrics(for song: Song) async -> DesktopLyricsCache.Entry? {
+    func qqWordLyrics(for song: Song) async -> DesktopLyricsCache.Entry? {
         guard let songID = song.qqSongNumber else { return nil }
         return await qqWordLyrics(id: songID, mid: song.id)
     }
 
-    static func qqWordLyrics(id: Int, mid: String? = nil) async -> DesktopLyricsCache.Entry? {
+    func qqWordLyrics(id: Int, mid: String? = nil) async -> DesktopLyricsCache.Entry? {
         var parameters: [String: Any] = [
             "songID": id,
             "qrc": 1, "qrc_t": 0, "lrc_t": 0, "trans": 0, "roma": 0, "crypt": 1, "type": 0, "ct": 19, "cv": 1859,
@@ -303,8 +305,8 @@ enum PlayerLyricsCatalog {
         (value as? NSNumber)?.doubleValue ?? (value as? String).flatMap(Double.init) ?? 0
     }
 
-    private static func json(for request: URLRequest) async -> [String: Any]? {
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+    private func json(for request: URLRequest) async -> [String: Any]? {
+        guard let (data, response) = try? await self.request(request),
               let http = response as? HTTPURLResponse, http.statusCode == 200, !Task.isCancelled else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }

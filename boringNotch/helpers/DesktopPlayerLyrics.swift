@@ -7,7 +7,7 @@ enum DesktopPlayerLyrics {
 
     static func read(_ recording: PlayerLyricsCatalog.Recording, source: PlayerLyricsCatalog.Source) async -> DesktopLyricsCache.Entry? {
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return await Task.detached(priority: .utility) {
+        let reader = Task.detached(priority: .utility) {
             switch source {
             case .qq:
                 let database = home.appendingPathComponent("Library/Containers/com.tencent.QQMusicMac/Data/Library/Application Support/QQMusicMac/iRRCache/rrdbcache.sqlite")
@@ -17,7 +17,12 @@ enum DesktopPlayerLyrics {
                 let downloads = home.appendingPathComponent("Music/网易云音乐", isDirectory: true)
                 return netEaseDownloads(for: recording, database: database, directory: downloads)
             }
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await reader.value
+        } onCancel: {
+            reader.cancel()
+        }
     }
 
     static func qqCache(for recording: PlayerLyricsCatalog.Recording, database: URL) -> DesktopLyricsCache.Entry? {
@@ -205,7 +210,7 @@ enum DesktopPlayerLyrics {
             guard sqlite3_bind_text(statement, 1, argument, -1, transient) == SQLITE_OK else { return [] }
         }
         var results: [T] = []
-        while sqlite3_step(statement) == SQLITE_ROW {
+        while !Task.isCancelled, sqlite3_step(statement) == SQLITE_ROW {
             if let value = read(statement) { results.append(value) }
         }
         return results

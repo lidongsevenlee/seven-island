@@ -41,6 +41,10 @@ actor DesktopLyricsCache {
         let lines: [Line]
         let characterTimings: [[LyricsDisplayText.CharacterTiming]]
 
+        var syncedLines: [LyricsDisplayText.SyncedLine] {
+            lines.map { ($0.time, $0.text) }
+        }
+
         var quality: Int {
             if characterTimings.contains(where: { !$0.isEmpty }) { return 3 }
             if !lines.isEmpty { return 2 }
@@ -62,7 +66,7 @@ actor DesktopLyricsCache {
     }
 
     func store(_ entry: Entry, for key: Key) {
-        guard entry.quality > 0, let url = fileURL(for: key),
+        guard !Task.isCancelled, entry.quality > 0, let url = fileURL(for: key),
               (read(from: url)?.quality ?? 0) <= entry.quality else { return }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

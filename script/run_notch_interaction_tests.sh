@@ -2,4 +2,5 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec "$ROOT_DIR/script/run_app_module_tests.sh" "$ROOT_DIR/SevenIslandTests/NotchSearchInteractionTests.swift"
+"$ROOT_DIR/script/run_app_module_tests.sh" "$ROOT_DIR/SevenIslandTests/NotchSearchInteractionTests.swift"
+exec "$ROOT_DIR/script/run_app_module_tests.sh" "$ROOT_DIR/SevenIslandTests/NotchWindowManagerTests.swift"

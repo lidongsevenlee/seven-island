@@ -21,8 +21,35 @@ class BoringViewModel: NSObject, ObservableObject {
     let animation: Animation?
 
     @Published var contentType: ContentType = .normal
-    @Published private(set) var notchState: NotchState = .closed
-    @Published var isPinnedOpen = false
+    @Published private var interactionState = NotchInteraction.State()
+
+    var notchState: NotchState { interactionState.notchState }
+    var isHovering: Bool { interactionState.isHovering }
+
+    var isPinnedOpen: Bool {
+        get { interactionState.isPinnedOpen }
+        set { interaction.setPinnedOpen(newValue) }
+    }
+
+    var isBatteryPopoverActive: Bool {
+        get { interactionState.isBatteryPopoverActive }
+        set { interaction.setBatteryPopoverActive(newValue) }
+    }
+
+    var isTextInputFocused: Bool {
+        get { interactionState.isTextInputFocused }
+        set { interaction.setTextInputFocused(newValue) }
+    }
+
+    private lazy var interaction = NotchInteraction(
+        pointerIsInside: { [weak self] in self?.isMouseHovering() ?? false },
+        hoverOpenDelay: { [weak self] in
+            guard let self, !self.coordinator.firstLaunch, !self.coordinator.sneakPeek.show,
+                  Defaults[.openNotchOnHover] else { return nil }
+            return .seconds(Defaults[.minimumHoverDuration])
+        },
+        onStateChange: { [weak self] state in self?.applyInteractionState(state) }
+    )
 
     var cancellables: Set<AnyCancellable> = []
     
@@ -30,15 +57,18 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
-    @Published var isBatteryPopoverActive: Bool = false
-    @Published var isTextInputFocused: Bool = false
     @Published var clipboardSearchText: String = ""
     @Published var vscodeSearchText: String = ""
 
-    @Published var screenUUID: String?
+    @Published private(set) var display: NotchDisplay?
+    @Published private var openHeight = openNotchSize.height
+    private let defaultClosedNotchSize = getClosedNotchSize()
 
-    @Published var notchSize: CGSize = getClosedNotchSize()
-    @Published var closedNotchSize: CGSize = getClosedNotchSize()
+    var closedNotchSize: CGSize { display?.closedNotchSize ?? defaultClosedNotchSize }
+
+    var notchSize: CGSize {
+        notchState == .open ? CGSize(width: openNotchSize.width, height: openHeight) : closedNotchSize
+    }
     
     let webcamManager = WebcamManager.shared
     @Published var isCameraExpanded: Bool = false
@@ -49,20 +79,28 @@ class BoringViewModel: NSObject, ObservableObject {
     // (e.g. when the associated window closes before the VM is released).
 
     func destroy() {
+        cancelPanelTimers()
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
 
-    init(screenUUID: String? = nil) {
+    override init() {
         animation = animationLibrary.animation
-
         super.init()
-        
-        self.screenUUID = screenUUID
-        notchSize = getClosedNotchSize(screenUUID: screenUUID)
-        closedNotchSize = notchSize
-
         setupDetectorObserver()
+    }
+
+    func updateDisplay(_ display: NotchDisplay?) {
+        guard self.display != display else { return }
+        let moved = self.display?.uuid != display?.uuid || self.display?.notchAnchor != display?.notchAnchor
+        self.display = display
+        if moved {
+            interaction.panelMoved()
+        }
+        if display == nil {
+            cancelPanelTimers()
+            isTextInputFocused = false
+        }
     }
     
     private func setupDetectorObserver() {
@@ -73,9 +111,8 @@ class BoringViewModel: NSObject, ObservableObject {
             .map { $0 != .never }
             .removeDuplicates()
 
-        // Publisher for the current screen UUID (non-nil, distinct)
-        let screenPublisher = $screenUUID
-            .compactMap { $0 }
+        let screenPublisher = $display
+            .map { $0?.uuid }
             .removeDuplicates()
 
         // Publisher for fullscreen status dictionary
@@ -85,7 +122,7 @@ class BoringViewModel: NSObject, ObservableObject {
         // Combine all three: screen UUID, fullscreen status, and enabled setting
         Publishers.CombineLatest3(screenPublisher, fullscreenStatusPublisher, enabledPublisher)
             .map { screenUUID, fullscreenStatus, enabled in
-                let isFullscreen = fullscreenStatus[screenUUID] ?? false
+                let isFullscreen = screenUUID.flatMap { fullscreenStatus[$0] } ?? false
                 return enabled && isFullscreen
             }
             .removeDuplicates()
@@ -100,8 +137,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     // Computed property for effective notch height
     var effectiveClosedNotchHeight: CGFloat {
-        let currentScreen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) }
-        let noNotchAndFullscreen = hideOnClosed && (currentScreen?.safeAreaInsets.top ?? 0 <= 0 || currentScreen == nil)
+        let noNotchAndFullscreen = hideOnClosed && display?.hasPhysicalNotch != true
         return noNotchAndFullscreen ? 0 : closedNotchSize.height
     }
 
@@ -110,18 +146,17 @@ class BoringViewModel: NSObject, ObservableObject {
             return 0
         }
 
-        guard let currentScreen = screenUUID.flatMap({ NSScreen.screen(withUUID: $0) }) else {
+        guard let display else {
             return 0
         }
 
         if notchState == .open { return 0 }
 
-        let menuBarHeight = currentScreen.frame.maxY - currentScreen.visibleFrame.maxY
         let currentHeight = effectiveClosedNotchHeight
 
         if currentHeight == 0 { return 0 }
 
-        return max(0, menuBarHeight - currentHeight)
+        return max(0, display.menuBarHeight - currentHeight)
     }
 
     func toggleCameraPreview() {
@@ -173,65 +208,74 @@ class BoringViewModel: NSObject, ObservableObject {
     }
     
     func isMouseHovering(position: NSPoint = NSEvent.mouseLocation) -> Bool {
-        let screenFrame = getScreenFrame(screenUUID)
-        if let frame = screenFrame {
+        if let frame = display?.frame {
             
             let baseY = frame.maxY - notchSize.height
             let baseX = frame.midX - notchSize.width / 2
             
-            return position.y >= baseY && position.x >= baseX && position.x <= baseX + notchSize.width
+            return position.y >= baseY && position.y <= frame.maxY
+                && position.x >= baseX && position.x <= baseX + notchSize.width
         }
         
         return false
     }
 
     func open() {
-        self.notchSize = openNotchSize
-        self.notchState = .open
-        
-        // Force music information update when notch is opened
-        MusicManager.shared.forceUpdate()
+        interaction.open()
+    }
+
+    func toggleFromShortcut() {
+        interaction.toggleFromShortcut()
+    }
+
+    func hoverChanged(_ hovering: Bool) {
+        interaction.hoverChanged(hovering)
+    }
+
+    func cancelPanelTimers() {
+        interaction.cancelPendingTransitions()
     }
 
     func setOpenNotchHeight(_ height: CGFloat) {
         guard notchState == .open else { return }
         let clampedHeight = min(max(height, openNotchSize.height), sevenIslandFeatureNotchHeight)
-        guard abs(notchSize.height - clampedHeight) > 0.5 else { return }
-        notchSize = CGSize(width: openNotchSize.width, height: clampedHeight)
+        guard abs(openHeight - clampedHeight) > 0.5 else { return }
+        openHeight = clampedHeight
     }
 
     func resetOpenNotchSize() {
         setOpenNotchHeight(openNotchSize.height)
     }
 
-    func closeAutomatically() {
-        guard !isTextInputFocused else { return }
-        closeUnlessPinned()
-    }
-
-    func closeAfterHoverExit(position: NSPoint = NSEvent.mouseLocation) {
-        // Typing can hide the cursor and end SwiftUI hover tracking in place.
-        guard notchState == .open,
-              !isMouseHovering(position: position),
-              !isBatteryPopoverActive else { return }
-        closeUnlessPinned()
-    }
-
     func closeUnlessPinned() {
-        guard !isPinnedOpen else { return }
-        close()
+        interaction.closeUnlessPinned()
     }
 
     func close() {
-        self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
-        self.closedNotchSize = self.notchSize
-        self.notchState = .closed
-        self.isPinnedOpen = false
-        self.isBatteryPopoverActive = false
-        self.isTextInputFocused = false
-        self.coordinator.sneakPeek.show = false
-        self.edgeAutoOpenActive = false
+        let wasClosed = notchState == .closed
+        interaction.close()
+        if wasClosed {
+            applyClosedEffects()
+        }
+    }
 
+    private func applyInteractionState(_ state: NotchInteraction.State) {
+        let visibilityChanged = state.notchState != notchState
+        if visibilityChanged {
+            switch state.notchState {
+            case .open: openHeight = openNotchSize.height
+            case .closed: applyClosedEffects()
+            }
+        }
+        interactionState = state
+        if visibilityChanged && state.notchState == .open {
+            MusicManager.shared.forceUpdate()
+        }
+    }
+
+    private func applyClosedEffects() {
+        coordinator.sneakPeek.show = false
+        edgeAutoOpenActive = false
     }
 
     func closeHello() {

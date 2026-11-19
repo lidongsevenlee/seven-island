@@ -24,8 +24,6 @@ struct ContentView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
-    @State private var hoverTask: Task<Void, Never>?
-    @State private var isHovering: Bool = false
     @State private var spectrumClient = UUID()
 
     @State private var haptics: Bool = false
@@ -123,7 +121,7 @@ struct ContentView: View {
                             .padding(.horizontal, topCornerRadius)
                     }
                     .shadow(
-                        color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
+                        color: ((vm.notchState == .open || vm.isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
                     )
                     .padding(
@@ -138,6 +136,7 @@ struct ContentView: View {
                         let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
 
                         return view
+                            .animation(animationSpring, value: vm.isHovering)
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
                     }
                     .contentShape(Rectangle())
@@ -152,11 +151,6 @@ struct ContentView: View {
                             }
                     )
                     .onChange(of: vm.notchState) { _, newState in
-                        if newState == .closed && isHovering {
-                            withAnimation {
-                                isHovering = false
-                            }
-                        }
                         if newState == .open {
                             withAnimation(.smooth(duration: 0.35)) {
                                 vm.setOpenNotchHeight(openNotchSize.height)
@@ -166,25 +160,6 @@ struct ContentView: View {
                     .onChange(of: coordinator.currentView) { _, _ in
                         withAnimation(.smooth(duration: 0.35)) {
                             vm.setOpenNotchHeight(openNotchSize.height)
-                        }
-                    }
-                    .onChange(of: vm.isPinnedOpen) { _, isPinned in
-                        if !isPinned {
-                            vm.closeAfterHoverExit()
-                        }
-                    }
-                    .onChange(of: vm.isBatteryPopoverActive) {
-                        if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open {
-                            hoverTask?.cancel()
-                            hoverTask = Task {
-                                try? await Task.sleep(for: .milliseconds(100))
-                                guard !Task.isCancelled else { return }
-                                await MainActor.run {
-                                    if !self.vm.isBatteryPopoverActive && !self.isHovering && self.vm.notchState == .open {
-                                        self.vm.closeAutomatically()
-                                    }
-                                }
-                            }
                         }
                     }
                     .sensoryFeedback(.alignment, trigger: haptics)
@@ -216,7 +191,10 @@ struct ContentView: View {
         .onChange(of: musicSpectrumSource, initial: true) { _, source in
             MusicAudioSpectrum.shared.setSource(source, for: spectrumClient)
         }
-        .onDisappear { MusicAudioSpectrum.shared.setSource(nil, for: spectrumClient) }
+        .onDisappear {
+            vm.cancelPanelTimers()
+            MusicAudioSpectrum.shared.setSource(nil, for: spectrumClient)
+        }
     }
 
     @ViewBuilder
@@ -228,7 +206,7 @@ struct ContentView: View {
                     HelloAnimation(onFinish: {
                         vm.closeHello()
                     }).frame(
-                        width: getClosedNotchSize().width,
+                        width: vm.closedNotchSize.width,
                         height: 80
                     )
                     .padding(.top, 40)
@@ -262,7 +240,7 @@ struct ContentView: View {
                         }
                         .frame(height: vm.effectiveClosedNotchHeight, alignment: .center)
                       } else if shouldShowInlineHUD {
-                          InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering)
+                          InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
                               .transition(.opacity)
                       } else if shouldShowMusicLiveActivity {
                           MusicLiveActivity()
@@ -478,48 +456,11 @@ struct ContentView: View {
     // MARK: - Hover Management
 
     private func handleHover(_ hovering: Bool) {
-        if coordinator.firstLaunch { return }
-        hoverTask?.cancel()
-        
-        if hovering {
-            isHovering = true
-
-            if vm.notchState == .closed && Defaults[.enableHaptics] {
-                haptics.toggle()
-            }
-            
-            guard vm.notchState == .closed,
-                  !coordinator.sneakPeek.show,
-                  Defaults[.openNotchOnHover] else { return }
-            
-            hoverTask = Task {
-                try? await Task.sleep(for: .seconds(Defaults[.minimumHoverDuration]))
-                guard !Task.isCancelled else { return }
-                
-                await MainActor.run {
-                    guard self.vm.notchState == .closed,
-                          self.isHovering,
-                          !self.coordinator.sneakPeek.show else { return }
-                    
-                    self.doOpen()
-                }
-            }
-        } else {
-            hoverTask = Task {
-                try? await Task.sleep(for: .milliseconds(100))
-                guard !Task.isCancelled else { return }
-
-                await MainActor.run {
-                    let mousePosition = NSEvent.mouseLocation
-                    let isPointerInside = self.vm.isMouseHovering(position: mousePosition)
-                    withAnimation(animationSpring) {
-                        self.isHovering = isPointerInside
-                    }
-
-                    self.vm.closeAfterHoverExit(position: mousePosition)
-                }
-            }
+        guard !coordinator.firstLaunch else { return }
+        if hovering && vm.notchState == .closed && Defaults[.enableHaptics] {
+            haptics.toggle()
         }
+        vm.hoverChanged(hovering)
     }
 
 }

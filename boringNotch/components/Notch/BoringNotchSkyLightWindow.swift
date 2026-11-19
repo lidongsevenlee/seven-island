@@ -9,6 +9,7 @@ import Cocoa
 import SkyLightWindow
 import Defaults
 import Combine
+import SwiftUI
 
 extension SkyLightOperator {
     func undelegateWindow(_ window: NSWindow) {
@@ -111,4 +112,55 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+}
+
+extension BoringNotchSkyLightWindow: NotchPanelWindow {
+    convenience init(viewModel: BoringViewModel) {
+        self.init(
+            contentRect: CGRect(origin: .zero, size: windowSize),
+            styleMask: [.borderless, .nonactivatingPanel, .utilityWindow, .hudWindow],
+            backing: .buffered,
+            defer: false
+        )
+        contentView = NSHostingView(rootView: ContentView().environmentObject(viewModel))
+    }
+
+    func show(at notchAnchor: CGPoint, onLockScreen: Bool) {
+        let origin = CGPoint(x: notchAnchor.x - frame.width / 2, y: notchAnchor.y - frame.height)
+        if frame.origin != origin {
+            setFrameOrigin(origin)
+        }
+
+        if onLockScreen {
+            enableSkyLight()
+        } else {
+            disableSkyLight()
+        }
+
+        if !isVisible {
+            orderFrontRegardless()
+        }
+        let space = NotchSpaceManager.shared.notchSpace
+        if !space.windows.contains(self) {
+            space.windows.insert(self)
+        }
+    }
+
+    func hide() {
+        leaveNotchSpaces()
+        orderOut(nil)
+    }
+
+    func dispose() {
+        leaveNotchSpaces()
+        close()
+    }
+
+    private func leaveNotchSpaces() {
+        disableSkyLight()
+        let space = NotchSpaceManager.shared.notchSpace
+        if space.windows.contains(self) {
+            space.windows.remove(self)
+        }
+    }
 }

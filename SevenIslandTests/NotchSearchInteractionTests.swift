@@ -1,91 +1,283 @@
-import AppKit
+import Foundation
 @testable import Seven_Island
 
 @main
+@MainActor
 enum NotchSearchInteractionTests {
-    @MainActor
     static func main() {
-        _ = NSApplication.shared
-        guard let screen = NSScreen.main else {
-            fputs("FAIL: interaction tests require a connected screen\n", stderr)
-            exit(1)
-        }
-        let vm = BoringViewModel(screenUUID: screen.displayUUID)
-
-        vm.open()
-        vm.isTextInputFocused = true
-        let searchPosition = NSPoint(x: screen.frame.midX, y: screen.frame.maxY - 60)
-        vm.closeAfterHoverExit(position: searchPosition)
-        expect(vm.notchState == .open, "keeps keyboard search expanded when cursor hiding ends hover tracking")
-
-        let outsidePosition = NSPoint(x: screen.frame.midX, y: screen.frame.maxY - 400)
-        vm.closeAfterHoverExit(position: outsidePosition)
-        expect(vm.notchState == .closed, "dismisses when the mouse leaves the notch during search")
-        expect(!vm.isTextInputFocused, "clears focus after a genuine hover exit")
-
-        vm.open()
-        vm.isTextInputFocused = true
-        vm.closeAutomatically()
-        expect(vm.notchState == .open, "keeps the notch expanded while search has keyboard focus")
-
-        vm.closeAutomatically()
-        expect(vm.notchState == .open, "keeps search expanded across repeated passive dismissal requests")
-
-        vm.isTextInputFocused = false
-        vm.closeAutomatically()
-        expect(vm.notchState == .closed, "resumes automatic dismissal after search loses focus")
-
-        vm.open()
-        vm.isTextInputFocused = true
-        vm.close()
-        expect(vm.notchState == .closed, "allows explicit dismissal while search has focus")
-        expect(!vm.isTextInputFocused, "clears search focus on explicit dismissal")
-
-        vm.open()
-        vm.closeAutomatically()
-        expect(vm.notchState == .closed, "automatically dismisses an unfocused notch")
-
-        let otherWindow = BoringViewModel()
-        vm.open()
-        otherWindow.open()
-        vm.isTextInputFocused = true
-        otherWindow.closeAutomatically()
-        vm.closeAutomatically()
-        expect(otherWindow.notchState == .closed, "keeps search focus local to its window")
-        expect(vm.notchState == .open, "preserves search in the focused window")
-
-        vm.isTextInputFocused = false
-        vm.isPinnedOpen = true
-        vm.closeAfterHoverExit(position: outsidePosition)
-        expect(vm.notchState == .open, "keeps the pinned panel open after hover exit")
-        vm.closeAutomatically()
-        expect(vm.notchState == .open, "keeps the pinned panel open after a timed dismissal")
-        vm.closeUnlessPinned()
-        expect(vm.notchState == .open, "keeps the pinned panel open after a tab action")
-
-        otherWindow.open()
-        otherWindow.closeAutomatically()
-        expect(otherWindow.notchState == .closed, "keeps the pin local to its panel")
-
-        vm.isPinnedOpen = false
-        vm.closeAfterHoverExit(position: outsidePosition)
-        expect(vm.notchState == .closed, "resumes hover dismissal after unpinning")
-
-        vm.open()
-        vm.isPinnedOpen = true
-        vm.close()
-        expect(vm.notchState == .closed, "allows explicit dismissal of a pinned panel")
-        expect(!vm.isPinnedOpen, "clears the pin on explicit dismissal")
-
-        vm.destroy()
-        otherWindow.destroy()
+        testHoverOpensAfterDwell()
+        testHoverExitUsesPointerLocation()
+        testWindowMovePreservesExpansion()
+        testShortcutTimeoutUsesPointerLocation()
+        testShortcutTimeoutWaitsForBlur()
+        testPinControlsDismissal()
+        testReopeningCancelsOldTimeout()
+        testPanelsHaveIndependentTimers()
+        testBatteryPopoverDismissal()
         print("NotchSearchInteractionTests passed")
+    }
+
+    private static func testHoverOpensAfterDwell() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(299))
+        expect(panel.isClosed, "hover waits for the configured dwell")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(101))
+        expect(panel.isClosed, "leaving cancels a pending hover open")
+
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(300))
+        expect(!panel.isClosed, "hover opens after the configured dwell")
+
+        panel.interaction.close()
+        panel.hoverDelay = nil
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.seconds(1))
+        expect(panel.isClosed, "hover respects the disabled setting")
+
+        panel.interaction.open()
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "click opens without starting the shortcut timer")
+    }
+
+    private static func testHoverExitUsesPointerLocation() {
+        let panel = Panel()
+        panel.interaction.open()
+        panel.pointerInside = true
+        panel.interaction.setTextInputFocused(true)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "cursor hiding during typing keeps the panel open")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(99))
+        expect(!panel.isClosed, "hover exit observes the grace period")
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(1))
+        expect(!panel.isClosed, "re-entering cancels a pending hover exit")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "genuine mouse exit closes the panel during input")
+        expect(!panel.interaction.state.isTextInputFocused, "closing clears input focus")
+    }
+
+    private static func testShortcutTimeoutUsesPointerLocation() {
+        let panel = Panel()
+        panel.interaction.toggleFromShortcut()
+        panel.clock.advance(.milliseconds(2999))
+        expect(!panel.isClosed, "shortcut opens immediately and waits three seconds")
+        panel.clock.advance(.milliseconds(1))
+        expect(panel.isClosed, "shortcut timeout dismisses when the pointer is outside")
+
+        panel.interaction.toggleFromShortcut()
+        panel.pointerInside = true
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "shortcut timeout keeps the hovered panel open")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover exit still dismisses after the shortcut timeout")
+    }
+
+    private static func testWindowMovePreservesExpansion() {
+        let panel = Panel()
+        panel.interaction.open()
+        panel.interaction.hoverChanged(false)
+        panel.interaction.panelMoved()
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "movement preserves expansion across pending and new hover exits")
+
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover dismissal resumes after entering the moved panel")
+    }
+
+    private static func testShortcutTimeoutWaitsForBlur() {
+        let panel = Panel()
+        panel.interaction.setTextInputFocused(true)
+        expect(panel.isClosed, "a closed panel stays closed on input focus")
+
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setTextInputFocused(true)
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "focused input defers shortcut dismissal")
+        panel.interaction.setTextInputFocused(false)
+        expect(panel.isClosed, "blur retries the expired shortcut dismissal outside the panel")
+
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setTextInputFocused(true)
+        panel.clock.advance(.seconds(3))
+        panel.pointerInside = true
+        panel.interaction.setTextInputFocused(false)
+        expect(!panel.isClosed, "blur keeps the panel open when the pointer is inside")
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover exit dismisses after blur inside the panel")
+
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setTextInputFocused(true)
+        panel.interaction.setTextInputFocused(false)
+        expect(!panel.isClosed, "blur before timeout leaves the original deadline in place")
+        panel.clock.advance(.seconds(3))
+        expect(panel.isClosed, "the original timeout still dismisses after early blur")
+    }
+
+    private static func testPinControlsDismissal() {
+        let panel = Panel()
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setPinnedOpen(true)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "pin keeps the panel open through hover exit and shortcut timeout")
+        panel.interaction.closeUnlessPinned()
+        expect(!panel.isClosed, "pin keeps the panel open after a clipboard or project action")
+
+        panel.pointerInside = true
+        panel.interaction.setPinnedOpen(false)
+        expect(!panel.isClosed, "unpin keeps the panel open while the pointer is inside")
+        panel.interaction.setPinnedOpen(true)
+        panel.pointerInside = false
+        panel.interaction.setPinnedOpen(false)
+        expect(panel.isClosed, "unpin dismisses with the pointer outside")
+
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setTextInputFocused(true)
+        panel.interaction.setPinnedOpen(true)
+        panel.interaction.toggleFromShortcut()
+        expect(panel.isClosed, "explicit shortcut dismissal works with focus and pin")
+        expect(!panel.interaction.state.isPinnedOpen, "explicit dismissal clears the pin")
+        expect(!panel.interaction.state.isTextInputFocused, "explicit dismissal clears focus")
+    }
+
+    private static func testReopeningCancelsOldTimeout() {
+        let panel = Panel()
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.closeUnlessPinned()
+        expect(panel.isClosed, "a clipboard or project action dismisses the unpinned panel")
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(300))
+        expect(!panel.isClosed, "hover reopens after early dismissal")
+
+        panel.pointerInside = false
+        panel.clock.advance(.seconds(3))
+        expect(!panel.isClosed, "the later opening survives the old shortcut deadline")
+    }
+
+    private static func testPanelsHaveIndependentTimers() {
+        let clock = Clock()
+        let first = Panel(clock: clock)
+        let second = Panel(clock: clock)
+        first.interaction.toggleFromShortcut()
+        clock.advance(.seconds(1))
+        second.interaction.toggleFromShortcut()
+        clock.advance(.seconds(2))
+        expect(first.isClosed, "opening the second panel preserves the first deadline")
+        expect(!second.isClosed, "the second panel stays open until its own deadline")
+        clock.advance(.seconds(1))
+        expect(second.isClosed, "the second panel dismisses at its own deadline")
+
+        first.interaction.toggleFromShortcut()
+        second.interaction.toggleFromShortcut()
+        first.interaction.setTextInputFocused(true)
+        clock.advance(.seconds(3))
+        expect(!first.isClosed, "focused panel remains open at its deadline")
+        expect(second.isClosed, "focus applies to its own panel only")
+    }
+
+    private static func testBatteryPopoverDismissal() {
+        let panel = Panel()
+        panel.interaction.open()
+        panel.interaction.setBatteryPopoverActive(true)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "battery popover holds the panel open after pointer exit")
+
+        panel.interaction.setBatteryPopoverActive(false)
+        panel.pointerInside = true
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "popover dismissal rechecks the actual pointer")
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover exit resumes after the popover closes")
+
+        panel.interaction.open()
+        panel.interaction.setBatteryPopoverActive(true)
+        panel.interaction.setBatteryPopoverActive(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "popover dismissal closes with the pointer outside")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {
         guard condition else {
             fputs("FAIL: \(message)\n", stderr)
             exit(1)
+        }
+    }
+
+    @MainActor
+    private final class Panel {
+        let clock: Clock
+        var pointerInside = false
+        var hoverDelay: Duration? = .milliseconds(300)
+
+        lazy var interaction = NotchInteraction(
+            pointerIsInside: { [unowned self] in pointerInside },
+            hoverOpenDelay: { [unowned self] in hoverDelay },
+            schedule: clock.schedule
+        )
+
+        var isClosed: Bool { interaction.state.notchState == .closed }
+
+        init(clock: Clock? = nil) {
+            self.clock = clock ?? Clock()
+        }
+    }
+
+    @MainActor
+    private final class Clock {
+        private struct Entry {
+            let deadline: Duration
+            let task: Task<Void, Never>
+            let action: @MainActor () -> Void
+        }
+
+        private var now = Duration.zero
+        private var entries: [Entry] = []
+
+        func schedule(_ delay: Duration, _ action: @escaping @MainActor () -> Void) -> Task<Void, Never> {
+            let task = Task<Void, Never> {}
+            entries.append(Entry(deadline: now + delay, task: task, action: action))
+            return task
+        }
+
+        func advance(_ duration: Duration) {
+            let target = now + duration
+            while let next = entries.indices.min(by: { entries[$0].deadline < entries[$1].deadline }),
+                  entries[next].deadline <= target {
+                let entry = entries.remove(at: next)
+                now = entry.deadline
+                if !entry.task.isCancelled {
+                    entry.action()
+                }
+            }
+            now = target
         }
     }
 }

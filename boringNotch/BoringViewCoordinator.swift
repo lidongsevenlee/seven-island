@@ -91,14 +91,9 @@ class BoringViewCoordinator: ObservableObject {
     // New UUID-based storage
     @AppStorage("preferred_screen_uuid") var preferredScreenUUID: String? {
         didSet {
-            if let uuid = preferredScreenUUID {
-                selectedScreenUUID = uuid
-            }
             NotificationCenter.default.post(name: Notification.Name.selectedScreenChanged, object: nil)
         }
     }
-
-    @Published var selectedScreenUUID: String = NSScreen.main?.displayUUID ?? ""
 
     @Published var optionKeyPressed: Bool = true
     private var accessibilityObserver: Any?
@@ -125,7 +120,6 @@ class BoringViewCoordinator: ObservableObject {
             preferredScreenUUID = NSScreen.main?.displayUUID
         }
         
-        selectedScreenUUID = preferredScreenUUID ?? NSScreen.main?.displayUUID ?? ""
         currentView = NotchViews(rawValue: lastNotchView) ?? .music
 
         // Observe changes to accessibility authorization and react accordingly

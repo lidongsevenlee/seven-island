@@ -1,27 +1,20 @@
 #!/usr/bin/env python3
-"""
-Update updater/appcast.xml with a new version entry.
+"""Update the Appcast entry for the published DMG of a GitHub release tag.
 
-Usage:
-  update-appcast.py <appcast_path> <dmg_path> <version> <build_num> <tag_name> <repo>
-
-Environment:
-  SPARKLE_PRIVATE_KEY - base64-encoded Ed25519 private key seed (32 bytes)
-
-Output:
-  Updates appcast.xml in place. Prints the EdDSA signature to stdout.
+Usage: update-appcast.py <appcast_path> <dmg_path> <version> <build_num> <tag_name> <repo>
+SPARKLE_PRIVATE_KEY contains the base64-encoded Ed25519 seed.
 """
 
 import base64
 import os
-import re
 import sys
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from email.utils import format_datetime, parsedate_to_datetime
+from pathlib import Path
+from urllib.parse import quote, unquote
 
-try:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-except ImportError:
-    sys.exit("cryptography library is required. Run: pip install cryptography")
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 NS = "http://www.andymatuschak.org/xml-namespaces/sparkle"
@@ -31,128 +24,107 @@ def sparkle(tag):
     return f"{{{NS}}}{tag}"
 
 
-def sign_dmg(dmg_path: str, private_key_b64: str) -> str:
-    """Sign a DMG file with the Sparkle Ed25519 private key."""
-    key_bytes = base64.b64decode(private_key_b64)
-    priv = Ed25519PrivateKey.from_private_bytes(key_bytes)
-    with open(dmg_path, "rb") as f:
-        data = f.read()
-    signature = priv.sign(data)
-    return base64.b64encode(signature).decode()
+def is_release_item(item, release_url, download_directory):
+    for field in ("link", sparkle("fullReleaseNotesLink")):
+        if unquote(item.findtext(field, "").strip()) == unquote(release_url):
+            return True
+    enclosure = item.find("enclosure")
+    if enclosure is None:
+        return False
+    directory = enclosure.get("url", "").rsplit("/", 1)[0]
+    return unquote(directory) == unquote(download_directory)
 
 
-def update_appcast(
-    appcast_path: str,
-    dmg_path: str,
-    version: str,
-    build_num: str,
-    tag_name: str,
-    repo: str,
-    private_key_b64: str,
-):
-    import xml.etree.ElementTree as ET
+def publication_date(item):
+    try:
+        value = parsedate_to_datetime(item.findtext("pubDate", ""))
+    except (TypeError, ValueError):
+        return datetime.max.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
+
+def update_item(item, fields, enclosure_attributes):
+    changed = False
+    for tag, value in fields.items():
+        field = item.find(tag)
+        if field is None:
+            field = ET.SubElement(item, tag)
+        if field.text != value:
+            field.text = value
+            changed = True
+
+    enclosure = item.find("enclosure")
+    if enclosure is None:
+        enclosure = ET.SubElement(item, "enclosure")
+    for key, value in enclosure_attributes.items():
+        if enclosure.get(key) != value:
+            enclosure.set(key, value)
+            changed = True
+    return changed
+
+
+def update_appcast(appcast_path, dmg_path, version, build_num, tag_name, repo, private_key_b64):
     ET.register_namespace("sparkle", NS)
-
-    # Sign the DMG
-    print(f"Signing {dmg_path}...", file=sys.stderr)
-    signature = sign_dmg(dmg_path, private_key_b64)
-
-    # Get file size
-    dmg_size = os.path.getsize(dmg_path)
-
-    # Generate pubDate
-    pub_date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
-
-    # Download URL
-    download_url = (
-        f"https://github.com/{repo}/releases/download/{tag_name}/"
-        f"Seven-Island-{version}.dmg"
-    )
-
-    # Parse existing appcast
     tree = ET.parse(appcast_path)
-    root = tree.getroot()
-    channel = root.find("channel")
+    channel = tree.getroot().find("channel")
     if channel is None:
-        print("Error: no <channel> found in appcast", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("no <channel> found in Appcast")
 
-    # Build new <item>
-    item = ET.Element("item")
+    dmg = Path(dmg_path).read_bytes()
+    key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(private_key_b64))
+    signature = base64.b64encode(key.sign(dmg)).decode("ascii")
+    repository_url = f"https://github.com/{repo}/releases"
+    tag_path = quote(tag_name, safe="")
+    release_url = f"{repository_url}/tag/{tag_path}"
+    download_directory = f"{repository_url}/download/{tag_path}"
+    download_url = f"{download_directory}/{quote(f'Seven-Island-{version}.dmg')}"
 
-    title = ET.SubElement(item, "title")
-    title.text = version
-
-    pub = ET.SubElement(item, "pubDate")
-    pub.text = pub_date
-
-    link = ET.SubElement(item, "link")
-    link.text = f"https://github.com/{repo}/releases/tag/{tag_name}"
-
-    sp_version = ET.SubElement(item, sparkle("version"))
-    sp_version.text = build_num
-
-    sp_short = ET.SubElement(item, sparkle("shortVersionString"))
-    sp_short.text = version
-
-    sp_min_os = ET.SubElement(item, sparkle("minimumSystemVersion"))
-    sp_min_os.text = "14.0"
-
-    # Use fullReleaseNotesLink so Sparkle opens the GitHub release page
-    rel_notes = ET.SubElement(item, sparkle("fullReleaseNotesLink"))
-    rel_notes.text = f"https://github.com/{repo}/releases/tag/{tag_name}"
-
-    # Brief description (no CDATA needed for plain text)
-    desc = ET.SubElement(item, "description")
-    desc.text = f"Release {version}. See the GitHub release for details."
-
-    # Enclosure
-    enclosure = ET.SubElement(item, "enclosure")
-    enclosure.set("url", download_url)
-    enclosure.set("length", str(dmg_size))
-    enclosure.set("type", "application/octet-stream")
-    enclosure.set(sparkle("edSignature"), signature)
-
-    # Insert at the top (newest first)
-    first_item = channel.find("item")
-    if first_item is not None:
-        channel.insert(list(channel).index(first_item), item)
+    items = channel.findall("item")
+    matching = [item for item in items if is_release_item(item, release_url, download_directory)]
+    changed = False
+    if matching:
+        item = min(matching, key=publication_date)
+        if len(matching) > 1:
+            index = list(channel).index(matching[0])
+            for duplicate in matching:
+                channel.remove(duplicate)
+            channel.insert(index, item)
+            changed = True
     else:
-        channel.append(item)
+        item = ET.Element("item")
+        index = list(channel).index(items[0]) if items else len(channel)
+        channel.insert(index, item)
+        changed = True
 
-    # Write to file
-    tree.write(appcast_path, xml_declaration=True, encoding="UTF-8")
-    print(f"Updated {appcast_path}", file=sys.stderr)
-    print(signature)
+    fields = {
+        "title": version,
+        "pubDate": item.findtext("pubDate") or format_datetime(datetime.now(timezone.utc)),
+        "link": release_url,
+        sparkle("version"): build_num,
+        sparkle("shortVersionString"): version,
+        sparkle("minimumSystemVersion"): "14.0",
+        sparkle("fullReleaseNotesLink"): release_url,
+        "description": f"Release {version}. See the GitHub release for details.",
+    }
+    enclosure = {
+        "url": download_url,
+        "length": str(len(dmg)),
+        "type": "application/octet-stream",
+        sparkle("edSignature"): signature,
+    }
+    if update_item(item, fields, enclosure) or changed:
+        tree.write(appcast_path, xml_declaration=True, encoding="UTF-8")
+        print(f"Updated {appcast_path} for {tag_name}.", file=sys.stderr)
+    return signature
 
 
 def main():
     if len(sys.argv) != 7:
-        print(
-            "Usage: update-appcast.py <appcast_path> <dmg_path> "
-            "<version> <build_num> <tag_name> <repo>",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    appcast_path = sys.argv[1]
-    dmg_path = sys.argv[2]
-    version = sys.argv[3]
-    build_num = sys.argv[4]
-    tag_name = sys.argv[5]
-    repo = sys.argv[6]
-
-    private_key_b64 = os.environ.get("SPARKLE_PRIVATE_KEY", "")
-    if not private_key_b64:
-        print("Error: SPARKLE_PRIVATE_KEY environment variable is not set",
-              file=sys.stderr)
-        sys.exit(1)
-
-    update_appcast(
-        appcast_path, dmg_path, version, build_num,
-        tag_name, repo, private_key_b64,
-    )
+        sys.exit("Usage: update-appcast.py <appcast_path> <dmg_path> <version> <build_num> <tag_name> <repo>")
+    key = os.environ.get("SPARKLE_PRIVATE_KEY")
+    if not key:
+        sys.exit("SPARKLE_PRIVATE_KEY is required to sign the published DMG.")
+    print(update_appcast(*sys.argv[1:], key))
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
   GIT_USER: "github-actions[bot]"
   GIT_EMAIL: "github-actions[bot]@users.noreply.github.com"
 
@@ -27,27 +28,30 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     steps:
-      - name: Checkout
+      - name: Checkout Release Workflow
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 0
 
-      - name: Resolve Tag Ref
-        id: tag
+      - name: Find Published DMG
+        id: asset
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "ref=refs/tags/${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "ref=${{ github.ref }}" >> "$GITHUB_OUTPUT"
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          fi
+          git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}" >/dev/null
+          DMG_NAME=$(python3 .github/workflows/scripts/find-release-dmg.py)
+          echo "name=$DMG_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Build App
+      - name: Build and Package Release Tag
+        id: build
+        if: steps.asset.outputs.name == ''
         env:
           DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
         run: |
+          mkdir -p build/dist
+          git worktree add --detach build/release-source "refs/tags/$RELEASE_TAG"
+          cd build/release-source
           xcodebuild -version
           xcodebuild \
             -project boringNotch.xcodeproj \
@@ -57,85 +61,88 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             build
 
-      - name: Read Version
-        id: version
-        run: |
-          INFO_PLIST="build/DerivedData/Build/Products/Release/Seven Island.app/Contents/Info.plist"
-          VERSION=$(defaults read "$(pwd)/$INFO_PLIST" CFBundleShortVersionString 2>/dev/null || echo "${{ steps.tag.outputs.tag }}" | sed 's/^v//')
-          BUILD=$(defaults read "$(pwd)/$INFO_PLIST" CFBundleVersion 2>/dev/null || echo "0")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-
-      - name: Create DMG
-        run: |
-          python3 -m venv build/dmg-venv
-          source build/dmg-venv/bin/activate
+          APP_PATH="build/DerivedData/Build/Products/Release/Seven Island.app"
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")
+          DMG_NAME="Seven-Island-$VERSION.dmg"
+          python3 -m venv "$GITHUB_WORKSPACE/build/dmg-venv"
+          source "$GITHUB_WORKSPACE/build/dmg-venv/bin/activate"
           pip install -q dmgbuild ds-store mac-alias
-          mkdir -p build/dist
-          DMG_PATH="build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg"
           bash Configuration/dmg/create_dmg.sh \
-            "build/DerivedData/Build/Products/Release/Seven Island.app" \
-            "$DMG_PATH" \
-            "Seven Island ${{ steps.version.outputs.version }}"
+            "$APP_PATH" "$GITHUB_WORKSPACE/build/dist/$DMG_NAME" "Seven Island $VERSION"
+          echo "name=$DMG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release with DMG
+        if: steps.asset.outputs.name == ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/dist/${{ steps.build.outputs.name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          overwrite_files: false
 
       - name: Check Sparkle Signing Key
         id: check-key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          if [ -n "$SPARKLE_PRIVATE_KEY" ]; then
+          if [[ -n "$SPARKLE_PRIVATE_KEY" ]]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Warning: SPARKLE_PRIVATE_KEY not set, skipping Sparkle signing" >> "$GITHUB_STEP_SUMMARY"
+            echo "Appcast requires SPARKLE_PRIVATE_KEY." >> "$GITHUB_STEP_SUMMARY"
           fi
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
 
-      - name: Create GitHub Release with DMG
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/dist/*.dmg
-          tag_name: ${{ steps.tag.outputs.tag }}
-          generate_release_notes: true
-          fail_on_unmatched_files: false
-
-      - name: Sparkle Sign DMG & Update Appcast
+      - name: Download Published DMG
         if: steps.check-key.outputs.available == 'true'
-        run: |
-          python3 -m venv build/sign-venv
-          source build/sign-venv/bin/activate
-          pip install -q cryptography
-          python3 .github/workflows/scripts/update-appcast.py \
-            "updater/appcast.xml" \
-            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
-            "${{ steps.version.outputs.version }}" \
-            "${{ steps.version.outputs.build }}" \
-            "${{ steps.tag.outputs.tag }}" \
-            "${{ github.repository }}"
+        id: download
         env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          DMG_NAME: ${{ steps.asset.outputs.name || steps.build.outputs.name }}
+        run: |
+          mkdir -p build/published
+          DMG_PATH="$GITHUB_WORKSPACE/build/published/$DMG_NAME"
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern "$DMG_NAME" --output "$DMG_PATH" -- "$RELEASE_TAG"
+          test -s "$DMG_PATH"
+          echo "path=$DMG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Read Version from Published DMG
+        if: steps.check-key.outputs.available == 'true'
+        id: version
+        env:
+          DMG_PATH: ${{ steps.download.outputs.path }}
+        run: |
+          MOUNT_POINT=$(mktemp -d "$RUNNER_TEMP/seven-island-dmg.XXXXXXXX")
+          mounted=false
+          cleanup() {
+            if [[ "$mounted" == true ]]; then
+              hdiutil detach "$MOUNT_POINT" >/dev/null
+            fi
+            rmdir "$MOUNT_POINT"
+          }
+          trap cleanup EXIT
+
+          hdiutil attach "$DMG_PATH" -readonly -nobrowse -noautoopen -mountpoint "$MOUNT_POINT" >/dev/null
+          mounted=true
+          INFO_PLIST="$MOUNT_POINT/Seven Island.app/Contents/Info.plist"
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
+          if [[ "${DMG_PATH##*/}" != "Seven-Island-$VERSION.dmg" || -z "$BUILD" ]]; then
+            echo "Published DMG and application version metadata must match." >&2
+            exit 1
+          fi
+          printf 'version=%s\nbuild=%s\n' "$VERSION" "$BUILD" >> "$GITHUB_OUTPUT"
 
       - name: Commit Updated Appcast
         if: steps.check-key.outputs.available == 'true'
+        env:
+          DMG_PATH: ${{ steps.download.outputs.path }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          git fetch origin main
-          # Prepare the latest main appcast before regenerating the release entry.
-          git restore -- updater/appcast.xml
-          git checkout -B appcast-update origin/main
-          # Sign the DMG and prepend the release to the existing version history.
           python3 -m venv build/sign-venv
           source build/sign-venv/bin/activate
           pip install -q cryptography
-          python3 .github/workflows/scripts/update-appcast.py \
-            "updater/appcast.xml" \
-            "build/dist/Seven-Island-${{ steps.version.outputs.version }}.dmg" \
-            "${{ steps.version.outputs.version }}" \
-            "${{ steps.version.outputs.build }}" \
-            "${{ steps.tag.outputs.tag }}" \
-            "${{ github.repository }}"
-          git config user.name "$GIT_USER"
-          git config user.email "$GIT_EMAIL"
-          git add updater/appcast.xml
-          git commit -m "Update appcast for ${{ steps.tag.outputs.tag }}" || echo "No changes to commit"
-          git push origin appcast-update:main
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          bash .github/workflows/scripts/publish-appcast.sh \
+            "$DMG_PATH" "$VERSION" "$BUILD" "$RELEASE_TAG" "$GITHUB_REPOSITORY"
