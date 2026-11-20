@@ -78,6 +78,8 @@ class BoringNotchSkyLightWindow: NSPanel {
         level = .mainMenu + 3
         hasShadow = false
         isReleasedWhenClosed = false
+        // SwiftUI animates the panel while AppKit hands keyboard focus back.
+        animationBehavior = .none
         
         // Force dark appearance regardless of system setting
         appearance = NSAppearance(named: .darkAqua)

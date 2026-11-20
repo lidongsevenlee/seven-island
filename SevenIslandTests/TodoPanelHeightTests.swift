@@ -15,6 +15,7 @@ enum TodoPanelHeightTests {
         vm.coordinator.firstLaunch = false
 
         let panel = BoringNotchSkyLightWindow(viewModel: vm)
+        precondition(panel.animationBehavior == .none, "Keyboard focus handoff keeps SwiftUI in charge of the panel animation")
         panel.setFrameOrigin(NSPoint(x: -2048, y: -2048))
         panel.ignoresMouseEvents = true
         panel.orderFrontRegardless()
