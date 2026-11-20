@@ -58,6 +58,126 @@ final class ScreenshotSelectionPanel: NSPanel {
     }
 }
 
+@MainActor
+final class FloatingScreenshotPanel: NSPanel {
+    private let canvas: ScreenshotSelectionCanvas
+    private var toolbarPanel: NSPanel?
+    private let toolbarMenuItem = NSMenuItem(title: "显示工具条", action: #selector(toggleToolbar), keyEquivalent: "")
+
+    init(screenshot: CapturedScreenshot, frame: CGRect, perform: @escaping (ScreenshotTool.Action, CGImage?) -> Void) {
+        let display = ScreenshotDisplay(frame: frame, image: screenshot.image, windowRegions: [], frontmostWindowRegion: nil)
+        canvas = ScreenshotSelectionCanvas(display: display, isFloating: true, finish: { action, _, image in
+            perform(action, image)
+        }, cancel: {})
+        super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        title = "悬浮截图"
+        animationBehavior = .none
+        hasShadow = true
+        isOpaque = false
+        backgroundColor = .clear
+        isFloatingPanel = true
+        level = .floating
+        hidesOnDeactivate = false
+        isReleasedWhenClosed = false
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        acceptsMouseMovedEvents = true
+        canvas.wantsLayer = true
+        canvas.layer?.cornerRadius = 5
+        canvas.layer?.masksToBounds = true
+        canvas.layer?.borderWidth = 1 / backingScaleFactor
+        canvas.layer?.borderColor = NSColor(white: 1, alpha: 0.4).cgColor
+        canvas.setAccessibilityLabel("悬浮截图，双击关闭")
+        canvas.onFloatingToolbarLayout = { [weak self] in self?.layoutToolbar() }
+        canvas.onFloatingToolbarDismiss = { [weak self] in self?.hideToolbar() }
+        canvas.menu = contextMenu()
+        contentView = canvas
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+    override var canBecomeKey: Bool { toolbarPanel != nil }
+
+    override func sendEvent(_ event: NSEvent) {
+        if toolbarPanel != nil, event.type == .keyDown, canvas.handleKey(event) { return }
+        super.sendEvent(event)
+    }
+
+    override func close() {
+        hideToolbar()
+        super.close()
+    }
+
+    private func contextMenu() -> NSMenu {
+        let menu = NSMenu()
+        let items = [
+            NSMenuItem(title: "复制", action: #selector(copyImage), keyEquivalent: ""),
+            NSMenuItem(title: "保存", action: #selector(saveImage), keyEquivalent: ""),
+            NSMenuItem(title: "销毁", action: #selector(destroyImage), keyEquivalent: ""),
+            toolbarMenuItem
+        ]
+        for item in items {
+            item.target = self
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    @objc private func copyImage() { canvas.submit(.copy) }
+    @objc private func saveImage() { canvas.submit(.save) }
+    @objc private func destroyImage() { close() }
+
+    @objc private func toggleToolbar() {
+        if toolbarPanel != nil {
+            hideToolbar()
+            return
+        }
+        let panel = NSPanel(contentRect: CGRect(origin: .zero, size: canvas.floatingToolbarSize),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.animationBehavior = .none
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = level
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = collectionBehavior
+        panel.contentView = canvas.floatingToolbarView
+        toolbarPanel = panel
+        toolbarMenuItem.title = "隐藏工具条"
+        layoutToolbar()
+        addChildWindow(panel, ordered: .above)
+        panel.orderFrontRegardless()
+        makeKey()
+        makeFirstResponder(canvas)
+    }
+
+    private func hideToolbar() {
+        guard let panel = toolbarPanel else { return }
+        toolbarPanel = nil
+        toolbarMenuItem.title = "显示工具条"
+        canvas.endFloatingEditing()
+        removeChildWindow(panel)
+        panel.close()
+        panel.contentView = nil
+    }
+
+    private func layoutToolbar() {
+        guard let toolbarPanel else { return }
+        let size = canvas.floatingToolbarSize
+        let gap: CGFloat = 7
+        let area = (screen ?? NSScreen.main)?.visibleFrame ?? frame.insetBy(dx: -size.width, dy: -size.height - gap)
+        let x = max(area.minX, min(frame.maxX - size.width, area.maxX - size.width))
+        let below = frame.minY - size.height - gap
+        let above = frame.maxY + gap
+        let y = below >= area.minY ? below : min(above, area.maxY - size.height)
+        let toolbarFrame = CGRect(origin: CGPoint(x: x, y: max(area.minY, y)), size: size)
+        if toolbarPanel.frame != toolbarFrame {
+            toolbarPanel.setFrame(toolbarFrame, display: true)
+        }
+    }
+}
+
 struct ScreenshotResizeHandle {
     enum Axis {
         case minimum, middle, maximum
@@ -106,6 +226,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         case create(CGPoint)
         case move(start: CGPoint, original: CGRect)
         case resize(handle: ScreenshotResizeHandle, start: CGPoint, original: CGRect)
+        case moveWindow(pointer: CGPoint, origin: CGPoint)
     }
 
     private struct SizeBadge {
@@ -114,9 +235,14 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     }
 
     var activateDisplay: (() -> Bool)?
+    var onFloatingToolbarLayout: (() -> Void)?
+    var onFloatingToolbarDismiss: (() -> Void)?
     var locksDisplay: Bool { selection != nil || drag != nil }
+    var floatingToolbarView: NSView { toolbar }
+    var floatingToolbarSize: CGSize { toolbarState.size }
 
     private let display: ScreenshotDisplay
+    private let isFloating: Bool
     private let backdrop: NSImage
     private let finish: (ScreenshotTool.Action, CGRect, CGImage?) -> Void
     private let cancel: () -> Void
@@ -131,7 +257,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     private var drawnLens: CGRect?
     private var drawnSizeBadge: SizeBadge?
     private let annotationRenderer: ScreenshotAnnotationRenderer
-    private let toolbarState = ScreenshotToolbarState()
+    private let toolbarState: ScreenshotToolbarState
     private var history = ScreenshotAnnotationHistory()
     private var draft: ScreenshotAnnotation?
     private var textEditor: (field: NSTextField, point: CGPoint, style: ScreenshotAnnotation.Style)?
@@ -146,21 +272,29 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         select: { [weak self] tool in self?.selectTool(tool) },
         changeHistory: { [weak self] redo in self?.changeHistory(redo: redo) },
         perform: { [weak self] action in self?.submit(action) },
-        cancel: { [weak self] in self?.cancel() }
+        cancel: { [weak self] in self?.dismiss() }
     ))
 
     private var currentRegion: CGRect? { selection ?? suggestedRegion }
 
-    init(display: ScreenshotDisplay, finish: @escaping (ScreenshotTool.Action, CGRect, CGImage?) -> Void,
+    init(display: ScreenshotDisplay, isFloating: Bool = false,
+         finish: @escaping (ScreenshotTool.Action, CGRect, CGImage?) -> Void,
          cancel: @escaping () -> Void) {
         self.display = display
+        self.isFloating = isFloating
+        toolbarState = ScreenshotToolbarState(isFloating: isFloating)
         annotationRenderer = ScreenshotAnnotationRenderer(display: display)
         backdrop = NSImage(cgImage: display.image, size: display.frame.size)
         self.finish = finish
         self.cancel = cancel
         super.init(frame: display.bounds)
-        toolbar.isHidden = true
-        addSubview(toolbar)
+        if isFloating {
+            selection = display.bounds
+            drawnRegion = selection
+        } else {
+            toolbar.isHidden = true
+            addSubview(toolbar)
+        }
     }
 
     @available(*, unavailable)
@@ -179,17 +313,17 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     }
 
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: .crosshair)
+        addCursorRect(bounds, cursor: isFloating && toolbarState.tool == nil ? .arrow : .crosshair)
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func draw(_ dirtyRect: NSRect) {
         backdrop.draw(in: display.bounds, from: .zero, operation: .copy, fraction: 1, respectFlipped: true, hints: nil)
-        if let region = drawnRegion {
-            if let context = NSGraphicsContext.current?.cgContext {
-                annotationRenderer.draw(history.visible, draft: previewDraft, clippedTo: region, in: context)
-            }
+        if let region = drawnRegion, let context = NSGraphicsContext.current?.cgContext {
+            annotationRenderer.draw(history.visible, draft: previewDraft, clippedTo: region, in: context)
+        }
+        if let region = drawnRegion, !isFloating {
             if region != display.bounds {
                 let mask = NSBezierPath(rect: display.bounds)
                 mask.appendRect(region)
@@ -225,7 +359,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        guard activateDisplay?() == true else { return }
+        guard isFloating || activateDisplay?() == true else { return }
         updatePointer(point(for: event))
     }
 
@@ -240,6 +374,10 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
 
     func updatePointer(_ point: CGPoint) {
         pointer = display.bounds.contains(point) ? point : nil
+        if isFloating {
+            if draft?.tool == .polyline { invalidate(selection, padding: 0) }
+            return
+        }
         let isOnToolbar = !toolbar.isHidden && toolbar.frame.contains(point)
         if !isOnToolbar, selection == nil, drag == nil, let pointer,
            suggestedRegion.flatMap({ resizeHandle(at: pointer, in: $0) }) == nil {
@@ -251,13 +389,21 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard activateDisplay?() == true else { return }
+        guard isFloating || activateDisplay?() == true else { return }
+        if isFloating, toolbarState.tool == nil, let window {
+            if event.clickCount == 2 {
+                window.close()
+            } else {
+                drag = .moveWindow(pointer: NSEvent.mouseLocation, origin: window.frame.origin)
+            }
+            return
+        }
         finishText()
         window?.makeFirstResponder(self)
         let point = point(for: event)
         pointer = point
         didDrag = false
-        if let region = drawnRegion, let handle = resizeHandle(at: point, in: region) {
+        if !isFloating, let region = drawnRegion, let handle = resizeHandle(at: point, in: region) {
             commitDraft()
             drag = .resize(handle: handle, start: point, original: region)
         } else if let selection, selection.contains(point), let tool = toolbarState.tool {
@@ -300,6 +446,9 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         case let .resize(handle, start, original):
             selection = handle.resize(original, by: CGVector(dx: point.x - start.x, dy: point.y - start.y),
                                       within: display.bounds)
+        case let .moveWindow(pointer, origin):
+            let mouse = NSEvent.mouseLocation
+            window?.setFrameOrigin(CGPoint(x: origin.x + mouse.x - pointer.x, y: origin.y + mouse.y - pointer.y))
         }
         update()
     }
@@ -314,6 +463,10 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
             return
         }
         guard drag != nil else { return }
+        if isFloating {
+            drag = nil
+            return
+        }
         if case .create = drag, !didDrag, selection != display.bounds {
             selection = display.suggestedRegion(at: point(for: event))
         }
@@ -326,7 +479,9 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        if textEditor != nil {
+        if isFloating {
+            super.rightMouseDown(with: event)
+        } else if textEditor != nil {
             finishText()
         } else if draft != nil {
             commitDraft()
@@ -363,7 +518,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         }
         switch Int(event.keyCode) {
         case kVK_Escape:
-            cancel()
+            dismiss()
             return true
         case kVK_Return, kVK_ANSI_KeypadEnter:
             if draft?.tool == .polyline {
@@ -378,7 +533,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
             selectTool(tool)
             return true
         case kVK_LeftArrow, kVK_RightArrow, kVK_UpArrow, kVK_DownArrow:
-            guard let selection = currentRegion else { return false }
+            guard !isFloating, let selection = currentRegion else { return false }
             let x = display.bounds.width / CGFloat(display.image.width)
             let y = display.bounds.height / CGFloat(display.image.height)
             let offsets = [kVK_LeftArrow: CGPoint(x: -x, y: 0), kVK_RightArrow: CGPoint(x: x, y: 0),
@@ -390,12 +545,12 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         default:
             guard event.modifierFlags.contains(.command) else { return false }
             switch event.charactersIgnoringModifiers?.lowercased() {
-            case "a":
+            case "a" where !isFloating:
                 if event.modifierFlags.contains(.shift) { selectFrontmostWindow() }
                 else { selectDisplay() }
             case "c": submit(.copy)
             case "s": submit(.save)
-            case "t": submit(.pin)
+            case "t" where !isFloating: submit(.pin)
             case "z": changeHistory(redo: event.modifierFlags.contains(.shift))
             case "y": changeHistory(redo: true)
             default: return false
@@ -421,7 +576,16 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         toolbarState.tool = tool
         window?.makeFirstResponder(self)
         annotationsChanged()
+        if isFloating { window?.invalidateCursorRects(for: self) }
         update()
+    }
+
+    func endFloatingEditing() {
+        selectTool(nil)
+    }
+
+    private func dismiss() {
+        if isFloating { onFloatingToolbarDismiss?() } else { cancel() }
     }
 
     private func commitDraft() {
@@ -467,7 +631,7 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
                              y: max(selection.minY, min(point.y, selection.maxY - height)))
         field.frame = CGRect(origin: origin, size: CGSize(width: width, height: height))
         textEditor = (field, CGPoint(x: origin.x + 3, y: origin.y + 2), style)
-        addSubview(field, positioned: .below, relativeTo: toolbar)
+        addSubview(field, positioned: .below, relativeTo: isFloating ? nil : toolbar)
         window?.makeFirstResponder(field)
     }
 
@@ -494,14 +658,19 @@ private final class ScreenshotSelectionCanvas: NSView, NSTextFieldDelegate {
         update()
     }
 
-    private func submit(_ action: ScreenshotTool.Action) {
+    func submit(_ action: ScreenshotTool.Action) {
         guard let selection = currentRegion, drag == nil else { return }
         finishText()
         commitDraft()
+        annotationsChanged()
         finish(action, selection, annotationRenderer.capture(selection, annotations: history.visible))
     }
 
     private func update() {
+        if isFloating {
+            onFloatingToolbarLayout?()
+            return
+        }
         let region = currentRegion.flatMap { $0.width >= 2 && $0.height >= 2 ? $0 : nil }
         let handles = region != nil && drag == nil
         let showsSize = region != nil && selection != nil
@@ -686,12 +855,15 @@ private extension ScreenshotAnnotation.Tool {
 
 @MainActor
 private final class ScreenshotToolbarState: ObservableObject {
+    let isFloating: Bool
     @Published var tool: ScreenshotAnnotation.Tool?
     @Published var style = ScreenshotAnnotation.Style()
     @Published var canUndo = false
     @Published var canRedo = false
 
-    var size: CGSize { CGSize(width: 404, height: tool == nil ? 33 : 65) }
+    init(isFloating: Bool) { self.isFloating = isFloating }
+
+    var size: CGSize { CGSize(width: isFloating ? 375 : 404, height: tool == nil ? 33 : 65) }
 
     var alternate: ScreenshotAnnotation.Tool? {
         guard let tool, tool.variants.count > 1, let index = tool.variants.firstIndex(of: tool) else { return nil }
@@ -734,8 +906,11 @@ private struct ScreenshotSelectionActions: View {
                 ScreenshotToolbarButton(label: "重做", icon: "arrow.uturn.forward", shortcut: "⇧⌘Z") { changeHistory(true) }
                     .disabled(!state.canRedo)
                 divider
-                ScreenshotToolbarButton(label: "取消截图", icon: "xmark", shortcut: "Esc", action: cancel)
-                ScreenshotToolbarButton(label: "悬浮", icon: "pin", shortcut: "⌘T") { perform(.pin) }
+                ScreenshotToolbarButton(label: state.isFloating ? "隐藏工具条" : "取消截图",
+                                        icon: "xmark", shortcut: "Esc", action: cancel)
+                if !state.isFloating {
+                    ScreenshotToolbarButton(label: "悬浮", icon: "pin", shortcut: "⌘T") { perform(.pin) }
+                }
                 ScreenshotToolbarButton(label: "保存", icon: "arrow.down.to.line", shortcut: "⌘S") { perform(.save) }
                 ScreenshotToolbarButton(label: "复制", icon: "doc.on.doc", shortcut: "↩ / ⌘C") { perform(.copy) }
             }

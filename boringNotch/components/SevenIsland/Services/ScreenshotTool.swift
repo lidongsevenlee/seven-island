@@ -5,16 +5,17 @@ import UniformTypeIdentifiers
 @MainActor
 struct CapturedScreenshot {
     let png: Data
-    let image: NSImage
+    let image: CGImage
+    let size: CGSize
 
     init?(image: CGImage, size: CGSize) {
         guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { return nil }
         self.png = png
-        self.image = NSImage(cgImage: image, size: size)
+        self.image = image
+        self.size = size
     }
 
     func fittedSize(in available: CGSize) -> CGSize {
-        let size = image.size
         let scale = min(available.width / size.width, available.height / size.height, 1)
         return CGSize(width: size.width * scale, height: size.height * scale)
     }
@@ -193,7 +194,7 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         cancelCapture()
         switch action {
         case .copy:
-            if !screenshot.copy(to: .general) { showNotice("复制截图失败，请重试。") }
+            copy(screenshot)
         case .save:
             save(screenshot)
         case .pin:
@@ -202,9 +203,18 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         }
     }
 
+    private func copy(_ screenshot: CapturedScreenshot) {
+        if !screenshot.copy(to: .general) { showNotice("复制截图失败，请重试。") }
+    }
+
     private func save(_ screenshot: CapturedScreenshot) {
+        if let savePanel {
+            savePanel.makeKeyAndOrderFront(nil)
+            return
+        }
         let panel = NSSavePanel()
         savePanel = panel
+        panel.level = .modalPanel
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
         let timestamp = Date.now.formatted(.iso8601).replacingOccurrences(of: ":", with: "")
@@ -227,35 +237,22 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         let screen = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 800, height: 600)
         let size = screenshot.fittedSize(in: CGSize(width: screen.width * 0.85, height: screen.height * 0.85))
-        let panel = NSPanel(
-            contentRect: CGRect(origin: .zero, size: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.title = "悬浮截图"
-        panel.animationBehavior = .none
-        panel.hasShadow = true
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        let x = max(screen.minX, min(point.x - size.width / 2, screen.maxX - size.width))
+        let y = max(screen.minY, min(point.y - size.height / 2, screen.maxY - size.height))
+        let frame = CGRect(origin: CGPoint(x: x, y: y), size: size)
+        let panel = FloatingScreenshotPanel(screenshot: screenshot, frame: frame) { [weak self] action, image in
+            guard let self else { return }
+            guard let image, let edited = CapturedScreenshot(image: image, size: screenshot.size) else {
+                showNotice("生成截图失败，请重试。")
+                return
+            }
+            switch action {
+            case .copy: copy(edited)
+            case .save: save(edited)
+            case .pin: break
+            }
+        }
         panel.delegate = self
-        let x = max(screen.minX, min(point.x - panel.frame.width / 2, screen.maxX - panel.frame.width))
-        let y = max(screen.minY, min(point.y - panel.frame.height / 2, screen.maxY - panel.frame.height))
-        panel.setFrameOrigin(CGPoint(x: x, y: y))
-        let imageView = FloatingScreenshotView(image: screenshot.image)
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.wantsLayer = true
-        imageView.layer?.cornerRadius = 5
-        imageView.layer?.masksToBounds = true
-        imageView.layer?.borderWidth = 1 / panel.backingScaleFactor
-        imageView.layer?.borderColor = NSColor(white: 1, alpha: 0.4).cgColor
-        imageView.setAccessibilityLabel("悬浮截图，双击关闭")
-        panel.contentView = imageView
         pinnedPanels.append(panel)
         panel.orderFrontRegardless()
         panel.invalidateShadow()
@@ -284,33 +281,5 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         alert.messageText = message
         NSApp.activate()
         alert.runModal()
-    }
-}
-
-private final class FloatingScreenshotView: NSImageView {
-    private var dragStart: (pointer: CGPoint, origin: CGPoint)?
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-    override func mouseDown(with event: NSEvent) {
-        if event.clickCount == 2 {
-            window?.close()
-            return
-        }
-        guard let window else { return }
-        dragStart = (pointer: NSEvent.mouseLocation, origin: window.frame.origin)
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let dragStart else { return }
-        let pointer = NSEvent.mouseLocation
-        window?.setFrameOrigin(CGPoint(
-            x: dragStart.origin.x + pointer.x - dragStart.pointer.x,
-            y: dragStart.origin.y + pointer.y - dragStart.pointer.y
-        ))
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        dragStart = nil
     }
 }
