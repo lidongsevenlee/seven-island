@@ -5,21 +5,30 @@
 //  Created by Hugo Persson on 2024-08-25.
 //
 
+import KeyboardShortcuts
 import SwiftUI
 
 struct TabModel: Identifiable {
     let label: String
     let view: NotchViews
+    let shortcut: KeyboardShortcuts.Name
 
     var id: NotchViews { view }
-}
 
-private let mainTabs = [
-    TabModel(label: "音乐", view: .music),
-    TabModel(label: "剪贴板", view: .clipboard),
-    TabModel(label: "VS Code", view: .vscodeProjects),
-    TabModel(label: "备忘录", view: .memo)
-]
+    static let main = [
+        TabModel(label: "音乐", view: .music, shortcut: .toggleMusicTab),
+        TabModel(label: "剪贴板", view: .clipboard, shortcut: .toggleClipboardTab),
+        TabModel(label: "VS Code", view: .vscodeProjects, shortcut: .toggleVSCodeTab),
+        TabModel(label: "备忘录", view: .memo, shortcut: .toggleMemoTab)
+    ]
+
+    static let utilities = [
+        TabModel(label: "应用启动器", view: .appLauncher, shortcut: .toggleAppLauncherTab),
+        TabModel(label: "工具集", view: .toolbox, shortcut: .toggleToolboxTab)
+    ]
+
+    static let all = main + utilities
+}
 
 private let notchHeaderIconSize: CGFloat = 15
 
@@ -36,7 +45,7 @@ struct NotchHeaderSymbol: View {
 }
 
 struct TabSelectionView: View {
-    var tabs: [TabModel] = mainTabs
+    var tabs: [TabModel] = TabModel.main
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Namespace var animation
     @State private var hoveredTab: NotchViews? = nil

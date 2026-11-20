@@ -250,6 +250,84 @@ private struct SettingsPicker<Value: Hashable>: View {
     }
 }
 
+private struct IslandShortcutRecorder: View {
+    let title: String
+    let name: KeyboardShortcuts.Name
+    @State private var previousShortcut: KeyboardShortcuts.Shortcut?
+    @State private var showsConflict = false
+
+    init(_ title: String, name: KeyboardShortcuts.Name) {
+        self.title = title
+        self.name = name
+        _previousShortcut = State(initialValue: name.shortcut)
+    }
+
+    var body: some View {
+        LabeledContent(title) {
+            ShortcutRecorderControl(name: name) { shortcut in
+                let names = TabModel.all.map(\.shortcut) + KeyboardShortcuts.Name.panelActions
+                if let shortcut, let conflict = names.first(where: { $0 != name && $0.shortcut == shortcut }) {
+                    name.shortcut = previousShortcut
+                    KeyboardShortcuts.enable(conflict)
+                    showsConflict = true
+                } else {
+                    previousShortcut = shortcut
+                }
+            }
+        }
+        .alert("该快捷键已被其他操作使用", isPresented: $showsConflict) {
+            Button("确定", role: .cancel) {}
+        }
+    }
+}
+
+private struct ShortcutRecorderControl: NSViewRepresentable {
+    let name: KeyboardShortcuts.Name
+    let onChange: (KeyboardShortcuts.Shortcut?) -> Void
+
+    func makeNSView(context: Context) -> ClickTarget {
+        ClickTarget(recorder: KeyboardShortcuts.RecorderCocoa(for: name, onChange: onChange))
+    }
+
+    func updateNSView(_ view: ClickTarget, context: Context) {
+        view.recorder.shortcutName = name
+    }
+
+    final class ClickTarget: NSView {
+        let recorder: KeyboardShortcuts.RecorderCocoa
+
+        init(recorder: KeyboardShortcuts.RecorderCocoa) {
+            self.recorder = recorder
+            super.init(frame: recorder.frame)
+            recorder.autoresizingMask = [.width, .height]
+            setContentHuggingPriority(.defaultHigh, for: .horizontal)
+            setContentHuggingPriority(.defaultHigh, for: .vertical)
+            addSubview(recorder)
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override var intrinsicContentSize: NSSize { recorder.intrinsicContentSize }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard let hit = super.hitTest(point) else { return nil }
+            guard hit === recorder || hit.isDescendant(of: recorder) else { return hit }
+            if let cell = recorder.cell as? NSSearchFieldCell, cell.cancelButtonCell != nil {
+                let localPoint = recorder.convert(point, from: superview)
+                if cell.cancelButtonRect(forBounds: recorder.bounds).contains(localPoint) {
+                    return hit
+                }
+            }
+            return self
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            // The recorder installs its key monitor when it becomes the first responder.
+            window?.makeFirstResponder(recorder)
+        }
+    }
+}
+
 struct GeneralSettings: View {
     @State private var screens = NSScreen.screens
     @EnvironmentObject var vm: BoringViewModel
@@ -311,7 +389,7 @@ struct GeneralSettings: View {
             }
 
             Section {
-                KeyboardShortcuts.Recorder("区域截图", name: .captureScreenshot)
+                IslandShortcutRecorder("区域截图", name: .captureScreenshot)
                 Button("开始截图") {
                     ScreenshotTool.shared.startCapture()
                 }
@@ -319,6 +397,18 @@ struct GeneralSettings: View {
                 Text("快捷键")
             } footer: {
                 Text("默认使用 Fn + F1。键盘设为标准功能键时，直接按 F1。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                ForEach(TabModel.all) { tab in
+                    IslandShortcutRecorder(tab.label, name: tab.shortcut)
+                }
+            } header: {
+                Text("标签页快捷键")
+            } footer: {
+                Text("再按一次当前标签页的快捷键即可收起面板。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

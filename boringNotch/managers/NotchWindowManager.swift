@@ -84,12 +84,18 @@ final class NotchWindowManager {
     }
 
     func togglePanel(at pointer: CGPoint) {
+        viewModel(at: pointer)?.toggleFromShortcut()
+    }
+
+    func toggleTab(_ tab: NotchViews, at pointer: CGPoint) {
+        viewModel(at: pointer)?.toggleTabFromShortcut(tab)
+    }
+
+    private func viewModel(at pointer: CGPoint) -> BoringViewModel? {
         if let panel = singlePanel, panel.viewModel.display != nil {
-            panel.viewModel.toggleFromShortcut()
-        } else {
-            panelsByDisplay.values.first { $0.viewModel.display?.frame.contains(pointer) == true }?
-                .viewModel.toggleFromShortcut()
+            return panel.viewModel
         }
+        return panelsByDisplay.values.first { $0.viewModel.display?.frame.contains(pointer) == true }?.viewModel
     }
 
     func removeAll() {

@@ -115,6 +115,12 @@ final class NotchInteraction {
         }
     }
 
+    func openFromTabShortcut() {
+        cancelPendingTransitions()
+        state.notchState = .open
+        resetPointerTracking()
+    }
+
     func setPinnedOpen(_ pinned: Bool) {
         guard state.notchState == .open, state.isPinnedOpen != pinned else { return }
         state.isPinnedOpen = pinned

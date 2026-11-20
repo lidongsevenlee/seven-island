@@ -1,4 +1,5 @@
 import Foundation
+import KeyboardShortcuts
 @testable import Seven_Island
 
 @main
@@ -9,7 +10,62 @@ enum NotchWindowManagerTests {
         testDisplaysSwapPositions()
         testSinglePanelFollowsPreferredDisplay()
         testModeSwitchAndLockScreen()
+        testTabShortcuts()
         print("NotchWindowManagerTests passed")
+    }
+
+    private static func testTabShortcuts() {
+        let coordinator = BoringViewCoordinator.shared
+        let previousTab = coordinator.currentView
+        defer { coordinator.currentView = previousTab }
+
+        let tabs = TabModel.all
+        let expectedTabs: [NotchViews] = [.music, .clipboard, .vscodeProjects, .memo, .appLauncher, .toolbox]
+        let keys: [KeyboardShortcuts.Key] = [.one, .two, .three, .four, .five, .six]
+        expect(tabs.map(\.view) == expectedTabs, "every tab is listed in header order")
+        expect(Set(tabs.map { $0.shortcut.rawValue }).count == expectedTabs.count, "each tab uses a separate shortcut setting")
+        for (tab, key) in zip(tabs, keys) {
+            let shortcut = KeyboardShortcuts.Shortcut(key, modifiers: [.command])
+            expect(tab.shortcut.defaultShortcut == shortcut, "the default tab shortcut matches the tab number")
+        }
+
+        let fixture = Fixture()
+        let laptop = display("laptop", x: 0)
+        let external = display("external", x: 1440)
+        let laptopPointer = CGPoint(x: 50, y: 500)
+        let externalPointer = CGPoint(x: 1500, y: 500)
+        fixture.reconcile([laptop, external], mode: .allDisplays)
+        let laptopModel = fixture.windows[0].viewModel
+        let externalModel = fixture.windows[1].viewModel
+
+        for tab in tabs {
+            fixture.manager.toggleTab(tab.view, at: externalPointer)
+            expect(externalModel.notchState == .open && coordinator.currentView == tab.view,
+                   "a tab shortcut opens its tab on the pointer display")
+            expect(laptopModel.notchState == .closed, "the other display stays folded")
+            fixture.manager.toggleTab(tab.view, at: externalPointer)
+            expect(externalModel.notchState == .closed, "repeating a tab shortcut folds the panel")
+        }
+
+        fixture.manager.toggleTab(.clipboard, at: laptopPointer)
+        laptopModel.isPinnedOpen = true
+        fixture.manager.toggleTab(.vscodeProjects, at: laptopPointer)
+        expect(laptopModel.isPinnedOpen && coordinator.currentView == .vscodeProjects,
+               "a different tab shortcut switches the open panel and preserves its pin")
+        fixture.manager.toggleTab(.vscodeProjects, at: laptopPointer)
+        expect(laptopModel.notchState == .closed && !laptopModel.isPinnedOpen,
+               "repeating the active tab shortcut folds a pinned panel")
+
+        let single = NotchWindowManager.Mode.singleDisplay(preferred: laptop.uuid, fallback: nil)
+        fixture.reconcile([laptop, external], mode: single)
+        let singleModel = fixture.windows[2].viewModel
+        fixture.manager.toggleTab(.memo, at: externalPointer)
+        expect(singleModel.notchState == .open && coordinator.currentView == .memo,
+               "a single panel receives tab shortcuts from the other display")
+
+        fixture.reconcile([external], mode: single)
+        fixture.manager.toggleTab(.music, at: externalPointer)
+        expect(coordinator.currentView == .memo, "a parked panel receives no tab shortcut")
     }
 
     private static func testUnplugAndReconnect() {

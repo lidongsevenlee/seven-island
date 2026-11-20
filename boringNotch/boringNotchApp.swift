@@ -173,6 +173,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
+        KeyboardShortcuts.Name.migrateTabShortcutPresets(TabModel.all.map(\.shortcut))
+
         KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
             guard let self = self else { return }
             if Defaults[.sneakPeekStyles] == .inline {
@@ -190,6 +192,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
             Task { @MainActor in
                 self?.notchWindows.togglePanel(at: NSEvent.mouseLocation)
+            }
+        }
+
+        for tab in TabModel.all {
+            KeyboardShortcuts.onKeyUp(for: tab.shortcut) { [weak self] in
+                Task { @MainActor in
+                    guard let self, !self.isScreenLocked else { return }
+                    self.notchWindows.toggleTab(tab.view, at: NSEvent.mouseLocation)
+                }
             }
         }
 

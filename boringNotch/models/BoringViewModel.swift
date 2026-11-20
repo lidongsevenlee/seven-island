@@ -243,6 +243,18 @@ class BoringViewModel: NSObject, ObservableObject {
         interaction.toggleFromShortcut()
     }
 
+    func toggleTabFromShortcut(_ tab: NotchViews) {
+        if notchState == .open && coordinator.currentView == tab {
+            close()
+            return
+        }
+
+        if coordinator.currentView != tab {
+            coordinator.currentView = tab
+        }
+        interaction.openFromTabShortcut()
+    }
+
     func hoverChanged(_ hovering: Bool) {
         interaction.hoverChanged(hovering)
     }

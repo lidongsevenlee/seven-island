@@ -12,11 +12,30 @@ enum NotchSearchInteractionTests {
         testScreenColorFormats()
         testShortcutTimeoutUsesPointerLocation()
         testShortcutTimeoutWaitsForBlur()
+        testTabShortcutWhilePointerIsOutside()
         testPinControlsDismissal()
         testReopeningCancelsOldTimeout()
         testPanelsHaveIndependentTimers()
         testBatteryPopoverDismissal()
         print("NotchSearchInteractionTests passed")
+    }
+
+    private static func testTabShortcutWhilePointerIsOutside() {
+        let panel = Panel()
+        panel.interaction.toggleFromShortcut()
+        panel.clock.advance(.seconds(1))
+
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.seconds(4))
+        expect(!panel.isClosed, "a tab shortcut replaces a prior transient opening and waits for pointer entry")
+
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover dismissal works after the pointer has entered the tab")
     }
 
     private static func testHoverOpensAfterDwell() {

@@ -41,10 +41,7 @@ struct BoringHeader: View {
             HStack(spacing: 4) {
                 if vm.notchState == .open {
                     if coordinator.alwaysShowTabs {
-                        TabSelectionView(tabs: [
-                            TabModel(label: "App 快捷启动器", view: .appLauncher),
-                            TabModel(label: "工具集", view: .toolbox)
-                        ])
+                        TabSelectionView(tabs: TabModel.utilities)
                     }
                     if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)
