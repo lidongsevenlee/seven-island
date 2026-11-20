@@ -37,7 +37,7 @@ struct AppLauncherSettingsView: View {
             }
         }
         .accentColor(.effectiveAccent)
-        .navigationTitle("App 快捷启动器")
+        .navigationTitle("应用启动器")
     }
 
     private func directoryLabel(_ directory: URL, title: String? = nil) -> some View {
@@ -65,7 +65,8 @@ struct AppLauncherSettingsView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.directoryURL = AppLauncherService.defaultApplicationDirectories.first
-        panel.message = "选择要扫描应用程序的目录"
+        panel.message = "选择要扫描 .app 和 .jar 的目录"
+        panel.prompt = "选取"
         panel.beginSheetModal(for: window) { response in
             guard response == .OK else { return }
             let defaults = Set(AppLauncherService.applicationDirectories(adding: []))

@@ -125,11 +125,17 @@ func testAppLauncherScansMultipleDirectories() throws {
     try makeApp(at: second.appendingPathComponent("Contents/Helpers/Embedded.app"), name: "Embedded Helper")
     try "document".write(to: extra.appendingPathComponent("Not an app.app"), atomically: true, encoding: .utf8)
     try files.createSymbolicLink(at: extra.appendingPathComponent("Alpha Shortcut.app"), withDestinationURL: first)
+    let jar = extra.appendingPathComponent("Gamma Tool.JAR")
+    try Data().write(to: jar)
+    try files.createSymbolicLink(at: applications.appendingPathComponent("Gamma Shortcut.jar"), withDestinationURL: jar)
+    try files.createDirectory(at: extra.appendingPathComponent("Directory.jar"), withIntermediateDirectories: false)
 
     let items = AppLauncherService.loadApplications(from: [applications, utilities, extra])
-    expectEqual(items.map(\.url.path), [first, second].map { $0.resolvingSymlinksInPath().path },
-                "finds app bundles across directories and keeps one entry per path")
-    expectEqual(items.map(\.name), ["Alpha", "Beta Display Name"], "uses app display names")
+    expectEqual(items.map(\.url.path), [first, second, jar].map { $0.resolvingSymlinksInPath().path },
+                "finds bundles and regular JAR files across directories and keeps one entry per path")
+    expectEqual(items.map(\.kind), [.app, .app, .jar], "identifies JAR files case-insensitively")
+    expectEqual(items.map(\.name), ["Alpha", "Beta Display Name", "Gamma Tool.JAR"], "uses app display names and JAR filenames")
+    expectEqual(items.last?.matches(query: "tool.jar"), true, "searches the JAR extension")
     expectEqual(items.first?.matches(query: "alpha tool"), true, "searches the app filename")
     expectEqual(items.first?.matches(query: "UTILITIES"), true, "searches the app directory")
     let configured = AppLauncherService.applicationDirectories(adding: [extra, extra])
@@ -621,6 +627,41 @@ func testScreenshotAnnotationOutputAndHistory() {
     expectEqual(sample(blurred, x: 12, y: 40), sample(unedited, x: 12, y: 40), "blur stays inside its drawn area")
 }
 
+func testScreenshotAnnotationObjectEdits() {
+    let style = ScreenshotAnnotation.Style()
+    let rect = ScreenshotAnnotation(tool: .rectangle, style: style, points: [
+        CGPoint(x: 30, y: 20), CGPoint(x: 70, y: 60)
+    ])
+    let moved = rect.offsetBy(dx: 20, dy: 10)
+    let target = CGRect(x: 50, y: 30, width: 60, height: 55)
+    let resized = moved.resized(to: target, using: .init(x: .maximum, y: .maximum))
+    expectEqual(resized.editBounds, target, "resizes an existing object around its opposite corner")
+    expectEqual(resized.hitTest(CGPoint(x: 90, y: 65)), true, "hit-tests the edited position")
+    expectEqual(resized.hitTest(CGPoint(x: 32, y: 22)), false, "the old position is clear")
+
+    var history = ScreenshotAnnotationHistory()
+    history.append(rect)
+    history.replace(at: 0, with: resized)
+    history.remove(at: 0)
+    expectEqual(history.visible.isEmpty, true, "deletes the selected object")
+    history.undo()
+    expectEqual(history.visible.first?.editBounds, target, "undo restores the edited object")
+    history.undo()
+    expectEqual(history.visible.first?.editBounds, rect.editBounds, "undo restores the original geometry")
+    history.apply(.size(2), toLast: .rectangle)
+    history.redo()
+    expectEqual(history.visible.first?.editBounds, target, "redo restores resized geometry")
+    expectEqual(history.visible.first?.style.size, 2, "redo keeps the updated style of the same object")
+
+    let single = ScreenshotAnnotation(tool: .text, style: style, points: [.zero], text: "第一行")
+    let multi = ScreenshotAnnotation(tool: .text, style: style, points: [.zero], text: "第一行\n第二行")
+    expectEqual(multi.editBounds.height > single.editBounds.height, true, "each line increases the text bounds")
+    let growth = multi.resized(to: CGRect(origin: .zero, size: CGSize(width: multi.editBounds.width * 2,
+                                                                    height: multi.editBounds.height * 2)),
+                               using: .init(x: .maximum, y: .maximum))
+    expectEqual(growth.textScale, 2, "scales multiline text proportionally")
+}
+
 @main
 enum SevenIslandFeatureTestRunner {
     static func main() async {
@@ -653,6 +694,7 @@ enum SevenIslandFeatureTestRunner {
             try testPlaybackSongIDsTrackTheCurrentRecording()
             try testScreenshotSelectionUsesBackingPixelsAndSavesPNG()
             testScreenshotAnnotationOutputAndHistory()
+            testScreenshotAnnotationObjectEdits()
             print("SevenIslandFeatureTests passed")
         } catch {
             fputs("FAIL: \(error.localizedDescription)\n", stderr)

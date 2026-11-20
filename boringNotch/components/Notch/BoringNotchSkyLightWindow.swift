@@ -34,6 +34,12 @@ extension SkyLightOperator {
 
 class BoringNotchSkyLightWindow: NSPanel {
     private var isSkyLightEnabled: Bool = false
+    private weak var viewModel: BoringViewModel?
+
+    var expandedContentSize: CGSize? {
+        guard let viewModel, viewModel.notchState == .open else { return nil }
+        return viewModel.notchSize
+    }
     
     override init(
         contentRect: NSRect,
@@ -122,6 +128,7 @@ extension BoringNotchSkyLightWindow: NotchPanelWindow {
             backing: .buffered,
             defer: false
         )
+        self.viewModel = viewModel
         viewModel.panelWindow = self
         contentView = NSHostingView(rootView: ContentView().environmentObject(viewModel))
     }

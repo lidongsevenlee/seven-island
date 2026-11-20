@@ -121,14 +121,33 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let ownProcess = ProcessInfo.processInfo.processIdentifier
         let excluded = content.applications.filter { $0.processID == ownProcess }
-        let candidates = content.windows.filter {
-            $0.windowLayer == 0 && $0.owningApplication?.processID != ownProcess
-                && $0.frame.width >= 40 && $0.frame.height >= 40
+        let islandPanels = NSApp.windows.compactMap { $0 as? BoringNotchSkyLightWindow }.filter {
+            $0.isVisible && $0.sharingType != .none
+        }
+        let panelsByID = Dictionary(uniqueKeysWithValues: islandPanels.map { (CGWindowID($0.windowNumber), $0) })
+        let settingsWindowID = SettingsWindowController.shared.window.flatMap { window -> CGWindowID? in
+            guard window.isVisible, !window.isMiniaturized, window.sharingType != .none else { return nil }
+            return CGWindowID(exactly: window.windowNumber)
+        }
+        let includedWindows = excluded.isEmpty ? [] : content.windows.filter {
+            panelsByID[$0.windowID] != nil || $0.windowID == settingsWindowID
+        }
+        let windowRegions = content.windows.compactMap { window -> (CGWindowID, (pid_t?, CGRect))? in
+            let pid = window.owningApplication?.processID
+            let frame = window.frame
+            if let size = panelsByID[window.windowID]?.expandedContentSize {
+                let region = CGRect(x: frame.midX - size.width / 2, y: frame.minY,
+                                    width: size.width, height: size.height)
+                return (window.windowID, (pid, region))
+            }
+            guard window.windowLayer == 0, pid != ownProcess || window.windowID == settingsWindowID,
+                  frame.width >= 40, frame.height >= 40 else { return nil }
+            return (window.windowID, (pid, frame))
         }
         let frontToBackIDs = (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
             as? [[String: Any]])?.compactMap { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value } ?? []
-        let windowsByID = Dictionary(candidates.map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
-        let orderedWindows = frontToBackIDs.compactMap { windowsByID[$0] }
+        let regionsByID = Dictionary(windowRegions, uniquingKeysWith: { first, _ in first })
+        let orderedRegions = frontToBackIDs.compactMap { regionsByID[$0] }
 
         var captures: [ScreenshotDisplay] = []
         for screen in NSScreen.screens {
@@ -136,16 +155,16 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
             guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
                   let display = content.displays.first(where: { $0.displayID == id.uint32Value }) else { continue }
 
-            let filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: [])
+            let filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: includedWindows)
             let configuration = SCStreamConfiguration()
             configuration.showsCursor = false
             configuration.width = Int((screen.frame.width * CGFloat(filter.pointPixelScale)).rounded())
             configuration.height = Int((screen.frame.height * CGFloat(filter.pointPixelScale)).rounded())
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
-            let visibleWindows = orderedWindows.compactMap { window -> (pid_t?, CGRect)? in
-                let clip = window.frame.intersection(display.frame)
+            let visibleWindows = orderedRegions.compactMap { pid, region -> (pid_t?, CGRect)? in
+                let clip = region.intersection(display.frame)
                 guard !clip.isEmpty else { return nil }
-                return (window.owningApplication?.processID, clip.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY))
+                return (pid, clip.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY))
             }
             let frontmost = frontmostPID == nil || frontmostPID == ownProcess
                 ? visibleWindows.first?.1

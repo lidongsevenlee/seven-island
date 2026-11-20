@@ -113,8 +113,7 @@ struct BoringHeader: View {
 
     private var panelLockToggle: some View {
         Toggle(isOn: $vm.isPinnedOpen) {
-            Image(systemName: vm.isPinnedOpen ? "lock.fill" : "lock.open")
-                .font(.system(size: 12, weight: .semibold))
+            NotchHeaderSymbol(name: vm.isPinnedOpen ? "lock.fill" : "lock.open")
                 .foregroundStyle(.white.opacity(vm.isPinnedOpen || isLockHovered ? 0.98 : 0.72))
                 .frame(width: 24, height: 24)
                 .background {

@@ -37,7 +37,7 @@ struct SettingsView: View {
                     Label("媒体", systemImage: "play.laptopcomputer")
                 }
                 NavigationLink(value: "HUD") {
-                    Label("HUD", systemImage: "dial.medium.fill")
+                    Label("系统提示", systemImage: "dial.medium.fill")
                 }
 //                NavigationLink(value: "Downloads") {
 //                    Label("Downloads", systemImage: "square.and.arrow.down")
@@ -49,7 +49,7 @@ struct SettingsView: View {
                     Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 NavigationLink(value: "App Launcher") {
-                    Label("App 快捷启动器", systemImage: "square.grid.2x2")
+                    Label("应用启动器", systemImage: "square.grid.2x2")
                 }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
@@ -415,7 +415,7 @@ struct GeneralSettings: View {
                     HStack {
                         Text("悬停延迟")
                         Spacer()
-                        Text("\(minimumHoverDuration, specifier: "%.1f")s")
+                        Text("\(minimumHoverDuration, specifier: "%.1f") 秒")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -526,9 +526,9 @@ struct HUD: View {
             Section {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("替换系统 HUD")
+                        Text("替换系统提示")
                             .font(.headline)
-                        Text("用自定义设计替换 macOS 标准的音量、显示亮度和键盘背光 HUD。")
+                        Text("通过刘海面板显示音量、屏幕亮度和键盘背光提示。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -543,7 +543,7 @@ struct HUD: View {
                 
                 if !accessibilityAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("替换系统 HUD 需要辅助功能权限。")
+                        Text("替换系统提示需要辅助功能权限。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -563,9 +563,13 @@ struct HUD: View {
             
             Section {
                 SettingsPicker(
-                    "Option 键行为",
+                    "按住 ⌥ 键并按媒体键时",
                     selection: $optionKeyAction,
-                    options: OptionKeyAction.allCases.map { .init($0, $0.rawValue) }
+                    options: [
+                        .init(.openSettings, "打开系统设置"),
+                        .init(.showHUD, "显示系统提示"),
+                        .init(.none, "无操作"),
+                    ]
                 )
                 
                 SettingsPicker("进度条样式", selection: $enableGradient, options: [
@@ -585,7 +589,7 @@ struct HUD: View {
             
             Section {
                 Defaults.Toggle(key: .showOpenNotchHUD) {
-                    Text("在打开的刘海内显示 HUD")
+                    Text("在展开的刘海面板内显示系统提示")
                 }
                 Defaults.Toggle(key: .showOpenNotchHUDPercentage) {
                     Text("显示百分比")
@@ -594,15 +598,15 @@ struct HUD: View {
             } header: {
                 HStack {
                     Text("打开刘海")
-                    customBadge(text: "Beta")
+                    customBadge(text: "测试版")
                 }
             }
             .disabled(!hudReplacement)
             
             Section {
-                SettingsPicker("HUD 样式", selection: $inlineHUD, options: [
+                SettingsPicker("提示样式", selection: $inlineHUD, options: [
                     .init(false, "默认"),
-                    .init(true, "内联"),
+                    .init(true, "内嵌"),
                 ])
                 .onChange(of: inlineHUD) { _, isInline in
                     if isInline {
@@ -622,7 +626,7 @@ struct HUD: View {
             .disabled(!Defaults[.hudReplacement])
         }
         .accentColor(.effectiveAccent)
-        .navigationTitle("HUD")
+        .navigationTitle("系统提示")
         .onAppear {
             accessibilityAuthorized = AXIsProcessTrusted()
             accessibilityPollTimer?.invalidate()
@@ -658,7 +662,9 @@ struct Media: View {
                 SettingsPicker(
                     "音乐源",
                     selection: $mediaController,
-                    options: availableMediaControllers.map { .init($0, $0.rawValue) }
+                    options: availableMediaControllers.map {
+                        .init($0, $0 == .nowPlaying ? "正在播放" : $0.rawValue)
+                    }
                 )
                 .onChange(of: mediaController) { _, _ in
                     NotificationCenter.default.post(
@@ -707,7 +713,10 @@ struct Media: View {
                 SettingsPicker(
                     "预览样式",
                     selection: $sneakPeekStyles,
-                    options: SneakPeekStyle.allCases.map { .init($0, $0.rawValue) }
+                    options: [
+                        .init(.standard, "默认"),
+                        .init(.inline, "内嵌"),
+                    ]
                 )
                 HStack {
                     Stepper(value: $waitInterval, in: 0...10, step: 1) {
@@ -727,7 +736,7 @@ struct Media: View {
                         .init(.nowPlayingOnly, "仅对媒体应用隐藏"),
                         .init(.never, "从不隐藏"),
                     ],
-                    badge: "Beta"
+                    badge: "测试版"
                 )
             } header: {
                 Text("音乐播放实时活动")
@@ -738,7 +747,7 @@ struct Media: View {
                 Defaults.Toggle(key: .enableLyrics) {
                     HStack {
                         Text("在音乐中显示歌词")
-                        customBadge(text: "Beta")
+                        customBadge(text: "测试版")
                     }
                 }
                 .onChange(of: enableLyrics) { _, _ in
@@ -817,7 +826,8 @@ struct About: View {
                     HStack {
                         Text("版本名称")
                         Spacer()
-                        Text(Defaults[.releaseName])
+                        let name = Defaults[.releaseName]
+                        Text(name == "Flying Rabbit 🐇🪽" ? "飞兔 🐇🪽" : name)
                             .foregroundStyle(.secondary)
                     }
                     HStack {
@@ -827,7 +837,7 @@ struct About: View {
                             Text("(\(Bundle.main.buildVersionNumber ?? ""))")
                                 .foregroundStyle(.secondary)
                         }
-                        Text(Bundle.main.releaseVersionNumber ?? "unkown")
+                        Text(Bundle.main.releaseVersionNumber ?? "未知")
                             .foregroundStyle(.secondary)
                     }
                     .onTapGesture {
@@ -1061,7 +1071,11 @@ struct Appearance: View {
                 SettingsPicker(
                     "滑块颜色",
                     selection: $sliderColor,
-                    options: SliderColorEnum.allCases.map { .init($0, $0.rawValue) }
+                    options: [
+                        .init(.white, "白色"),
+                        .init(.albumArt, "匹配专辑封面"),
+                        .init(.accent, "强调色"),
+                    ]
                 )
             } header: {
                 Text("媒体")
@@ -1092,7 +1106,7 @@ struct Appearance: View {
             } header: {
                 HStack {
                     Text("自定义音乐实时活动动画")
-                    customBadge(text: "Coming soon")
+                    customBadge(text: "即将上线")
                 }
             }
 
@@ -1186,7 +1200,7 @@ struct Appearance: View {
                         HStack {
                             Text("速度")
                             Spacer(minLength: 80)
-                            Text("\(speed, specifier: "%.1f")s")
+                            Text("\(speed, specifier: "%.1f") 倍")
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(.secondary)
                             Slider(value: $speed, in: 0...2, step: 0.1)
@@ -1535,7 +1549,7 @@ struct AccentCircleButton: View {
 
 
 func proFeatureBadge() -> some View {
-    Text("Upgrade to Pro")
+    Text("升级至专业版")
         .foregroundStyle(Color(red: 0.545, green: 0.196, blue: 0.98))
         .font(.footnote.bold())
         .padding(.vertical, 3)
@@ -1546,7 +1560,7 @@ func proFeatureBadge() -> some View {
 }
 
 func comingSoonTag() -> some View {
-    Text("Coming soon")
+    Text("即将上线")
         .foregroundStyle(.secondary)
         .font(.footnote.bold())
         .padding(.vertical, 3)

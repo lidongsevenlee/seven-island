@@ -21,6 +21,20 @@ private let mainTabs = [
     TabModel(label: "备忘录", view: .memo)
 ]
 
+private let notchHeaderIconSize: CGFloat = 15
+
+struct NotchHeaderSymbol: View {
+    let name: String
+
+    var body: some View {
+        Image(systemName: name)
+            .resizable()
+            .scaledToFit()
+            .frame(width: notchHeaderIconSize, height: notchHeaderIconSize)
+            .font(.system(size: notchHeaderIconSize, weight: .semibold))
+    }
+}
+
 struct TabSelectionView: View {
     var tabs: [TabModel] = mainTabs
     @ObservedObject var coordinator = BoringViewCoordinator.shared
@@ -71,7 +85,7 @@ struct TabSelectionView: View {
         case .music:
             AppleMusicNoteShape()
                 .fill(color)
-                .frame(width: 15, height: 15)
+                .frame(width: notchHeaderIconSize, height: notchHeaderIconSize)
                 .foregroundStyle(color)
                 .opacity(isSelected ? 0.98 : 0.82)
                 .offset(y: -0.25)
@@ -81,19 +95,40 @@ struct TabSelectionView: View {
         case .vscodeProjects:
             VSCodeSymbolShape()
                 .fill(color, style: FillStyle(eoFill: true))
-                .frame(width: 15, height: 15)
+                .frame(width: notchHeaderIconSize, height: notchHeaderIconSize)
                 .opacity(isSelected ? 0.98 : 0.82)
                 .offset(y: -0.15)
         case .memo:
-            Image(systemName: "note.text")
+            NotchHeaderSymbol(name: "note.text")
                 .foregroundStyle(color)
         case .appLauncher:
-            Image(systemName: "square.grid.2x2")
-                .foregroundStyle(color)
+            AppLauncherGridShape()
+                .fill(color, style: FillStyle(eoFill: true))
+                .frame(width: notchHeaderIconSize, height: notchHeaderIconSize)
         case .toolbox:
-            Image(systemName: "cube")
+            NotchHeaderSymbol(name: "cube")
                 .foregroundStyle(color)
         }
+    }
+}
+
+private struct AppLauncherGridShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height) * 0.87
+        let diameter = side * 0.45
+        let pitch = side - diameter
+        let ringWidth = side * 0.085
+        let left = rect.midX - side / 2
+        let top = rect.midY - side / 2
+        var path = Path()
+        for y in [top, top + pitch] {
+            for x in [left, left + pitch] {
+                let ring = CGRect(x: x, y: y, width: diameter, height: diameter)
+                path.addEllipse(in: ring)
+                path.addEllipse(in: ring.insetBy(dx: ringWidth, dy: ringWidth))
+            }
+        }
+        return path
     }
 }
 

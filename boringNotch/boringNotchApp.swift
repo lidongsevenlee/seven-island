@@ -30,18 +30,18 @@ struct DynamicNotchApp: App {
 
     var body: some Scene {
         MenuBarExtra(isInserted: $showMenuBarIcon) {
-            Button("Settings") {
+            Button("设置") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
                 }
             }
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
             Button("区域截图") {
-                ScreenshotTool.shared.startCapture()
+                appDelegate.startScreenshotFromMenu()
             }
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Seven Island") {
+            Button("重启") {
                 ApplicationRelauncher.restart()
             }
             Button("Quit", role: .destructive) {
@@ -67,6 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindowController: NSWindowController?
     private var screenLockedObserver: Any?
     private var screenUnlockedObserver: Any?
+    private weak var trackingMenu: NSMenu?
     private var isScreenLocked = false
     private var unlockTask: Task<Void, Never>?
 
@@ -114,8 +115,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func startScreenshotFromMenu() {
+        trackingMenu?.cancelTracking()
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            Task { @MainActor in
+                guard self?.isScreenLocked == false else { return }
+                ScreenshotTool.shared.startCapture()
+            }
+        }
+    }
+
+    @objc private func menuTrackingDidBegin(_ notification: Notification) {
+        trackingMenu = notification.object as? NSMenu
+    }
+
+    @objc private func menuTrackingDidEnd(_ notification: Notification) {
+        if let menu = notification.object as? NSMenu, menu === trackingMenu {
+            trackingMenu = nil
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = ClipboardHistoryStore.shared
+
+        NotificationCenter.default.addObserver(self, selector: #selector(menuTrackingDidBegin),
+                                               name: NSMenu.didBeginTrackingNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(menuTrackingDidEnd),
+                                               name: NSMenu.didEndTrackingNotification, object: nil)
 
         let windowConfigurationNotifications: [Notification.Name] = [
             NSApplication.didChangeScreenParametersNotification,

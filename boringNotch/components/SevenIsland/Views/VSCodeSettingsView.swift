@@ -121,6 +121,7 @@ struct VSCodeSettingsView: View {
         panel.allowsMultipleSelection = false
         panel.showsHiddenFiles = vscodeIncludeHidden
         panel.message = "选择 VS Code 项目目录"
+        panel.prompt = "选取"
         panel.directoryURL = {
             if vscodeProjectsDirectory.isEmpty {
                 return VSCodeRecentProjectsService.defaultProjectsDirectoryURL()
@@ -142,6 +143,7 @@ struct VSCodeSettingsView: View {
         panel.allowsMultipleSelection = true
         panel.showsHiddenFiles = true
         panel.message = "选择需要直接列出的独立文件夹（可多选）"
+        panel.prompt = "选取"
 
         let response = panel.runModal()
         if response == .OK, !panel.urls.isEmpty {

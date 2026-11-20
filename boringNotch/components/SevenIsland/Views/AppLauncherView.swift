@@ -71,14 +71,18 @@ struct AppLauncherView: View {
         launchTask = Task {
             defer { launchTask = nil }
             do {
-                try await AppLauncherService.openApplication(item.url)
+                try await AppLauncherService.openApplication(item)
                 guard !Task.isCancelled else { return }
                 withAnimation(.smooth(duration: 0.2)) {
                     vm.closeUnlessPinned()
                 }
             } catch {
                 guard !Task.isCancelled else { return }
-                launchError = "无法打开「\(item.name)」"
+                if let error = error as? AppLauncherService.JavaLaunchError {
+                    launchError = error.localizedDescription
+                } else {
+                    launchError = "无法打开「\(item.name)」"
+                }
             }
         }
     }
