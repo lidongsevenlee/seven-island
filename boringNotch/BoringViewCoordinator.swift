@@ -50,8 +50,10 @@ struct ExpandedItem {
 class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
 
+    private(set) var tabSelectionCycle = 0
     @Published var currentView: NotchViews = .music {
         didSet {
+            if currentView != oldValue { tabSelectionCycle += 1 }
             lastNotchView = currentView.rawValue
         }
     }

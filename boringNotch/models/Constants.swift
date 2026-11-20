@@ -198,11 +198,15 @@ extension Defaults.Keys {
     static let vscodePinnedFolders = Key<[URL]>("vscodePinnedFolders", default: [])
     static let vscodeIncludeHidden = Key<Bool>("vscodeIncludeHidden", default: false)
     static let vscodeScanDepth = Key<Int>("vscodeScanDepth", default: 1)
+    static let projectOpenMethods = Key<[ProjectOpenMethod]>("projectOpenMethods", default: ProjectOpenMethod.presets)
+    static let projectDefaultOpenMethodID = Key<String>("projectDefaultOpenMethodID", default: ProjectOpenMethod.vscode.id)
     static let appLauncherExtraDirectories = Key<[URL]>("appLauncherExtraDirectories", default: [])
 
     // MARK: Memo
     static let memoText = Key<String>("sevenIslandMemoText", default: "")
     static let memoLibrary = Key<MemoLibrary?>("sevenIslandMemoLibrary")
+
+    static let todoItems = Key<[TodoItem]>("sevenIslandTodoItems", default: [])
 
     // Helper to determine the default media controller based on NowPlaying deprecation status
     static var defaultMediaController: MediaControllerType {

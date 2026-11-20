@@ -42,12 +42,13 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     weak var panelWindow: NSWindow?
-    private var didMakePanelKeyForTextInput = false
+    private var didMakePanelKeyForKeyboardInput = false
 
-    func makePanelKeyForTextInput() {
-        guard notchState == .open, let panelWindow, panelWindow.isVisible, !panelWindow.isKeyWindow else { return }
-        panelWindow.makeKey()
-        didMakePanelKeyForTextInput = panelWindow.isKeyWindow
+    func makePanelKeyForKeyboardInput() {
+        guard notchState == .open, !interactionState.isCapturingScreenshot,
+              let panelWindow, panelWindow.isVisible else { return }
+        if !panelWindow.isKeyWindow { panelWindow.makeKey() }
+        didMakePanelKeyForKeyboardInput = panelWindow.isKeyWindow
     }
 
     private lazy var interaction = NotchInteraction(
@@ -77,6 +78,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published private(set) var display: NotchDisplay?
     @Published private var openHeight = openNotchSize.height
+    private(set) var expansionCycle = 0
     private let defaultClosedNotchSize = getClosedNotchSize()
 
     var closedNotchSize: CGSize { display?.closedNotchSize ?? defaultClosedNotchSize }
@@ -241,6 +243,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func toggleFromShortcut() {
         interaction.toggleFromShortcut()
+        makePanelKeyForKeyboardInput()
     }
 
     func toggleTabFromShortcut(_ tab: NotchViews) {
@@ -253,10 +256,20 @@ class BoringViewModel: NSObject, ObservableObject {
             coordinator.currentView = tab
         }
         interaction.openFromTabShortcut()
+        makePanelKeyForKeyboardInput()
+    }
+
+    @discardableResult
+    func dismissFromEscape() -> Bool {
+        interaction.dismissFromEscape()
     }
 
     func hoverChanged(_ hovering: Bool) {
         interaction.hoverChanged(hovering)
+    }
+
+    func setScreenshotCaptureActive(_ active: Bool) {
+        interaction.setScreenshotCaptureActive(active)
     }
 
     func pickScreenColor() {
@@ -283,9 +296,9 @@ class BoringViewModel: NSObject, ObservableObject {
         interaction.cancelPendingTransitions()
     }
 
-    func setOpenNotchHeight(_ height: CGFloat) {
+    func setOpenNotchHeight(_ height: CGFloat, minimum: CGFloat = openNotchSize.height) {
         guard notchState == .open else { return }
-        let clampedHeight = min(max(height, openNotchSize.height), sevenIslandFeatureNotchHeight)
+        let clampedHeight = min(max(height, minimum), sevenIslandFeatureNotchHeight)
         guard abs(openHeight - clampedHeight) > 0.5 else { return }
         openHeight = clampedHeight
     }
@@ -310,7 +323,9 @@ class BoringViewModel: NSObject, ObservableObject {
         let visibilityChanged = state.notchState != notchState
         if visibilityChanged {
             switch state.notchState {
-            case .open: openHeight = openNotchSize.height
+            case .open:
+                expansionCycle += 1
+                openHeight = openNotchSize.height
             case .closed: applyClosedEffects()
             }
         }
@@ -319,13 +334,13 @@ class BoringViewModel: NSObject, ObservableObject {
         if state.notchState == .open {
             MusicManager.shared.forceUpdate()
         } else {
-            releasePanelKeyForTextInput()
+            releasePanelKeyForKeyboardInput()
         }
     }
 
-    private func releasePanelKeyForTextInput() {
-        guard didMakePanelKeyForTextInput else { return }
-        didMakePanelKeyForTextInput = false
+    private func releasePanelKeyForKeyboardInput() {
+        guard didMakePanelKeyForKeyboardInput else { return }
+        didMakePanelKeyForKeyboardInput = false
         guard let panelWindow, panelWindow.isKeyWindow else { return }
         panelWindow.makeFirstResponder(nil)
         panelWindow.orderOut(nil)

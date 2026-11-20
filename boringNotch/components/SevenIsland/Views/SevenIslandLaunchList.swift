@@ -5,7 +5,6 @@ struct SevenIslandLaunchList<Item: Identifiable, Row: View>: View {
     let searchPrompt: String
     let items: [Item]
     let emptyMessage: String
-    let itemHelp: String
     var makesPanelKey = false
     let open: (Item) -> Void
     @ViewBuilder let row: (Item) -> Row
@@ -53,15 +52,7 @@ struct SevenIslandLaunchList<Item: Identifiable, Row: View>: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(items) { item in
-                            Button {
-                                open(item)
-                            } label: {
-                                row(item)
-                            }
-                            .buttonStyle(.plain)
-                            .help(itemHelp)
-                        }
+                        ForEach(items, content: row)
                     }
                 }
                 .frame(maxHeight: 300)
@@ -73,7 +64,7 @@ struct SevenIslandLaunchList<Item: Identifiable, Row: View>: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled, vm.notchState == .open else { return }
             if makesPanelKey {
-                vm.makePanelKeyForTextInput()
+                vm.makePanelKeyForKeyboardInput()
             }
             isSearchFocused = true
         }
@@ -87,34 +78,46 @@ struct SevenIslandLaunchList<Item: Identifiable, Row: View>: View {
     }
 }
 
-struct SevenIslandLaunchRow<Icon: View>: View {
+struct SevenIslandLaunchRow<Icon: View, Actions: View>: View {
     let title: String
     let detail: String?
+    let help: String
+    let open: () -> Void
     @ViewBuilder let icon: () -> Icon
+    @ViewBuilder let actions: () -> Actions
 
     @State private var isHovering = false
     @State private var didPushCursor = false
 
     var body: some View {
         HStack(spacing: sevenIslandRowSpacing) {
-            icon()
-                .frame(width: sevenIslandRowIconWidth)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                if let detail {
-                    Text(detail)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            Button(action: open) {
+                HStack(spacing: sevenIslandRowSpacing) {
+                    icon()
+                        .frame(width: sevenIslandRowIconWidth)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        if let detail {
+                            Text(detail)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 8)
                 }
+                .padding(.leading, sevenIslandRowInset)
+                .padding(.vertical, 7)
+                .contentShape(Rectangle())
             }
-            Spacer(minLength: 8)
+            .buttonStyle(.plain)
+            .help(help)
+            actions()
         }
-        .padding(.horizontal, sevenIslandRowInset)
-        .padding(.vertical, 7)
+        .padding(.trailing, sevenIslandRowInset)
         .background(
             isHovering ? sevenIslandHoveredContentBackground : sevenIslandContentBackground,
             in: RoundedRectangle(cornerRadius: 8)

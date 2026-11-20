@@ -33,15 +33,16 @@ struct AppLauncherView: View {
                 searchPrompt: "搜索应用...",
                 items: filteredApplications,
                 emptyMessage: emptyMessage,
-                itemHelp: "打开应用程序",
                 makesPanelKey: true,
                 open: open
             ) { item in
-                SevenIslandLaunchRow(title: item.name, detail: nil) {
+                SevenIslandLaunchRow(title: item.name, detail: nil, help: "打开应用程序", open: { open(item) }) {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                         .resizable()
                         .scaledToFit()
                         .frame(height: 18)
+                } actions: {
+                    EmptyView()
                 }
             }
         }

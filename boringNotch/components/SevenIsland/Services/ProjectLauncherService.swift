@@ -2,17 +2,18 @@ import AppKit
 import Defaults
 import Foundation
 
-final class VSCodeRecentProjectsService: ObservableObject {
-    static let shared = VSCodeRecentProjectsService()
+final class ProjectLauncherService: ObservableObject {
+    static let shared = ProjectLauncherService()
 
-    @Published private(set) var projects: [VSCodeProjectItem] = []
+    @Published private(set) var projects: [ProjectItem] = []
+    private var refreshGeneration = 0
 
     private let storageJSONURL: URL
     private let stateDatabaseURL: URL
 
     init(
-        storageJSONURL: URL = VSCodeRecentProjectsService.defaultStorageJSONURL(),
-        stateDatabaseURL: URL = VSCodeRecentProjectsService.defaultStateDatabaseURL()
+        storageJSONURL: URL = ProjectLauncherService.defaultStorageJSONURL(),
+        stateDatabaseURL: URL = ProjectLauncherService.defaultStateDatabaseURL()
     ) {
         self.storageJSONURL = storageJSONURL
         self.stateDatabaseURL = stateDatabaseURL
@@ -26,15 +27,18 @@ final class VSCodeRecentProjectsService: ObservableObject {
         return defaultProjectsDirectoryURL()
     }
 
+    @MainActor
     func refresh(includeMissing: Bool = false) {
         // Recursive filesystem walk + mtime sort can stall the main thread on
         // large home directories. Run it on a userInitiated queue and publish
         // the result back to main when ready.
         let directory = Self.effectiveProjectsDirectoryURL()
         let pinned = Defaults[.vscodePinnedFolders]
-        let recentlyOpened = localFolderURLsFromStateDatabase()
+        refreshGeneration += 1
+        let generation = refreshGeneration
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
+            let recentlyOpened = Set(self.localFolderURLsFromStateDatabase().map(\.path))
             var loaded = self.loadProjects(from: directory, includeMissing: includeMissing, limit: .max)
             var seen = Set(loaded.map { $0.id })
 
@@ -45,14 +49,14 @@ final class VSCodeRecentProjectsService: ObservableObject {
                 var isDirectory: ObjCBool = false
                 let exists = FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory) && isDirectory.boolValue
                 guard includeMissing || exists else { continue }
-                loaded.append(VSCodeProjectItem(url: standardized, exists: exists))
+                loaded.append(ProjectItem(url: standardized, exists: exists))
             }
 
             // 匹配最近打开的文件夹，设置 lastSeenAt
             let now = Date()
             for (index, item) in loaded.enumerated() {
-                if recentlyOpened.contains(where: { $0.path == item.url.path }) {
-                    loaded[index] = VSCodeProjectItem(url: item.url, lastSeenAt: now, exists: item.exists)
+                if recentlyOpened.contains(item.url.path) {
+                    loaded[index] = ProjectItem(url: item.url, lastSeenAt: now, exists: item.exists)
                 }
             }
 
@@ -62,15 +66,16 @@ final class VSCodeRecentProjectsService: ObservableObject {
                 return lhDate > rhDate
             }
             DispatchQueue.main.async {
+                guard self.refreshGeneration == generation else { return }
                 self.projects = loaded
             }
         }
     }
 
-    func loadProjects(from directory: URL, includeMissing: Bool, limit: Int) -> [VSCodeProjectItem] {
+    func loadProjects(from directory: URL, includeMissing: Bool, limit: Int) -> [ProjectItem] {
         let urls = localProjectsFromDirectory(directory)
         var seen = Set<String>()
-        var items: [VSCodeProjectItem] = []
+        var items: [ProjectItem] = []
 
         for url in urls {
             let standardized = url.standardizedFileURL
@@ -81,7 +86,7 @@ final class VSCodeRecentProjectsService: ObservableObject {
             let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
             guard includeMissing || exists else { continue }
 
-            items.append(VSCodeProjectItem(url: standardized, exists: exists))
+            items.append(ProjectItem(url: standardized, exists: exists))
             if items.count >= limit {
                 break
             }
@@ -90,14 +95,128 @@ final class VSCodeRecentProjectsService: ObservableObject {
         return items
     }
 
-    func open(_ item: VSCodeProjectItem) {
-        AppLauncherService.openVSCodeProject(item.url)
-        // 更新 lastSeenAt，使其排在最前面
-        let now = Date()
-        projects = projects.map { existing in
-            existing.id == item.id 
-                ? VSCodeProjectItem(url: item.url, lastSeenAt: now, exists: item.exists)
-                : existing
+    @MainActor
+    func open(_ item: ProjectItem, with method: ProjectOpenMethod) async throws {
+        let directory = item.url.standardizedFileURL
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            throw LaunchError.missingProject
+        }
+        guard method.isValid else { throw LaunchError.invalidConfiguration }
+
+        switch method.kind {
+        case .folder:
+            if Self.usesVSCodeCLI(method), AppLauncherService.launchVSCodeCLI(for: directory) { break }
+            let app = try Self.requireApplication(for: method)
+            try await Self.open(directory, withApplicationAt: app)
+        case .link:
+            guard let link = method.link(for: directory) else { throw LaunchError.invalidConfiguration }
+            if method.hasApplication {
+                let app = try Self.requireApplication(for: method)
+                try await Self.open(link, withApplicationAt: app)
+            } else if !NSWorkspace.shared.open(link) {
+                throw LaunchError.missingApplication(method.title)
+            }
+        case .command:
+            try await Self.run(method, in: directory)
+        }
+        recordOpened(item)
+    }
+
+    @MainActor
+    static func isAvailable(_ method: ProjectOpenMethod) -> Bool {
+        guard method.isValid else { return false }
+        switch method.kind {
+        case .folder:
+            return applicationURL(for: method) != nil || (usesVSCodeCLI(method) && AppLauncherService.hasVSCodeCLI)
+        case .link:
+            if method.hasApplication { return applicationURL(for: method) != nil }
+            guard let link = method.link(for: URL(fileURLWithPath: "/tmp")) else { return false }
+            return NSWorkspace.shared.urlForApplication(toOpen: link) != nil
+        case .command:
+            return FileManager.default.isExecutableFile(atPath: (method.executablePath as NSString).expandingTildeInPath)
+        }
+    }
+
+    private static func usesVSCodeCLI(_ method: ProjectOpenMethod) -> Bool {
+        method.applicationURL == nil && method.applicationBundleID == ProjectOpenMethod.vscode.applicationBundleID
+    }
+
+    @MainActor
+    static func applicationURL(for method: ProjectOpenMethod) -> URL? {
+        if let url = method.applicationURL, let executable = Bundle(url: url)?.executableURL,
+           FileManager.default.isExecutableFile(atPath: executable.path) {
+            return url
+        }
+        return method.applicationBundleID.flatMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }
+    }
+
+    @MainActor
+    static func applicationIcon(for method: ProjectOpenMethod) -> NSImage? {
+        let workspace = NSWorkspace.shared
+        if let app = applicationURL(for: method) {
+            return workspace.icon(forFile: app.path)
+        }
+        if method.kind == .link, !method.hasApplication,
+           let link = method.link(for: URL(fileURLWithPath: "/tmp")),
+           let app = workspace.urlForApplication(toOpen: link) {
+            return workspace.icon(forFile: app.path)
+        }
+        return nil
+    }
+
+    @MainActor
+    private static func requireApplication(for method: ProjectOpenMethod) throws -> URL {
+        guard let app = applicationURL(for: method) else { throw LaunchError.missingApplication(method.title) }
+        return app
+    }
+
+    @MainActor
+    private static func open(_ target: URL, withApplicationAt app: URL) async throws {
+        let configuration = NSWorkspace.OpenConfiguration()
+        _ = try await NSWorkspace.shared.open([target], withApplicationAt: app, configuration: configuration)
+    }
+
+    private static func run(_ method: ProjectOpenMethod, in directory: URL) async throws {
+        let executable = (method.executablePath as NSString).expandingTildeInPath
+        guard FileManager.default.isExecutableFile(atPath: executable) else {
+            throw LaunchError.missingApplication(method.title)
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.currentDirectoryURL = directory
+        process.arguments = method.arguments(for: directory)
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        try await Task.sleep(for: .milliseconds(250))
+        if !process.isRunning, process.terminationStatus != 0 {
+            throw LaunchError.commandFailed(process.terminationStatus)
+        }
+    }
+
+    private func recordOpened(_ item: ProjectItem) {
+        guard let index = projects.firstIndex(where: { $0.id == item.id }) else { return }
+        var updated = projects
+        updated.remove(at: index)
+        updated.insert(ProjectItem(url: item.url, lastSeenAt: .now), at: 0)
+        projects = updated
+    }
+
+    enum LaunchError: LocalizedError {
+        case missingProject
+        case missingApplication(String)
+        case invalidConfiguration
+        case commandFailed(Int32)
+
+        var errorDescription: String? {
+            switch self {
+            case .missingProject: "找不到项目文件夹。"
+            case .missingApplication(let title): "找不到「\(title)」。"
+            case .invalidConfiguration: "请在「设置 → 项目」检查打开方式。"
+            case .commandFailed(let status): "启动命令退出（状态码 \(status)）。"
+            }
         }
     }
 
@@ -216,16 +335,16 @@ final class VSCodeRecentProjectsService: ObservableObject {
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return ""
         }
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
         return String(data: data, encoding: .utf8) ?? ""
     }
 }

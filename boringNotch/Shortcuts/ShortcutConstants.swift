@@ -17,39 +17,84 @@ extension KeyboardShortcuts.Name {
     static let captureScreenshot = Self("captureScreenshot", default: .init(.f1))
     static let panelActions: [Self] = [.captureScreenshot, .toggleNotchOpen, .toggleSneakPeek]
 
-    static let toggleMusicTab = tab(.toggleMusicTab, key: .one)
-    static let toggleClipboardTab = tab(.toggleClipboardTab, key: .two)
-    static let toggleVSCodeTab = tab(.toggleVSCodeTab, key: .three)
-    static let toggleMemoTab = tab(.toggleMemoTab, key: .four)
-    static let toggleAppLauncherTab = tab(.toggleAppLauncherTab, key: .five)
-    static let toggleToolboxTab = tab(.toggleToolboxTab, key: .six)
+    static let toggleMusicTab = tab(.toggleMusicTab)
+    static let toggleClipboardTab = tab(.toggleClipboardTab)
+    static let toggleVSCodeTab = tab(.toggleVSCodeTab)
+    static let toggleMemoTab = tab(.toggleMemoTab)
+    static let toggleTodoTab = tab(.toggleTodoTab)
+    static let toggleAppLauncherTab = tab(.toggleAppLauncherTab)
+    static let toggleToolboxTab = tab(.toggleToolboxTab)
 
     private enum Tab: String, CaseIterable {
         case toggleMusicTab
         case toggleClipboardTab = "clipboardHistoryPanel"
         case toggleVSCodeTab
         case toggleMemoTab
+        case toggleTodoTab
         case toggleAppLauncherTab
         case toggleToolboxTab
-    }
 
-    private static func tab(_ tab: Tab, key: KeyboardShortcuts.Key) -> Self {
-        let preset = Shortcut(key, modifiers: [.command])
-        let otherTabs = Tab.allCases.filter { $0 != tab }.map { Self($0.rawValue) }
-        let isTaken = (panelActions + otherTabs).contains { $0.shortcut == preset }
-        return Self(tab.rawValue, default: isTaken ? nil : preset)
-    }
-
-    static func migrateTabShortcutPresets(_ names: [Self]) {
-        let migrationKey = "sevenIslandMigratedCommandTabShortcuts"
-        guard !UserDefaults.standard.bool(forKey: migrationKey) else { return }
-
-        for name in names {
-            guard let preset = name.defaultShortcut, let key = preset.key,
-                  name.shortcut == Shortcut(key, modifiers: [.control, .command]) else { continue }
-            name.shortcut = preset
+        var key: KeyboardShortcuts.Key {
+            switch self {
+            case .toggleMusicTab: .one
+            case .toggleClipboardTab: .two
+            case .toggleVSCodeTab: .three
+            case .toggleMemoTab: .four
+            case .toggleTodoTab: .five
+            case .toggleAppLauncherTab: .six
+            case .toggleToolboxTab: .seven
+            }
         }
 
-        UserDefaults.standard.set(true, forKey: migrationKey)
+        var previousKey: KeyboardShortcuts.Key {
+            switch self {
+            case .toggleTodoTab: .seven
+            case .toggleAppLauncherTab: .five
+            case .toggleToolboxTab: .six
+            default: key
+            }
+        }
+
+        var preset: Shortcut { Shortcut(key, modifiers: [.command]) }
     }
+
+    private static func tab(_ tab: Tab) -> Self {
+        _ = migrateTabShortcutPresets
+        let otherTabs = Tab.allCases.filter { $0 != tab }.map { Self($0.rawValue) }
+        let isTaken = (panelActions + otherTabs).contains { $0.shortcut == tab.preset }
+        return Self(tab.rawValue, default: isTaken ? nil : tab.preset)
+    }
+
+    private static let migrateTabShortcutPresets: Void = {
+        let defaults = UserDefaults.standard
+        let migrationKey = "sevenIslandMigratedTabShortcutOrder"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        let migrateControlCommand = !defaults.bool(forKey: "sevenIslandMigratedCommandTabShortcuts")
+        var reserved = Set(panelActions.compactMap(\.shortcut))
+        var moves: [(name: Self, current: Shortcut, next: Shortcut)] = []
+
+        for tab in Tab.allCases {
+            let name = Self(tab.rawValue)
+            guard let current = name.shortcut else { continue }
+            let previous = Shortcut(tab.previousKey, modifiers: [.command])
+            let legacy = Shortcut(tab.previousKey, modifiers: [.control, .command])
+            let changesOrder = current == previous && current != tab.preset
+            let removesControl = migrateControlCommand && tab != .toggleTodoTab && current == legacy
+            if changesOrder || removesControl {
+                moves.append((name, current, tab.preset))
+            } else {
+                reserved.insert(current)
+            }
+        }
+
+        while let blocked = moves.firstIndex(where: { reserved.contains($0.next) }) {
+            reserved.insert(moves.remove(at: blocked).current)
+        }
+        for move in moves {
+            move.name.shortcut = move.next
+        }
+
+        defaults.set(true, forKey: migrationKey)
+    }()
 }

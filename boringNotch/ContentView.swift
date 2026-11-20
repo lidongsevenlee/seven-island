@@ -28,6 +28,14 @@ struct ContentView: View {
 
     @State private var haptics: Bool = false
 
+    private let openPanelBottomInset: CGFloat = 12
+    private let todoContentSpacing: CGFloat = 8
+    private var openHeaderHeight: CGFloat { max(24, vm.effectiveClosedNotchHeight) }
+    private var hiddenNotchBottomInset: CGFloat { vm.effectiveClosedNotchHeight == 0 ? 10 : 0 }
+    private var compactTodoContentHeight: CGFloat {
+        openNotchSize.height - openHeaderHeight - todoContentSpacing - openPanelBottomInset - hiddenNotchBottomInset
+    }
+
     @Namespace var albumArtNamespace
 
     @Default(.useMusicVisualizer) var useMusicVisualizer
@@ -111,7 +119,8 @@ struct ContentView: View {
                         ? (cornerRadiusInsets.opened.top) : (cornerRadiusInsets.opened.bottom)
                         : cornerRadiusInsets.closed.bottom
                     )
-                    .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+                    .padding(.horizontal, vm.notchState == .open ? 12 : 0)
+                    .padding(.bottom, vm.notchState == .open ? openPanelBottomInset : 0)
                     .background(.black)
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
@@ -124,10 +133,7 @@ struct ContentView: View {
                         color: ((vm.notchState == .open || vm.isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
                     )
-                    .padding(
-                        .bottom,
-                        vm.effectiveClosedNotchHeight == 0 ? 10 : 0
-                    )
+                    .padding(.bottom, hiddenNotchBottomInset)
                 
                 mainLayout
                     .frame(height: vm.notchState == .open ? vm.notchSize.height : nil, alignment: .top)
@@ -151,13 +157,14 @@ struct ContentView: View {
                             }
                     )
                     .onChange(of: vm.notchState) { _, newState in
-                        if newState == .open {
+                        if newState == .open && coordinator.currentView != .todo {
                             withAnimation(.smooth(duration: 0.35)) {
                                 vm.setOpenNotchHeight(openNotchSize.height)
                             }
                         }
                     }
-                    .onChange(of: coordinator.currentView) { _, _ in
+                    .onChange(of: coordinator.currentView) { _, view in
+                        guard view != .todo else { return }
                         withAnimation(.smooth(duration: 0.35)) {
                             vm.setOpenNotchHeight(openNotchSize.height)
                         }
@@ -199,7 +206,7 @@ struct ContentView: View {
 
     @ViewBuilder
     func NotchLayout() -> some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: vm.notchState == .open && coordinator.currentView == .todo ? todoContentSpacing : nil) {
             VStack(alignment: .leading) {
                 if coordinator.helloAnimationRunning {
                     Spacer()
@@ -249,7 +256,7 @@ struct ContentView: View {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
                            BoringHeader()
-                               .frame(height: max(24, vm.effectiveClosedNotchHeight))
+                               .frame(height: openHeaderHeight)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -304,11 +311,17 @@ struct ContentView: View {
                     case .clipboard:
                         ClipboardHistoryView()
                     case .vscodeProjects:
-                        VSCodeProjectsView()
+                        ProjectsView()
                     case .appLauncher:
                         AppLauncherView()
                     case .memo:
                         MemoView()
+                    case .todo:
+                        let presentation = TodoView.Presentation(
+                            expansionCycle: vm.expansionCycle, tabSelectionCycle: coordinator.tabSelectionCycle
+                        )
+                        TodoView(compactContentHeight: compactTodoContentHeight, presentation: presentation)
+                            .id(presentation)
                     case .toolbox:
                         ToolboxView()
                     }

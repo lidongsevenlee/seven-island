@@ -40,6 +40,16 @@ class BoringNotchSkyLightWindow: NSPanel {
         guard let viewModel, viewModel.notchState == .open else { return nil }
         return viewModel.notchSize
     }
+
+    var isPointerOverPanel: Bool { viewModel?.isMouseHovering() == true }
+
+    func setScreenshotCaptureActive(_ active: Bool) {
+        viewModel?.setScreenshotCaptureActive(active)
+    }
+
+    func restoreKeyboardFocus() {
+        viewModel?.makePanelKeyForKeyboardInput()
+    }
     
     override init(
         contentRect: NSRect,
@@ -118,6 +128,12 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func cancelOperation(_ sender: Any?) {
+        if viewModel?.dismissFromEscape() != true {
+            super.cancelOperation(sender)
+        }
+    }
 }
 
 extension BoringNotchSkyLightWindow: NotchPanelWindow {

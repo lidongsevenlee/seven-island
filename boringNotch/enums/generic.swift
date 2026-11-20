@@ -30,6 +30,7 @@ public enum NotchViews: String {
     case vscodeProjects
     case appLauncher
     case memo = "menuBarItems"
+    case todo
     case toolbox
 }
 

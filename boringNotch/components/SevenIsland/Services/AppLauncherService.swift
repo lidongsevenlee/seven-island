@@ -145,37 +145,23 @@ enum AppLauncherService {
         return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func openVSCodeProject(_ url: URL) {
-        if runCodeCLI(arguments: ["-n", url.path]) {
-            return
-        }
+    static var hasVSCodeCLI: Bool { vsCodeCLI != nil }
 
-        let appURL = URL(fileURLWithPath: "/Applications/Visual Studio Code.app")
-        if FileManager.default.fileExists(atPath: appURL.path) {
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.createsNewApplicationInstance = false
-            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: configuration)
-            return
-        }
-
-        NSWorkspace.shared.open(url)
-    }
-
-    private static func runCodeCLI(arguments: [String]) -> Bool {
+    private static var vsCodeCLI: String? {
         let candidates = [
             "/opt/homebrew/bin/code",
             "/usr/local/bin/code"
         ]
+        return candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) })
+    }
 
-        guard let executable = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-            return false
-        }
-
+    static func launchVSCodeCLI(for directory: URL) -> Bool {
+        guard let executable = vsCodeCLI else { return false }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
+        process.arguments = ["-n", directory.path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()

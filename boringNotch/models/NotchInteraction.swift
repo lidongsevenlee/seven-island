@@ -2,11 +2,13 @@
 final class NotchInteraction {
     struct State: Equatable {
         var notchState: NotchState = .closed
+        var allowsEscapeDismissal = false
         var isHovering = false
         var isPinnedOpen = false
         var isTextInputFocused = false
         var isBatteryPopoverActive = false
         var isSamplingScreenColor = false
+        var isCapturingScreenshot = false
     }
 
     typealias Schedule = @MainActor (Duration, @escaping @MainActor () -> Void) -> Task<Void, Never>
@@ -20,6 +22,7 @@ final class NotchInteraction {
     private var shortcutTask: Task<Void, Never>?
     private var shortcutCloseDeferredForFocus = false
     private var awaitingPointerEntry = false
+    private var awaitingPointerExitAfterEscape = false
 
     private(set) var state = State() {
         didSet {
@@ -53,7 +56,11 @@ final class NotchInteraction {
     }
 
     func hoverChanged(_ hovering: Bool) {
-        guard !state.isSamplingScreenColor else { return }
+        guard !state.isSamplingScreenColor, !state.isCapturingScreenshot else { return }
+        if awaitingPointerExitAfterEscape {
+            guard !hovering, !pointerIsInside() else { return }
+            awaitingPointerExitAfterEscape = false
+        }
         if awaitingPointerEntry {
             guard hovering, pointerIsInside() else { return }
             awaitingPointerEntry = false
@@ -88,17 +95,31 @@ final class NotchInteraction {
         }
     }
 
+    func setScreenshotCaptureActive(_ active: Bool) {
+        guard state.notchState == .open, state.isCapturingScreenshot != active else { return }
+        if active {
+            cancelPendingTransitions()
+            state.isCapturingScreenshot = true
+        } else {
+            state.isCapturingScreenshot = false
+            resetPointerTracking()
+            confirmPointerExit()
+            if state.notchState == .open { state.allowsEscapeDismissal = true }
+        }
+    }
+
     private func resetPointerTracking() {
         cancelHoverTransition()
         let inside = pointerIsInside()
+        if !inside { awaitingPointerExitAfterEscape = false }
         awaitingPointerEntry = state.notchState == .open && !inside
         state.isHovering = inside
     }
 
-    func open() {
+    func open(fromShortcut: Bool = false) {
         guard state.notchState == .closed else { return }
         cancelPendingTransitions()
-        state.notchState = .open
+        setOpenState(fromShortcut: fromShortcut)
     }
 
     func toggleFromShortcut() {
@@ -107,7 +128,7 @@ final class NotchInteraction {
             return
         }
 
-        open()
+        open(fromShortcut: true)
         shortcutTask = schedule(.seconds(3)) { [weak self] in
             guard let self else { return }
             self.shortcutTask = nil
@@ -117,8 +138,25 @@ final class NotchInteraction {
 
     func openFromTabShortcut() {
         cancelPendingTransitions()
-        state.notchState = .open
+        setOpenState(fromShortcut: true)
         resetPointerTracking()
+    }
+
+    private func setOpenState(fromShortcut: Bool) {
+        awaitingPointerExitAfterEscape = false
+        var next = state
+        next.notchState = .open
+        next.allowsEscapeDismissal = fromShortcut
+        state = next
+    }
+
+    @discardableResult
+    func dismissFromEscape() -> Bool {
+        guard state.allowsEscapeDismissal, !state.isSamplingScreenColor, !state.isBatteryPopoverActive,
+              !state.isCapturingScreenshot else { return false }
+        close()
+        awaitingPointerExitAfterEscape = pointerIsInside()
+        return true
     }
 
     func setPinnedOpen(_ pinned: Bool) {
@@ -156,6 +194,7 @@ final class NotchInteraction {
     func close() {
         cancelPendingTransitions()
         awaitingPointerEntry = false
+        awaitingPointerExitAfterEscape = false
         state = State()
     }
 
@@ -184,7 +223,7 @@ final class NotchInteraction {
         // Typing can cause SwiftUI to report a hover exit while the pointer is still inside.
         let inside = pointerIsInside()
         if !inside && state.notchState == .open && !state.isPinnedOpen && !state.isBatteryPopoverActive
-            && !state.isSamplingScreenColor
+            && !state.isSamplingScreenColor && !state.isCapturingScreenshot
             && (!respectingTextFocus || !state.isTextInputFocused) {
             close()
         } else {

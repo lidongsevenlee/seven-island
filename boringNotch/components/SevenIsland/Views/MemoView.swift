@@ -168,24 +168,13 @@ private struct MemoTab: View {
             .accessibilityAction(named: Text(isConfirmingDeletion ? "确认删除备忘录" : "删除备忘录"), delete)
 
             if showsDeleteButton {
-                Button(action: delete) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 9, weight: .semibold))
-
-                        if isConfirmingDeletion {
-                            Text("?")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                    }
-                    .padding(.horizontal, 3)
-                    .frame(minWidth: 18, minHeight: 18)
-                    .foregroundStyle(isConfirmingDeletion ? Color.red : (isSelected ? Color.white : Color.secondary))
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(isConfirmingDeletion ? "再次点击删除备忘录" : "删除备忘录")
-                .accessibilityLabel(isConfirmingDeletion ? "确认删除\(memo.title)？" : "删除\(memo.title)")
+                InlineDeleteButton(
+                    itemTitle: memo.title,
+                    deleteLabel: "删除备忘录",
+                    isConfirming: isConfirmingDeletion,
+                    color: isSelected ? .white : .secondary,
+                    action: delete
+                )
                 .transition(.asymmetric(
                     insertion: .opacity.animation(.easeIn(duration: 0.24).delay(0.12)),
                     removal: .opacity.animation(.easeOut(duration: 0.08))
@@ -199,5 +188,34 @@ private struct MemoTab: View {
             in: RoundedRectangle(cornerRadius: 6)
         )
         .contentShape(Rectangle())
+    }
+}
+
+struct InlineDeleteButton: View {
+    let itemTitle: String
+    let deleteLabel: String
+    let isConfirming: Bool
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "trash")
+                    .font(.system(size: 9, weight: .semibold))
+
+                if isConfirming {
+                    Text("?")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .padding(.horizontal, 3)
+            .frame(minWidth: 18, minHeight: 18)
+            .foregroundStyle(isConfirming ? .red : color)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(isConfirming ? "再次点击\(deleteLabel)" : deleteLabel)
+        .accessibilityLabel(isConfirming ? "确认删除\(itemTitle)？" : "删除\(itemTitle)")
     }
 }

@@ -20,13 +20,13 @@ enum NotchWindowManagerTests {
         defer { coordinator.currentView = previousTab }
 
         let tabs = TabModel.all
-        let expectedTabs: [NotchViews] = [.music, .clipboard, .vscodeProjects, .memo, .appLauncher, .toolbox]
-        let keys: [KeyboardShortcuts.Key] = [.one, .two, .three, .four, .five, .six]
+        let expectedTabs: [NotchViews] = [.music, .clipboard, .vscodeProjects, .memo, .todo, .appLauncher, .toolbox]
+        let keys: [KeyboardShortcuts.Key] = [.one, .two, .three, .four, .five, .six, .seven]
         expect(tabs.map(\.view) == expectedTabs, "every tab is listed in header order")
         expect(Set(tabs.map { $0.shortcut.rawValue }).count == expectedTabs.count, "each tab uses a separate shortcut setting")
         for (tab, key) in zip(tabs, keys) {
             let shortcut = KeyboardShortcuts.Shortcut(key, modifiers: [.command])
-            expect(tab.shortcut.defaultShortcut == shortcut, "the default tab shortcut matches the tab number")
+            expect(tab.shortcut.defaultShortcut == shortcut, "the default shortcut follows the tab position")
         }
 
         let fixture = Fixture()

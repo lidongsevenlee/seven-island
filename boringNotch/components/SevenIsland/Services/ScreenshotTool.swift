@@ -69,6 +69,12 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
     private weak var activeOverlay: ScreenshotSelectionPanel?
     private var pinnedPanels: [NSPanel] = []
     private var savePanel: NSSavePanel?
+    private let suspendedNotchPanels = NSHashTable<BoringNotchSkyLightWindow>.weakObjects()
+    private weak var keyWindowBeforeCapture: NSWindow?
+
+    private var visibleNotchPanels: [BoringNotchSkyLightWindow] {
+        NSApp.windows.compactMap { $0 as? BoringNotchSkyLightWindow }.filter(\.isVisible)
+    }
 
     func toggleCapture() {
         if preparation != nil || !overlays.isEmpty {
@@ -81,8 +87,12 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
     func startCapture() {
         guard preparation == nil, overlays.isEmpty, savePanel == nil else { return }
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        suspendNotchPanels()
         preparation = Task {
-            defer { preparation = nil }
+            defer {
+                preparation = nil
+                if overlays.isEmpty && savePanel == nil { resumeNotchPanels() }
+            }
             let authorized = await Task.detached { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }.value
             guard !Task.isCancelled else { return }
             guard authorized else {
@@ -111,19 +121,46 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
 
     func cancelCapture() {
         preparation?.cancel()
+        closeSelection()
+        resumeNotchPanels()
+    }
+
+    private func closeSelection() {
         let windows = overlays
         overlays.removeAll()
         activeOverlay = nil
         windows.forEach { $0.close() }
     }
 
+    private func suspendNotchPanels() {
+        if suspendedNotchPanels.allObjects.isEmpty {
+            keyWindowBeforeCapture = NSApp.keyWindow
+        }
+        for panel in visibleNotchPanels where panel.expandedContentSize != nil && !suspendedNotchPanels.contains(panel) {
+            suspendedNotchPanels.add(panel)
+            panel.setScreenshotCaptureActive(true)
+        }
+    }
+
+    private func resumeNotchPanels() {
+        let panels = suspendedNotchPanels.allObjects
+        let previousKey = keyWindowBeforeCapture
+        suspendedNotchPanels.removeAllObjects()
+        keyWindowBeforeCapture = nil
+        guard !panels.isEmpty else { return }
+        panels.forEach { $0.setScreenshotCaptureActive(false) }
+
+        if let keyWindow = NSApp.keyWindow ?? previousKey, !(keyWindow is BoringNotchSkyLightWindow) { return }
+        let remaining = panels.filter { $0.isVisible && $0.expandedContentSize != nil }
+        let target = remaining.first { $0 === previousKey } ?? remaining.first(where: \.isPointerOverPanel)
+        target?.restoreKeyboardFocus()
+    }
+
     private func captureDisplays(frontmostPID: pid_t?) async throws -> [ScreenshotDisplay] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let ownProcess = ProcessInfo.processInfo.processIdentifier
         let excluded = content.applications.filter { $0.processID == ownProcess }
-        let islandPanels = NSApp.windows.compactMap { $0 as? BoringNotchSkyLightWindow }.filter {
-            $0.isVisible && $0.sharingType != .none
-        }
+        let islandPanels = visibleNotchPanels.filter { $0.sharingType != .none }
         let panelsByID = Dictionary(uniqueKeysWithValues: islandPanels.map { (CGWindowID($0.windowNumber), $0) })
         let settingsWindowID = SettingsWindowController.shared.window.flatMap { window -> CGWindowID? in
             guard window.isVisible, !window.isMiniaturized, window.sharingType != .none else { return nil }
@@ -177,6 +214,7 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
 
     func showSelection(_ displays: [ScreenshotDisplay]) {
         guard !displays.isEmpty, overlays.isEmpty else { return }
+        suspendNotchPanels()
         overlays = displays.map { display in
             ScreenshotSelectionPanel(display: display, activate: { [weak self] panel in
                 self?.activate(panel) ?? false
@@ -210,15 +248,17 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
             return
         }
 
-        cancelCapture()
+        closeSelection()
         switch action {
         case .copy:
             copy(screenshot)
+            resumeNotchPanels()
         case .save:
             save(screenshot)
         case .pin:
             let center = CGPoint(x: display.frame.minX + selection.midX, y: display.frame.maxY - selection.midY)
             pin(screenshot, near: center)
+            resumeNotchPanels()
         }
     }
 
@@ -242,7 +282,10 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         NSApp.activate()
         panel.begin { [weak self, weak panel] response in
             guard let self else { return }
-            defer { self.savePanel = nil }
+            defer {
+                self.savePanel = nil
+                self.resumeNotchPanels()
+            }
             guard response == .OK, let url = panel?.url else { return }
             do {
                 try screenshot.save(to: url)

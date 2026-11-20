@@ -49,7 +49,7 @@ func testClipboardHistoryRespectsMaximumItemLimit() {
     expectEqual(items.map(\.content), ["item 5", "item 4", "item 3"], "keeps newest items up to limit")
 }
 
-func testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly() throws {
+func testProjectsLoadFirstLevelDirectories() throws {
     let temp = FileManager.default.temporaryDirectory
         .appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
@@ -68,7 +68,7 @@ func testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly() throws {
     try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
     try "not a folder".write(to: projectsDirectory.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
 
-    let service = VSCodeRecentProjectsService(
+    let service = ProjectLauncherService(
         storageJSONURL: temp.appendingPathComponent("missing-storage.json"),
         stateDatabaseURL: temp.appendingPathComponent("missing.vscdb")
     )
@@ -90,6 +90,31 @@ func testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly() throws {
         "loads first-level project folders by modification time"
     )
     expectEqual(projects.first?.name, "Alpha", "uses folder name as display name")
+}
+
+@MainActor
+func testProjectOpenMethods() async throws {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Project & A+B #项目 \(UUID())", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    let codex = ProjectOpenMethod.codex
+    let link = codex.link(for: directory)!
+    let components = URLComponents(url: link, resolvingAgainstBaseURL: false)!
+    expectEqual(components.scheme, "codex", "uses Codex's desktop scheme")
+    expectEqual(components.path, "/new", "uses the local chat route")
+    expectEqual(components.queryItems, [URLQueryItem(name: "path", value: directory.path)], "round-trips the workspace path")
+    expectEqual(components.percentEncodedQuery?.contains("+"), false, "escapes plus signs in query values")
+    expectEqual(ProjectOpenMethod.preferred(in: ProjectOpenMethod.presets, id: ProjectOpenMethod.vscode.id),
+                .vscode, "uses VS Code as the initial default")
+
+    let method = ProjectOpenMethod(title: "Check folder", kind: .command,
+                                  executablePath: "/bin/test", argumentTemplate: "-d\n{path}")
+    expectEqual(method.arguments(for: directory), ["-d", directory.path], "passes the project path as one argument")
+    let data = try JSONEncoder().encode(method)
+    expectEqual(try JSONDecoder().decode(ProjectOpenMethod.self, from: data), method, "persists a custom open method")
+    try await ProjectLauncherService().open(ProjectItem(url: directory), with: method)
 }
 
 func testAppLauncherScansMultipleDirectories() throws {
@@ -122,6 +147,10 @@ func testAppLauncherScansMultipleDirectories() throws {
     let second = extra.appendingPathComponent("Beta.app", isDirectory: true)
     try makeApp(at: first, name: "Alpha")
     try makeApp(at: second, name: "Beta Display Name")
+    let projectMethod = ProjectOpenMethod.forApplication(second)
+    expectEqual(projectMethod.title, "Beta Display Name", "names a project opener after the selected app")
+    expectEqual(projectMethod.kind, .folder, "selecting an app automatically configures folder opening")
+    expectEqual(projectMethod.applicationURL, second, "retains the selected app's path")
     try makeApp(at: second.appendingPathComponent("Contents/Helpers/Embedded.app"), name: "Embedded Helper")
     try "document".write(to: extra.appendingPathComponent("Not an app.app"), atomically: true, encoding: .utf8)
     try files.createSymbolicLink(at: extra.appendingPathComponent("Alpha Shortcut.app"), withDestinationURL: first)
@@ -668,7 +697,8 @@ enum SevenIslandFeatureTestRunner {
         do {
             testClipboardHistoryDeduplicatesAndFiltersSensitiveText()
             testClipboardHistoryRespectsMaximumItemLimit()
-            try testVSCodeProjectsLoadsFirstLevelProjectsDirectoryFoldersOnly()
+            try testProjectsLoadFirstLevelDirectories()
+            try await testProjectOpenMethods()
             try testAppLauncherScansMultipleDirectories()
             testLyricsDisplayTextBuildsSingleAndMultilineLyrics()
             testLyricsDisplayTextCentersCurrentSyncedLyricInWindow()

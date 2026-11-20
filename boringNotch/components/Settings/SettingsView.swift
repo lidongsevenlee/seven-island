@@ -45,8 +45,8 @@ struct SettingsView: View {
                 NavigationLink(value: "Clipboard") {
                     Label("剪贴板", systemImage: "clipboard")
                 }
-                NavigationLink(value: "VS Code") {
-                    Label("VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
+                NavigationLink(value: "Projects") {
+                    Label("项目", systemImage: "folder")
                 }
                 NavigationLink(value: "App Launcher") {
                     Label("应用启动器", systemImage: "square.grid.2x2")
@@ -78,8 +78,8 @@ struct SettingsView: View {
                     HUD()
                 case "Clipboard":
                     ClipboardSettingsView()
-                case "VS Code":
-                    VSCodeSettingsView()
+                case "Projects", "VS Code":
+                    ProjectSettingsView()
                 case "App Launcher":
                     AppLauncherSettingsView()
                 case "Extensions":
@@ -122,7 +122,7 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsPicker<Value: Hashable>: View {
+struct SettingsPicker<Value: Hashable>: View {
     struct Option: Identifiable {
         let value: Value
         let title: String

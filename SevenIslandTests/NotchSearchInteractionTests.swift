@@ -9,15 +9,47 @@ enum NotchSearchInteractionTests {
         testHoverExitUsesPointerLocation()
         testWindowMovePreservesExpansion()
         testScreenColorSamplingPreservesExpansion()
+        testScreenshotRestoresPointerTracking()
         testScreenColorFormats()
         testShortcutTimeoutUsesPointerLocation()
         testShortcutTimeoutWaitsForBlur()
         testTabShortcutWhilePointerIsOutside()
+        testEscapeDismissesShortcutPanel()
         testPinControlsDismissal()
         testReopeningCancelsOldTimeout()
         testPanelsHaveIndependentTimers()
         testBatteryPopoverDismissal()
         print("NotchSearchInteractionTests passed")
+    }
+
+    private static func testEscapeDismissesShortcutPanel() {
+        let panel = Panel()
+        panel.interaction.open()
+        expect(!panel.interaction.dismissFromEscape(), "mouse-opened panels keep their normal cancel behavior")
+        panel.interaction.close()
+
+        panel.interaction.toggleFromShortcut()
+        expect(panel.interaction.dismissFromEscape() && panel.isClosed, "Escape dismisses the general keyboard opening")
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.setPinnedOpen(true)
+        panel.pointerInside = true
+        expect(panel.interaction.dismissFromEscape() && panel.isClosed, "Escape dismisses a pinned tab opened by shortcut")
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.seconds(1))
+        expect(panel.isClosed, "the pointer already over the notch cannot reopen the panel immediately")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(300))
+        expect(!panel.isClosed, "hover resumes on a fresh pointer entry")
+
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.setScreenColorSampling(true)
+        expect(!panel.interaction.dismissFromEscape(), "the screen color sampler owns Escape while it is active")
+        panel.interaction.setScreenColorSampling(false)
+        expect(panel.interaction.dismissFromEscape() && panel.isClosed, "Escape can dismiss once sampling ends")
     }
 
     private static func testTabShortcutWhilePointerIsOutside() {
@@ -146,6 +178,35 @@ enum NotchSearchInteractionTests {
         panel.interaction.hoverChanged(false)
         panel.clock.advance(.milliseconds(100))
         expect(panel.isClosed, "hover dismissal resumes after entering the panel")
+    }
+
+    private static func testScreenshotRestoresPointerTracking() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.open()
+        panel.interaction.hoverChanged(true)
+        panel.interaction.setScreenshotCaptureActive(true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.seconds(1))
+        expect(!panel.isClosed, "screenshot selection keeps expanded panels available for capture")
+        panel.interaction.setScreenshotCaptureActive(false)
+        expect(panel.isClosed, "screenshot teardown checks the current pointer position")
+
+        panel.pointerInside = true
+        panel.interaction.open()
+        panel.interaction.setScreenshotCaptureActive(true)
+        panel.interaction.setScreenshotCaptureActive(false)
+        expect(!panel.isClosed, "screenshot teardown preserves the panel under the pointer")
+        expect(panel.interaction.dismissFromEscape() && panel.isClosed, "Escape can close the panel after capture")
+
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.setPinnedOpen(true)
+        panel.interaction.setScreenshotCaptureActive(true)
+        expect(!panel.interaction.dismissFromEscape(), "the screenshot overlay owns Escape during capture")
+        panel.pointerInside = false
+        panel.interaction.setScreenshotCaptureActive(false)
+        expect(!panel.isClosed && panel.interaction.state.isPinnedOpen, "a pinned panel keeps its expansion after capture")
     }
 
     private static func testScreenColorFormats() {

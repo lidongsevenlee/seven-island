@@ -14,7 +14,7 @@ let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 let shadowPadding: CGFloat = 20
 let openNotchSize: CGSize = .init(width: 640, height: 240)
-let sevenIslandFeatureNotchHeight: CGFloat = openNotchSize.height * 1.5
+let sevenIslandFeatureNotchHeight: CGFloat = openNotchSize.height * 2
 let sevenIslandContentInset: CGFloat = 12
 let sevenIslandRowIconWidth: CGFloat = 18
 let sevenIslandRowSpacing: CGFloat = 10
