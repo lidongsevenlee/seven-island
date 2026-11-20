@@ -148,7 +148,7 @@ button { font: inherit; cursor: pointer; }
 }
 .capture-tabs {
   --active-index: 0;
-  --tab-count: 7;
+  --tab-count: 8;
   max-width: 100%;
   position: relative;
   isolation: isolate;
@@ -211,7 +211,7 @@ button { font: inherit; cursor: pointer; }
 }
 .capability-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 24px;
   margin: 52px 0 0;
   padding: 0;
@@ -254,8 +254,6 @@ button { font: inherit; cursor: pointer; }
 }
 .toolbox-icon::before { width: 25px; height: 20px; top: 15px; border-radius: 4px; }
 .toolbox-icon::after { width: 10px; height: 6px; top: 10px; border-radius: 3px 3px 0 0; }
-.code-icon { gap: 4px; font-size: 35px; }
-.code-icon span { transform: translateY(1px); }
 .capability-grid h3 { margin-bottom: 4px; font-size: 16px; font-weight: 600; }
 .capability-grid p { max-width: 16em; margin-inline: auto; color: #565252; font-size: 14px; }
 

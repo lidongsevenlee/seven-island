@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录、应用启动、屏幕取色、截图标注与悬浮缩放。">
+  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、项目打开、备忘录、待办、应用启动、屏幕取色、截图标注与悬浮缩放。">
   <meta name="theme-color" content="#fbfbfb">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island">
   <meta property="og:description" content="Seven Island 的原生界面操作录屏与 macOS 下载。">
   <meta property="og:url" content="https://lidongsevenlee.github.io/seven-island/">
-  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-202-arrow.jpg">
+  <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-todo-210.jpg">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=202">
-  <script src="demo.js?v=expand" defer></script>
+  <link rel="stylesheet" href="styles.css?v=210">
+  <script src="demo.js?v=210" defer></script>
   <title>Seven Island</title>
 </head>
 <body>
@@ -23,31 +23,34 @@
         <img class="wallpaper" src="assets/showcase-2560.jpg" srcset="assets/showcase-1280.jpg 1280w, assets/showcase-2560.jpg 2560w" sizes="100vw" alt="" fetchpriority="high">
         <div class="hero-content">
           <h1 class="product-notch" id="product-name"><img src="assets/icon.png" width="24" height="24" alt="Seven Island"></h1>
-          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/download/v2.0.2/Seven-Island-2.0.2.dmg">
-            <span class="download-icon" aria-hidden="true"><span></span></span>下载 macOS 版 · 2.0.2
+          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/download/v2.1.0/Seven-Island-2.1.0.dmg">
+            <span class="download-icon" aria-hidden="true"><span></span></span>下载 macOS 版 · 2.1.0
           </a>
           <div class="capture-frame">
             <div class="capture-viewport">
-              <div id="panel-screenshot" role="tabpanel" aria-labelledby="tab-screenshot" tabindex="0">
-                <video muted playsinline preload="none" poster="assets/seven-island-screenshot-f1-202.jpg" data-src="assets/seven-island-screenshot-f1-202.mp4" aria-label="Seven Island 2.0.2 截图录屏。按 F1 开始截图，框选区域并添加文字标注，再将截图悬浮，以中心点缩放并查看右上角的比例。"></video>
-              </div>
-              <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-music-202-arrow.jpg" data-src="assets/seven-island-music-202-arrow.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
+              <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
+                <video muted playsinline preload="none" poster="assets/seven-island-music-210.jpg" data-src="assets/seven-island-music-210.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
               </div>
               <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-202-arrow.jpg" data-src="assets/seven-island-clipboard-202-arrow.mp4" aria-label="剪贴板录屏。展开刘海后依次筛选文本、图片和文件，再搜索文件名。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-clipboard-210.jpg" data-src="assets/seven-island-clipboard-210.mp4" aria-label="剪贴板录屏。展开刘海后依次筛选文本、图片和文件，再搜索文件名。"></video>
               </div>
               <div id="panel-vscode" role="tabpanel" aria-labelledby="tab-vscode" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-vscode-202-arrow.jpg" data-src="assets/seven-island-vscode-202-arrow.mp4" aria-label="VS Code 录屏。从折叠态展开，搜索 Island Demo，点击条目后在 VS Code 打开项目。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-projects-210.jpg" data-src="assets/seven-island-projects-210.mp4" aria-label="项目录屏。从折叠态展开，搜索 IslandDemo，点击条目后在默认的 VS Code 打开项目。"></video>
               </div>
               <div id="panel-memo" role="tabpanel" aria-labelledby="tab-memo" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-memo-202-arrow.jpg" data-src="assets/seven-island-memo-202-arrow.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-memo-210.jpg" data-src="assets/seven-island-memo-210.mp4" aria-label="备忘录录屏。展开刘海后切换到本周计划，编辑内容，再新建备忘录。"></video>
+              </div>
+              <div id="panel-todo" role="tabpanel" aria-labelledby="tab-todo" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-todo-210.jpg" data-src="assets/seven-island-todo-210.mp4" aria-label="待办录屏。从折叠态展开，新增一项待办并标记完成，再切换到全部和日期视图。"></video>
               </div>
               <div id="panel-launcher" role="tabpanel" aria-labelledby="tab-launcher" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-launcher-202-arrow.jpg" data-src="assets/seven-island-launcher-202-arrow.mp4" aria-label="应用启动器录屏。从折叠态展开，搜索 Focus Timer 并打开示例应用。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-launcher-210.jpg" data-src="assets/seven-island-launcher-210.mp4" aria-label="应用启动器录屏。从折叠态展开，搜索 Focus Timer 并打开示例应用。"></video>
               </div>
               <div id="panel-toolbox" role="tabpanel" aria-labelledby="tab-toolbox" tabindex="0" hidden>
-                <video muted playsinline preload="none" poster="assets/seven-island-toolbox-color-202-arrow.jpg" data-src="assets/seven-island-toolbox-color-202-arrow.mp4" aria-label="工具集取色器录屏。从折叠态展开，点击屏幕取色并选中青色样块，查看 HEX 和 RGB。选中的 HEX 会自动复制。"></video>
+                <video muted playsinline preload="none" poster="assets/seven-island-toolbox-210.jpg" data-src="assets/seven-island-toolbox-210.mp4" aria-label="工具集取色器录屏。从折叠态展开，点击屏幕取色并选中青色样块，查看 HEX 和 RGB。选中的 HEX 会自动复制。"></video>
+              </div>
+              <div id="panel-screenshot" role="tabpanel" aria-labelledby="tab-screenshot" tabindex="0" hidden>
+                <video muted playsinline preload="none" poster="assets/seven-island-screenshot-f1-210.jpg" data-src="assets/seven-island-screenshot-f1-210.mp4" aria-label="Seven Island 截图录屏。按 F1 开始截图，框选区域并添加文字标注，再将截图悬浮，以中心点缩放并查看右上角的比例。"></video>
               </div>
             </div>
           </div>
@@ -56,13 +59,14 @@
 
       <div class="demo-controls">
         <div class="capture-tabs" role="tablist" aria-label="切换录屏场景">
-          <button id="tab-screenshot" type="button" role="tab" aria-selected="true" aria-controls="panel-screenshot">截图</button>
-          <button id="tab-music" type="button" role="tab" aria-selected="false" aria-controls="panel-music" tabindex="-1">音乐</button>
+          <button id="tab-music" type="button" role="tab" aria-selected="true" aria-controls="panel-music">音乐</button>
           <button id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
-          <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
+          <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">项目</button>
           <button id="tab-memo" type="button" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
+          <button id="tab-todo" type="button" role="tab" aria-selected="false" aria-controls="panel-todo" tabindex="-1">待办</button>
           <button id="tab-launcher" type="button" role="tab" aria-selected="false" aria-controls="panel-launcher" tabindex="-1">应用启动器</button>
           <button id="tab-toolbox" type="button" role="tab" aria-selected="false" aria-controls="panel-toolbox" tabindex="-1">工具集</button>
+          <button id="tab-screenshot" type="button" role="tab" aria-selected="false" aria-controls="panel-screenshot" tabindex="-1">截图</button>
         </div>
         <button id="motion-toggle" class="motion-toggle" type="button" aria-label="播放录屏" title="播放录屏">
           <span id="motion-icon" aria-hidden="true">▶</span>
@@ -86,14 +90,19 @@
           <p>按文本、图片和文件筛选剪贴板历史，也可搜索文件名。</p>
         </li>
         <li>
-          <div class="capability-icon code-icon" aria-hidden="true">‹<span>›</span></div>
-          <h3>VS Code</h3>
-          <p>查找最近使用或固定的项目，点击即可打开。</p>
+          <div class="capability-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8 11v4m4-4v2m4-2v5"/></svg></div>
+          <h3>项目</h3>
+          <p>搜索本地项目，可用 VS Code、Codex 或自选应用打开。</p>
         </li>
         <li>
           <div class="capability-icon memo-icon" aria-hidden="true"></div>
           <h3>备忘录</h3>
           <p>用标签切换多份备忘录，编辑内容自动保存在本机。</p>
+        </li>
+        <li>
+          <div class="capability-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="5" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><path d="M10 5h11m-11 7h11m-11 7h11"/></svg></div>
+          <h3>待办</h3>
+          <p>新增待办时自动记录时间。过去未完成的事项会带到今天，也可按日期回看。</p>
         </li>
         <li>
           <div class="capability-icon launcher-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
