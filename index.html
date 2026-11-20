@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录、应用启动、屏幕取色和截图标注。">
+  <meta name="description" content="Seven Island 是一款开源 macOS 刘海应用，支持音乐控制、剪贴板分类、VS Code 项目、备忘录、应用启动、屏幕取色、截图标注与悬浮缩放。">
   <meta name="theme-color" content="#fbfbfb">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Seven Island">
@@ -12,7 +12,7 @@
   <meta property="og:image" content="https://lidongsevenlee.github.io/seven-island/assets/seven-island-music-200.jpg">
   <link rel="icon" href="assets/icon.png">
   <link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=200">
+  <link rel="stylesheet" href="styles.css?v=202">
   <script src="demo.js?v=expand" defer></script>
   <title>Seven Island</title>
 </head>
@@ -23,12 +23,15 @@
         <img class="wallpaper" src="assets/showcase-2560.jpg" srcset="assets/showcase-1280.jpg 1280w, assets/showcase-2560.jpg 2560w" sizes="100vw" alt="" fetchpriority="high">
         <div class="hero-content">
           <h1 class="product-notch" id="product-name"><img src="assets/icon.png" width="24" height="24" alt="Seven Island"></h1>
-          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/latest">
-            <span class="download-icon" aria-hidden="true"><span></span></span>下载 macOS 版
+          <a class="download-link" href="https://github.com/lidongsevenlee/seven-island/releases/download/v2.0.2/Seven-Island-2.0.2.dmg">
+            <span class="download-icon" aria-hidden="true"><span></span></span>下载 macOS 版 · 2.0.2
           </a>
           <div class="capture-frame">
             <div class="capture-viewport">
-              <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0">
+              <div id="panel-screenshot" role="tabpanel" aria-labelledby="tab-screenshot" tabindex="0">
+                <video muted playsinline preload="none" poster="assets/seven-island-screenshot-202.jpg" data-src="assets/seven-island-screenshot-202.mp4" aria-label="Seven Island 2.0.2 截图录屏。从折叠态展开刘海，框选区域并输入文字标注，再悬浮贴图，以中心点缩放并查看右上角的比例。"></video>
+              </div>
+              <div id="panel-music" role="tabpanel" aria-labelledby="tab-music" tabindex="0" hidden>
                 <video muted playsinline preload="none" poster="assets/seven-island-music-200.jpg" data-src="assets/seven-island-music-200.mp4" aria-label="音乐录屏。将鼠标移到刘海展开播放器，查看同步歌词和频谱，暂停与恢复播放。"></video>
               </div>
               <div id="panel-clipboard" role="tabpanel" aria-labelledby="tab-clipboard" tabindex="0" hidden>
@@ -53,7 +56,8 @@
 
       <div class="demo-controls">
         <div class="capture-tabs" role="tablist" aria-label="切换录屏场景">
-          <button id="tab-music" type="button" role="tab" aria-selected="true" aria-controls="panel-music">音乐</button>
+          <button id="tab-screenshot" type="button" role="tab" aria-selected="true" aria-controls="panel-screenshot">截图</button>
+          <button id="tab-music" type="button" role="tab" aria-selected="false" aria-controls="panel-music" tabindex="-1">音乐</button>
           <button id="tab-clipboard" type="button" role="tab" aria-selected="false" aria-controls="panel-clipboard" tabindex="-1">剪贴板</button>
           <button id="tab-vscode" type="button" role="tab" aria-selected="false" aria-controls="panel-vscode" tabindex="-1">VS Code</button>
           <button id="tab-memo" type="button" role="tab" aria-selected="false" aria-controls="panel-memo" tabindex="-1">备忘录</button>
@@ -99,7 +103,7 @@
         <li>
           <div class="capability-icon toolbox-icon" aria-hidden="true"></div>
           <h3>工具集</h3>
-          <p>屏幕取色自动复制 HEX。按 Fn + F1 截图，支持标注、复制、保存和悬浮。</p>
+          <p>屏幕取色可自动复制 HEX。按 Fn + F1 截图并添加文字标注，悬浮贴图可居中缩放并显示比例。</p>
         </li>
       </ul>
     </section>
