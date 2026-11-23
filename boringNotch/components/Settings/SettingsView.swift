@@ -644,12 +644,10 @@ struct HUD: View {
 
                         HStack(spacing: 12) {
                             Button("请求辅助功能权限") {
-                                let options = [
-                                    kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true
-                                ] as CFDictionary
-                                AXIsProcessTrustedWithOptions(options)
+                                XPCHelperClient.shared.requestAccessibilityAuthorization()
                             }
                             .buttonStyle(.borderedProminent)
+                            Link("打开系统设置", destination: URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                         }
                     }
                     .padding(.top, 6)
@@ -750,6 +748,7 @@ struct Media: View {
     @Default(.enableLyrics) var enableLyrics
     @Default(.appleMusicLyricsCacheBookmark) private var appleMusicLyricsCacheBookmark
     @State private var lyricsCacheError: String?
+    @State private var systemPlaybackUnavailable = MusicManager.shared.isSystemPlaybackUnavailable
 
     var body: some View {
         Form {
@@ -757,8 +756,8 @@ struct Media: View {
                 SettingsPicker(
                     "音乐源",
                     selection: $mediaController,
-                    options: availableMediaControllers.map {
-                        .init($0, $0 == .nowPlaying ? "正在播放" : $0.rawValue)
+                    options: MediaControllerType.allCases.map {
+                        .init($0, $0.displayName)
                     }
                 )
                 .onChange(of: mediaController) { _, _ in
@@ -770,33 +769,28 @@ struct Media: View {
             } header: {
                 Text("音乐源")
             } footer: {
-                if mediaController == .lxMusic {
-                    Text(mediaController.description)
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                } else if MusicManager.shared.isNowPlayingDeprecated {
-                    HStack {
-                        Text("YouTube Music 需要安装此第三方应用：")
+                if mediaController == .youtubeMusic {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(mediaController.description)
                             .foregroundStyle(.secondary)
-                            .font(.caption)
                         Link(
-                            "https://github.com/pear-devs/pear-desktop",
+                            "查看 Pear Desktop",
                             destination: URL(string: "https://github.com/pear-devs/pear-desktop")!
                         )
-                        .font(.caption)
-                        .foregroundColor(.blue)  // Ensures it's visibly a link
                     }
-                } else if mediaController.systemPlayerBundleIdentifier != nil {
-                    Text(mediaController.description)
+                    .font(.caption)
+                } else if mediaController.usesSystemPlayback && systemPlaybackUnavailable {
+                    Text("暂时无法读取系统播放信息。可以切换音乐源后重试。")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 } else {
-                    Text(
-                        "「正在播放」在之前的版本中是唯一选项，适用于所有媒体应用。"
-                    )
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
+                    Text(mediaController.description)
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
                 }
+            }
+            .onReceive(MusicManager.shared.$isSystemPlaybackUnavailable.removeDuplicates()) { unavailable in
+                systemPlaybackUnavailable = unavailable
             }
             
             Section {
@@ -904,10 +898,6 @@ struct Media: View {
         }
     }
 
-    // Only show controller options that are available on this macOS version
-    private var availableMediaControllers: [MediaControllerType] {
-        MediaControllerType.available(systemPlayback: !MusicManager.shared.isNowPlayingDeprecated)
-    }
 }
 
 struct About: View {

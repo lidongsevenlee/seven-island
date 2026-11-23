@@ -53,6 +53,8 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
     
     var id: String { self.rawValue }
 
+    var displayName: String { self == .nowPlaying ? "正在播放" : rawValue }
+
     var systemPlayerBundleIdentifier: String? {
         switch self {
         case .neteaseMusic: "com.netease.163music"
@@ -65,9 +67,6 @@ enum MediaControllerType: String, CaseIterable, Identifiable, Defaults.Serializa
         self == .nowPlaying || systemPlayerBundleIdentifier != nil
     }
 
-    static func available(systemPlayback: Bool) -> [Self] {
-        allCases.filter { systemPlayback || !$0.usesSystemPlayback }
-    }
 }
 
 // Sneak peek styles for selection in settings
@@ -188,7 +187,7 @@ extension Defaults.Keys {
     static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .nowPlayingOnly)
     
     // MARK: Media Controller
-    static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
+    static let mediaController = Key<MediaControllerType>("mediaController", default: .nowPlaying)
     
     // MARK: Advanced Settings
     static let useCustomAccentColor = Key<Bool>("useCustomAccentColor", default: false)
@@ -208,15 +207,6 @@ extension Defaults.Keys {
     static let memoLibrary = Key<MemoLibrary?>("sevenIslandMemoLibrary")
 
     static let todoItems = Key<[TodoItem]>("sevenIslandTodoItems", default: [])
-
-    // Helper to determine the default media controller based on NowPlaying deprecation status
-    static var defaultMediaController: MediaControllerType {
-        if MusicManager.shared.isNowPlayingDeprecated {
-            return .appleMusic
-        } else {
-            return .nowPlaying
-        }
-    }
 
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
 }

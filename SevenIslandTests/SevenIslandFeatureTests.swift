@@ -546,6 +546,38 @@ func testPlaybackSongIDsTrackTheCurrentRecording() throws {
 }
 
 @MainActor
+func testScreenCapturePermissionRequestsRequireConfirmation() async {
+    var confirmations = 0
+    var requests = 0
+    let alreadyAuthorized = await ScreenshotTool.authorizeCapture(preflight: { true }, confirmRequest: {
+        confirmations += 1
+        return true
+    }, request: {
+        requests += 1
+        return true
+    })
+    precondition(alreadyAuthorized && confirmations == 0 && requests == 0)
+
+    let opensSettings = await ScreenshotTool.authorizeCapture(preflight: { false }, confirmRequest: {
+        confirmations += 1
+        return false
+    }, request: {
+        requests += 1
+        return true
+    })
+    precondition(!opensSettings && confirmations == 1 && requests == 0)
+
+    let denied = await ScreenshotTool.authorizeCapture(preflight: { false }, confirmRequest: {
+        confirmations += 1
+        return true
+    }, request: {
+        requests += 1
+        return false
+    })
+    precondition(!denied && confirmations == 2 && requests == 1)
+}
+
+@MainActor
 func testScreenshotSelectionUsesBackingPixelsAndSavesPNG() throws {
     let context = CGContext(data: nil, width: 200, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
@@ -722,6 +754,7 @@ enum SevenIslandFeatureTestRunner {
             testNativeDesktopLyricsKeepWordStartAndEndTimes()
             testDesktopLyricsMatchPreviewAndQQMetadataAliases()
             try testPlaybackSongIDsTrackTheCurrentRecording()
+            await testScreenCapturePermissionRequestsRequireConfirmation()
             try testScreenshotSelectionUsesBackingPixelsAndSavesPNG()
             testScreenshotAnnotationOutputAndHistory()
             testScreenshotAnnotationObjectEdits()

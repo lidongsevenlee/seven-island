@@ -21,9 +21,7 @@ class MusicManager: ObservableObject {
     private var controllerCancellables = Set<AnyCancellable>()
     private var debounceIdleTask: Task<Void, Never>?
 
-    // Helper to check if macOS has removed support for NowPlayingController
-    public private(set) var isNowPlayingDeprecated: Bool = false
-    private let mediaChecker = MediaChecker()
+    @Published private(set) var isSystemPlaybackUnavailable = false
 
     // Active controller
     private var activeController: (any MediaControllerProtocol)?
@@ -82,19 +80,7 @@ class MusicManager: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // Initialize deprecation check asynchronously
-        Task { @MainActor in
-            do {
-                self.isNowPlayingDeprecated = try await self.mediaChecker.checkDeprecationStatus()
-                print("Deprecation check completed: \(self.isNowPlayingDeprecated)")
-            } catch {
-                print("Failed to check deprecation status: \(error). Defaulting to false.")
-                self.isNowPlayingDeprecated = false
-            }
-            
-            // Initialize the active controller after deprecation check
-            self.setActiveControllerBasedOnPreference()
-        }
+        Task { @MainActor [weak self] in self?.setActiveControllerBasedOnPreference() }
     }
 
     deinit {
@@ -128,12 +114,7 @@ class MusicManager: ObservableObject {
 
         switch type {
         case .nowPlaying, .neteaseMusic, .qqMusic:
-            // Only create NowPlayingController if not deprecated on this macOS version
-            if !self.isNowPlayingDeprecated {
-                newController = NowPlayingController(sourceBundleIdentifier: type.systemPlayerBundleIdentifier)
-            } else {
-                return nil
-            }
+            newController = NowPlayingController(sourceBundleIdentifier: type.systemPlayerBundleIdentifier)
         case .appleMusic:
             newController = AppleMusicController()
         case .lxMusic:
@@ -163,16 +144,14 @@ class MusicManager: ObservableObject {
         let preferredType = Defaults[.mediaController]
         print("Preferred Media Controller: \(preferredType)")
 
-        // If NowPlaying is deprecated but that's the preference, use Apple Music instead
-        let controllerType = (self.isNowPlayingDeprecated && preferredType.usesSystemPlayback)
-            ? .appleMusic
-            : preferredType
-
-        if let controller = createController(for: controllerType) {
+        isSystemPlaybackUnavailable = false
+        if let controller = createController(for: preferredType) {
             setActiveController(controller)
-        } else if controllerType != .appleMusic, let fallbackController = createController(for: .appleMusic) {
-            // Fallback to Apple Music if preferred controller couldn't be created
-            setActiveController(fallbackController)
+        } else {
+            isSystemPlaybackUnavailable = preferredType.usesSystemPlayback
+            if preferredType != .appleMusic, let fallbackController = createController(for: .appleMusic) {
+                setActiveController(fallbackController)
+            }
         }
     }
 
@@ -182,6 +161,17 @@ class MusicManager: ObservableObject {
 
         // Set new active controller
         activeController = controller
+
+        if let systemController = controller as? NowPlayingController {
+            systemController.$isStreamUnavailable
+                .removeDuplicates()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self, weak systemController] unavailable in
+                    guard let self, let systemController, self.activeController === systemController else { return }
+                    self.isSystemPlaybackUnavailable = unavailable
+                }
+                .store(in: &controllerCancellables)
+        }
         
         self.canFavoriteTrack = controller.supportsFavorite
 

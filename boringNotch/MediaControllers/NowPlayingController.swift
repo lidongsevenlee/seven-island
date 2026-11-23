@@ -16,6 +16,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     // MARK: - Properties
     @Published private(set) var playbackState: PlaybackState
+    @Published private(set) var isStreamUnavailable = false
     private let sourceBundleIdentifier: String?
     private var systemPlaybackState = PlaybackState.idle(bundleIdentifier: "")
 
@@ -237,11 +238,18 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
     }
 
+    @MainActor
     private func setupNowPlayingObserver() async {
-        guard let process = makeAdapterProcess(arguments: ["stream"]) else { return }
+        guard let process = makeAdapterProcess(arguments: ["stream"]) else {
+            isStreamUnavailable = true
+            return
+        }
         
         let pipeHandler = JSONLinesPipeHandler()
         process.standardOutput = await pipeHandler.getPipe()
+        process.terminationHandler = { [weak self] _ in
+            Task { @MainActor [weak self] in self?.isStreamUnavailable = true }
+        }
         
         self.process = process
         self.pipeHandler = pipeHandler
@@ -254,6 +262,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                 }
             }
         } catch {
+            isStreamUnavailable = true
             NSLog("Could not start media adapter stream: %@", String(describing: error))
         }
     }

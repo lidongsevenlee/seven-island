@@ -149,10 +149,6 @@ class BoringViewCoordinator: ObservableObject {
 
                     if change.newValue {
                         self.hudEnableTask = Task { @MainActor in
-                            // Prompt user for accessibility authorization via AX API
-                            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                            AXIsProcessTrustedWithOptions(options)
-
                             // Check if already authorized directly
                             if AXIsProcessTrusted() {
                                 await MediaKeyInterceptor.shared.start()

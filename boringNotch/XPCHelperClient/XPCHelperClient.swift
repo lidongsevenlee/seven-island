@@ -105,6 +105,7 @@ final class XPCHelperClient: NSObject {
     // directly from the main app process using the AX C API.
 
     nonisolated func requestAccessibilityAuthorization() {
+        guard !AXIsProcessTrusted() else { return }
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
@@ -123,8 +124,7 @@ final class XPCHelperClient: NSObject {
             return true
         }
         if promptIfNeeded {
-            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            _ = AXIsProcessTrustedWithOptions(options)
+            requestAccessibilityAuthorization()
         }
         // Re-check shortly so callers don't always see false right after a prompt.
         try? await Task.sleep(for: .milliseconds(500))

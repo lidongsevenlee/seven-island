@@ -44,6 +44,59 @@ def workflow_shell(step_name):
     return textwrap.dedent(body)
 
 
+class ReleaseCodeSigningTests(unittest.TestCase):
+    def build(self, with_certificate):
+        with tempfile.TemporaryDirectory() as path:
+            work = Path(path)
+            command_log = work / "commands.log"
+            fake_command = work / "command"
+            fake_command.write_text(f"#!{sys.executable}\n" + textwrap.dedent("""\
+                import json, os, sys
+                from pathlib import Path
+
+                app = Path(sys.argv[0]).name
+                args = sys.argv[1:]
+                if app == "security" and args[0] == "list-keychains" and "-s" not in args:
+                    print('    "/test/login.keychain-db"')
+                elif app == "security" and args[0] == "find-identity":
+                    print('  1) 0123456789ABCDEF0123456789ABCDEF01234567 "Developer ID Application: Release Test (TEAMABC123)"')
+                elif app in ("xcodebuild", "codesign"):
+                    assert "DEVELOPER_ID_CERTIFICATE_BASE64" not in os.environ
+                    assert "DEVELOPER_ID_CERTIFICATE_PASSWORD" not in os.environ
+                    with open(os.environ["COMMAND_LOG"], "a") as log:
+                        print(json.dumps([app, *args]), file=log)
+            """))
+            fake_command.chmod(0o755)
+            for name in ("security", "xcodebuild", "codesign"):
+                (work / name).symlink_to(fake_command)
+
+            env = {
+                **os.environ,
+                "PATH": f"{work}:{os.environ['PATH']}",
+                "RUNNER_TEMP": str(work),
+                "COMMAND_LOG": str(command_log),
+                "DEVELOPER_ID_CERTIFICATE_BASE64": base64.b64encode(b"fixture").decode() if with_certificate else "",
+                "DEVELOPER_ID_CERTIFICATE_PASSWORD": "fixture" if with_certificate else "",
+            }
+            subprocess.run(["bash", SCRIPTS / "build-release.sh"], cwd=work, env=env, check=True)
+            return [json.loads(row) for row in command_log.read_text().splitlines()]
+
+    def test_existing_release_build_accepts_ad_hoc_signing(self):
+        build = next(command for command in self.build(with_certificate=False) if "build" in command)
+        self.assertIn("CODE_SIGN_IDENTITY=-", build)
+
+    def test_developer_id_release_requires_bundle_and_team_identity(self):
+        commands = self.build(with_certificate=True)
+        build = next(command for command in commands if "build" in command)
+        self.assertIn("CODE_SIGN_STYLE=Manual", build)
+        self.assertIn("DEVELOPMENT_TEAM=TEAMABC123", build)
+        self.assertIn("CODE_SIGN_IDENTITY=0123456789ABCDEF0123456789ABCDEF01234567", build)
+        verification = next(command for command in commands if "-R" in command)
+        requirement = verification[verification.index("-R") + 1]
+        self.assertIn('identifier "com.local.seven-island"', requirement)
+        self.assertIn('certificate leaf[subject.OU] = "TEAMABC123"', requirement)
+
+
 class ReleaseAssetTests(unittest.TestCase):
     def setUp(self):
         self.release = load_script("find-release-dmg")

@@ -14,10 +14,6 @@ struct MusicControllerSelectionView: View {
 
     @Default(.mediaController) var mediaController
     
-    private var availableMediaControllers: [MediaControllerType] {
-        MediaControllerType.available(systemPlayback: !MusicManager.shared.isNowPlayingDeprecated)
-    }
-    
     @State private var selectedMediaController: MediaControllerType = Defaults[.mediaController]
     
     var body: some View {
@@ -35,7 +31,7 @@ struct MusicControllerSelectionView: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    ForEach(availableMediaControllers) { controller in
+                    ForEach(MediaControllerType.allCases) { controller in
                         ControllerOptionView(
                             controller: controller,
                             isSelected: self.selectedMediaController == controller
@@ -47,8 +43,6 @@ struct MusicControllerSelectionView: View {
                 }
                 .padding()
             }
-            //Disable scroll if there are 4 or fewer to avoid unnecessary scroll behavior
-            .scrollDisabled(availableMediaControllers.count <= 4)
 
 //            Spacer()
 
@@ -84,7 +78,7 @@ struct ControllerOptionView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(controller.rawValue)
+                Text(controller.displayName)
                     .font(.headline)
                     .fontWeight(.semibold)
 
@@ -119,7 +113,7 @@ extension MediaControllerType {
     var description: String {
         switch self {
         case .nowPlaying:
-            return "与大多数媒体应用（包括浏览器）配合使用，检测正在播放的内容。注意：此功能可能在未来的 macOS 版本中被移除。"
+            return "显示系统当前正在播放的内容，可自动跟随支持系统媒体控制的播放器。"
         case .spotify:
             return "直接连接到 Spotify 应用。"
         case .appleMusic:

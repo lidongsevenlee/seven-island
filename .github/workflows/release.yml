@@ -43,24 +43,23 @@ jobs:
           DMG_NAME=$(python3 .github/workflows/scripts/find-release-dmg.py)
           echo "name=$DMG_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Package Release Tag
-        id: build
+      - name: Build Release Tag
         if: steps.asset.outputs.name == ''
         env:
           DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
         run: |
           mkdir -p build/dist
           git worktree add --detach build/release-source "refs/tags/$RELEASE_TAG"
           cd build/release-source
-          xcodebuild -version
-          xcodebuild \
-            -project boringNotch.xcodeproj \
-            -scheme boringNotch \
-            -configuration Release \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGN_IDENTITY="-" \
-            build
+          bash "$GITHUB_WORKSPACE/.github/workflows/scripts/build-release.sh"
 
+      - name: Package Release DMG
+        id: build
+        if: steps.asset.outputs.name == ''
+        run: |
+          cd build/release-source
           APP_PATH="build/DerivedData/Build/Products/Release/Seven Island.app"
           VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")
           DMG_NAME="Seven-Island-$VERSION.dmg"

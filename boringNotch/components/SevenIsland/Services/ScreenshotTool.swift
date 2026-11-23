@@ -93,12 +93,12 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
                 preparation = nil
                 if overlays.isEmpty && savePanel == nil { resumeNotchPanels() }
             }
-            let authorized = await Task.detached { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }.value
-            guard !Task.isCancelled else { return }
-            guard authorized else {
-                showPermissionNotice()
-                return
-            }
+            let authorized = await Self.authorizeCapture(
+                preflight: { await Task.detached { CGPreflightScreenCaptureAccess() }.value },
+                confirmRequest: { showPermissionNotice(canRequest: true) },
+                request: { await Task.detached { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() }.value }
+            )
+            guard authorized, !Task.isCancelled else { return }
 
             do {
                 let displays = try await captureDisplays(frontmostPID: frontmostPID)
@@ -110,13 +110,23 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
                 showSelection(displays)
             } catch {
                 guard !Task.isCancelled else { return }
-                if CGPreflightScreenCaptureAccess() {
-                    showNotice("截图失败，请重试。")
+                if (error as? SCStreamError)?.code == .userDeclined || !CGPreflightScreenCaptureAccess() {
+                    showPermissionNotice(canRequest: false)
                 } else {
-                    showPermissionNotice()
+                    showNotice("截图失败，请重试。")
                 }
             }
         }
+    }
+
+    static func authorizeCapture(
+        preflight: () async -> Bool, confirmRequest: () -> Bool, request: () async -> Bool
+    ) async -> Bool {
+        let alreadyAuthorized = await preflight()
+        guard !Task.isCancelled else { return false }
+        if alreadyAuthorized { return true }
+        guard confirmRequest(), !Task.isCancelled else { return false }
+        return await request()
     }
 
     func cancelCapture() {
@@ -325,17 +335,21 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         pinnedPanels.removeAll { $0 === panel }
     }
 
-    private func showPermissionNotice() {
+    @discardableResult
+    private func showPermissionNotice(canRequest: Bool) -> Bool {
         let alert = NSAlert()
         alert.messageText = "截图需要屏幕录制权限"
-        alert.informativeText = "在「屏幕与系统音频录制」中允许 Seven Island，然后重新打开应用。"
+        alert.informativeText = "在「屏幕与系统音频录制」中允许 Seven Island，然后重新打开应用。更新后若授权仍不可用，请移除旧条目，再添加「应用程序」中的 Seven Island。"
         alert.addButton(withTitle: "打开系统设置")
+        if canRequest { alert.addButton(withTitle: "请求系统授权") }
         alert.addButton(withTitle: "取消")
         NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn {
+        let action = alert.runModal()
+        if action == .alertFirstButtonReturn {
             let settings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
             NSWorkspace.shared.open(settings)
         }
+        return canRequest && action == .alertSecondButtonReturn
     }
 
     private func showNotice(_ message: String) {
