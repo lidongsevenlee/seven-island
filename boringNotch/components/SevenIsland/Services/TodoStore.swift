@@ -38,6 +38,34 @@ final class TodoStore: ObservableObject {
         save(next)
     }
 
+    @discardableResult
+    func move(_ sourceID: UUID, onto targetID: UUID, in filter: TodoFilter, on date: Date, using calendar: Calendar) -> Bool {
+        guard sourceID != targetID,
+              let section = sections(for: filter, on: date, in: calendar).first(where: { section in
+                  section.items.contains { $0.id == sourceID }
+              }),
+              let source = section.items.first(where: { $0.id == sourceID }) else { return false }
+
+        var group = section.items.filter { $0.isCompleted == source.isCompleted }
+        guard let sourceIndex = group.firstIndex(where: { $0.id == sourceID }),
+              let targetIndex = group.firstIndex(where: { $0.id == targetID }) else { return false }
+
+        let moved = group.remove(at: sourceIndex)
+        group.insert(moved, at: targetIndex)
+
+        let groupIDs = Set(group.map(\.id))
+        var ordered = items.sorted(by: isOrderedBefore)
+        let slots = ordered.indices.filter { groupIDs.contains(ordered[$0].id) }
+        for (index, item) in zip(slots, group) {
+            ordered[index] = item
+        }
+        for index in ordered.indices {
+            ordered[index].sortIndex = index
+        }
+        save(ordered)
+        return true
+    }
+
     func delete(_ id: UUID) {
         delete([id])
     }
@@ -79,7 +107,7 @@ final class TodoStore: ObservableObject {
             let firstCompleted = first.isCompleted && !pendingCompletionIDs.contains(first.id)
             let secondCompleted = second.isCompleted && !pendingCompletionIDs.contains(second.id)
             if firstCompleted != secondCompleted { return !firstCompleted }
-            return first.createdAt > second.createdAt
+            return isOrderedBefore(first, second)
         }
         guard !ordered.isEmpty else { return [] }
 
@@ -93,6 +121,13 @@ final class TodoStore: ObservableObject {
             let start = calendar.startOfDay(for: day)
             return [TodoSection(id: .day(start), items: ordered)]
         }
+    }
+
+    private func isOrderedBefore(_ first: TodoItem, _ second: TodoItem) -> Bool {
+        let firstIndex = first.sortIndex ?? -1
+        let secondIndex = second.sortIndex ?? -1
+        if firstIndex != secondIndex { return firstIndex < secondIndex }
+        return first.createdAt > second.createdAt
     }
 
     private func save(_ next: [TodoItem]) {

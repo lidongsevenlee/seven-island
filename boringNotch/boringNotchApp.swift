@@ -67,6 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindowController: NSWindowController?
     private var screenLockedObserver: Any?
     private var screenUnlockedObserver: Any?
+    private var tabShortcutObserver: AnyCancellable?
     private weak var trackingMenu: NSMenu?
     private var isScreenLocked = false
     private var unlockTask: Task<Void, Never>?
@@ -86,6 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             screenUnlockedObserver = nil
         }
         MusicManager.shared.destroy()
+        tabShortcutObserver?.cancel()
         unlockTask?.cancel()
         notchWindows.removeAll()
         XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
@@ -203,6 +205,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        let tabNames = tabs.map(\.shortcut)
+        tabShortcutObserver = coordinator.$tabLayout
+            .map { Set($0.visibleTabs.map(\.shortcut)) }
+            .removeDuplicates()
+            .sink { visibleNames in
+                KeyboardShortcuts.disable(tabNames.filter { !visibleNames.contains($0) })
+                KeyboardShortcuts.enable(tabNames.filter { visibleNames.contains($0) })
+            }
 
         KeyboardShortcuts.onKeyUp(for: .captureScreenshot) { [weak self] in
             Task { @MainActor in

@@ -9,6 +9,7 @@ final class NotchInteraction {
         var isBatteryPopoverActive = false
         var isSamplingScreenColor = false
         var isCapturingScreenshot = false
+        var isReorderingTodo = false
     }
 
     typealias Schedule = @MainActor (Duration, @escaping @MainActor () -> Void) -> Task<Void, Never>
@@ -56,7 +57,7 @@ final class NotchInteraction {
     }
 
     func hoverChanged(_ hovering: Bool) {
-        guard !state.isSamplingScreenColor, !state.isCapturingScreenshot else { return }
+        guard !state.isSamplingScreenColor, !state.isCapturingScreenshot, !state.isReorderingTodo else { return }
         if awaitingPointerExitAfterEscape {
             guard !hovering, !pointerIsInside() else { return }
             awaitingPointerExitAfterEscape = false
@@ -105,6 +106,17 @@ final class NotchInteraction {
             resetPointerTracking()
             confirmPointerExit()
             if state.notchState == .open { state.allowsEscapeDismissal = true }
+        }
+    }
+
+    func setTodoReordering(_ active: Bool) {
+        guard state.notchState == .open, state.isReorderingTodo != active else { return }
+        state.isReorderingTodo = active
+        if active {
+            cancelHoverTransition()
+        } else {
+            resetPointerTracking()
+            if !state.isHovering { schedulePointerExit() }
         }
     }
 
@@ -224,6 +236,7 @@ final class NotchInteraction {
         let inside = pointerIsInside()
         if !inside && state.notchState == .open && !state.isPinnedOpen && !state.isBatteryPopoverActive
             && !state.isSamplingScreenColor && !state.isCapturingScreenshot
+            && !state.isReorderingTodo
             && (!respectingTextFocus || !state.isTextInputFocused) {
             close()
         } else {
@@ -232,7 +245,7 @@ final class NotchInteraction {
     }
 
     private func evaluateShortcutDismissal() {
-        guard state.notchState == .open, !state.isPinnedOpen else { return }
+        guard state.notchState == .open, !state.isPinnedOpen, !state.isReorderingTodo else { return }
         if state.isTextInputFocused {
             shortcutCloseDeferredForFocus = true
         } else if !pointerIsInside() {

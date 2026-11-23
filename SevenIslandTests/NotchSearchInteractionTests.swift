@@ -10,6 +10,7 @@ enum NotchSearchInteractionTests {
         testWindowMovePreservesExpansion()
         testScreenColorSamplingPreservesExpansion()
         testScreenshotRestoresPointerTracking()
+        testTodoDragRetainsPanelUntilRelease()
         testScreenColorFormats()
         testShortcutTimeoutUsesPointerLocation()
         testShortcutTimeoutWaitsForBlur()
@@ -20,6 +21,28 @@ enum NotchSearchInteractionTests {
         testPanelsHaveIndependentTimers()
         testBatteryPopoverDismissal()
         print("NotchSearchInteractionTests passed")
+    }
+
+    private static func testTodoDragRetainsPanelUntilRelease() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.toggleFromShortcut()
+        panel.interaction.setTodoReordering(true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.seconds(4))
+        expect(!panel.isClosed, "an active drag keeps the panel open outside its bounds")
+
+        panel.pointerInside = true
+        panel.interaction.setTodoReordering(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(!panel.isClosed, "re-entering during a drag allows release inside the panel")
+
+        panel.interaction.setTodoReordering(true)
+        panel.pointerInside = false
+        panel.interaction.setTodoReordering(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "a release outside restores normal hover dismissal")
     }
 
     private static func testEscapeDismissesShortcutPanel() {

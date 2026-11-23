@@ -5,6 +5,7 @@
 //  Created by Hugo Persson on 2024-08-25.
 //
 
+import Defaults
 import KeyboardShortcuts
 import SwiftUI
 
@@ -31,6 +32,60 @@ struct TabModel: Identifiable {
     static let all = main + utilities
 }
 
+struct PanelTabLayout: Codable, Defaults.Serializable, Equatable {
+    private var order: [String] = []
+    private var hidden: Set<String> = []
+
+    var orderedTabs: [TabModel] {
+        let saved = order.compactMap { id in TabModel.all.first { $0.view.rawValue == id } }
+        var seen = Set<NotchViews>()
+        return (saved + TabModel.all).filter { seen.insert($0.view).inserted }
+    }
+
+    var visibleTabs: [TabModel] {
+        let ordered = orderedTabs
+        let visible = ordered.filter { !hidden.contains($0.view.rawValue) }
+        return visible.isEmpty ? Array(ordered.prefix(1)) : visible
+    }
+
+    var leadingTabs: [TabModel] {
+        let visible = Set(visibleTabs.map(\.view))
+        return orderedTabs.prefix(TabModel.main.count).filter { visible.contains($0.view) }
+    }
+
+    var trailingTabs: [TabModel] {
+        let visible = Set(visibleTabs.map(\.view))
+        return orderedTabs.dropFirst(TabModel.main.count).filter { visible.contains($0.view) }
+    }
+
+    func isVisible(_ tab: NotchViews) -> Bool {
+        visibleTabs.contains { $0.view == tab }
+    }
+
+    func selection(preferred tab: NotchViews) -> NotchViews {
+        let visible = visibleTabs
+        return visible.contains { $0.view == tab } ? tab : (visible.first?.view ?? .music)
+    }
+
+    mutating func move(_ tab: NotchViews, onto target: NotchViews) {
+        guard tab != target else { return }
+        var updated = orderedTabs.map(\.view.rawValue)
+        guard let source = updated.firstIndex(of: tab.rawValue),
+              let destination = updated.firstIndex(of: target.rawValue) else { return }
+        let moved = updated.remove(at: source)
+        updated.insert(moved, at: destination)
+        order = updated
+    }
+
+    mutating func setVisible(_ visible: Bool, for tab: NotchViews) {
+        if visible {
+            hidden.remove(tab.rawValue)
+        } else if visibleTabs.contains(where: { $0.view != tab }) {
+            hidden.insert(tab.rawValue)
+        }
+    }
+}
+
 private let notchHeaderIconSize: CGFloat = 15
 
 struct NotchHeaderSymbol: View {
@@ -46,7 +101,7 @@ struct NotchHeaderSymbol: View {
 }
 
 struct TabSelectionView: View {
-    var tabs: [TabModel] = TabModel.main
+    let tabs: [TabModel]
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Namespace var animation
     @State private var hoveredTab: NotchViews? = nil

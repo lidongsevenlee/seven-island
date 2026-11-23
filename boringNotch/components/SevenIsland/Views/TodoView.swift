@@ -3,6 +3,8 @@ import SwiftUI
 
 @MainActor
 struct TodoView: View {
+    private static let rowSpacing: CGFloat = 4
+
     struct Presentation: Hashable {
         let expansionCycle: Int
         let tabSelectionCycle: Int
@@ -24,6 +26,7 @@ struct TodoView: View {
     @State private var todoPendingDeletion: UUID?
     @State private var pendingClear: ClearRequest?
     @State private var pendingCompletionMoves: [UUID: UUID] = [:]
+    @State private var reorder = RowReorder<UUID>(spacing: Self.rowSpacing)
     @State private var controlsHeight: CGFloat = 0
     @State private var listMeasurement: ListMeasurement?
 
@@ -78,6 +81,10 @@ struct TodoView: View {
             if case .day(let date) = section.id { return [.date(date)] + items }
             return items
         }
+        let reorderGroups = pendingCompletionMoves.isEmpty ? sections.flatMap { section in
+            let groups = Dictionary(grouping: section.items, by: \.isCompleted)
+            return [false, true].compactMap { groups[$0]?.map(\.id) }
+        } : []
         let dates = store.dates(in: calendar)
         let minimumRowHeight = rowControlHeight + 2 * rowVerticalInset
         let rowCount = sections.reduce(0) { $0 + $1.items.count }
@@ -103,11 +110,11 @@ struct TodoView: View {
             } else {
                 ScrollView {
                     if rowCount > eagerRowLimit && fillsAvailableHeight {
-                        LazyVStack(alignment: .leading, spacing: 4) {
+                        LazyVStack(alignment: .leading, spacing: Self.rowSpacing) {
                             listRows(entries, in: calendar)
                         }
                     } else {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Self.rowSpacing) {
                             listRows(entries, in: calendar)
                         }
                         .onGeometryChange(for: ListMeasurement.self) { geometry in
@@ -150,6 +157,11 @@ struct TodoView: View {
         .onChange(of: filter) { _, _ in
             todoPendingDeletion = nil
             pendingClear = nil
+            reorder.reset()
+        }
+        .onChange(of: reorderGroups, initial: true) { _, groups in reorder.setGroups(groups) }
+        .onChange(of: reorder.source != nil) { _, active in
+            if isCurrentPresentation { vm.setTodoReordering(active) }
         }
         .onChange(of: panelHeight, initial: true) { _, height in
             guard let height, isCurrentPresentation else { return }
@@ -168,10 +180,12 @@ struct TodoView: View {
             if vm.expansionCycle == presentation.expansionCycle,
                vm.coordinator.currentView != .todo || isCurrentPresentation {
                 vm.isTextInputFocused = false
+                vm.setTodoReordering(false)
             }
             todoPendingDeletion = nil
             pendingClear = nil
             pendingCompletionMoves.removeAll()
+            reorder.reset()
         }
         .preferredColorScheme(.dark)
     }
@@ -326,8 +340,7 @@ struct TodoView: View {
         let isConfirmingDeletion = todoPendingDeletion == item.id
         return TodoRow(item: item, showsDate: showsDate, isEditing: editingID == item.id,
                        isConfirmingDeletion: isConfirmingDeletion) { isHovered in
-            rowContent(item, showsDate: showsDate, isConfirmingDeletion: isConfirmingDeletion,
-                       showsDeleteButton: isHovered || isConfirmingDeletion)
+            rowContent(item, showsDate: showsDate, isConfirmingDeletion: isConfirmingDeletion, isHovered: isHovered)
         }
         .equatable()
         .contextMenu {
@@ -336,12 +349,17 @@ struct TodoView: View {
                 deleteOrConfirm(item)
             }
         }
+        .reorderRow(item.id, in: reorder, background: Color(white: 0.16))
     }
 
     private func rowContent(
-        _ item: TodoItem, showsDate: Bool, isConfirmingDeletion: Bool, showsDeleteButton: Bool
+        _ item: TodoItem, showsDate: Bool, isConfirmingDeletion: Bool, isHovered: Bool
     ) -> some View {
-        HStack(spacing: sevenIslandRowSpacing) {
+        let showsReorderHandle = isHovered || reorder.source == item.id
+        let showsDeleteButton = isHovered || isConfirmingDeletion
+        let hoverAnimation: Animation? = reduceMotion ? nil : .easeOut(duration: 0.12)
+
+        return HStack(spacing: sevenIslandRowSpacing) {
             Button {
                 toggleCompletion(for: item.id)
             } label: {
@@ -391,21 +409,41 @@ struct TodoView: View {
                 }
             }
 
-            Color.clear
-                .frame(width: 26, height: rowControlHeight)
-                .overlay(alignment: .trailing) {
-                    if showsDeleteButton {
-                        InlineDeleteButton(
-                            itemTitle: item.text,
-                            deleteLabel: "删除待办",
-                            isConfirming: isConfirmingDeletion,
-                            color: .secondary,
-                            action: { deleteOrConfirm(item) }
-                        )
-                        .transition(.opacity)
+            HStack(spacing: 4) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 18, height: rowControlHeight)
+                    .contentShape(Rectangle())
+                    .reorderHandle(for: item.id, in: reorder) { target in
+                        guard isCurrentPresentation, pendingCompletionMoves.isEmpty else { return nil }
+                        let selection = filter
+                        let date = referenceDate
+                        return { store.move(item.id, onto: target, in: selection, on: date, using: .autoupdatingCurrent) }
                     }
-                }
-                .animation(.easeOut(duration: 0.12), value: showsDeleteButton)
+                    .help("拖动排序")
+                    .accessibilityLabel("拖动\(item.text)调整顺序")
+                    .opacity(showsReorderHandle ? 1 : 0)
+                    .allowsHitTesting(showsReorderHandle)
+                    .accessibilityHidden(!showsReorderHandle)
+                    .animation(hoverAnimation, value: showsReorderHandle)
+
+                Color.clear
+                    .frame(width: 26, height: rowControlHeight)
+                    .overlay(alignment: .trailing) {
+                        if showsDeleteButton {
+                            InlineDeleteButton(
+                                itemTitle: item.text,
+                                deleteLabel: "删除待办",
+                                isConfirming: isConfirmingDeletion,
+                                color: .secondary,
+                                action: { deleteOrConfirm(item) }
+                            )
+                            .transition(.opacity)
+                        }
+                    }
+                    .animation(hoverAnimation, value: showsDeleteButton)
+            }
 
             if editingID != item.id {
                 timestamp(for: item, showsDate: showsDate)

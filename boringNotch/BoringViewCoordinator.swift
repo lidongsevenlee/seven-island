@@ -50,6 +50,7 @@ struct ExpandedItem {
 class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
 
+    @Published private(set) var tabLayout = Defaults[.panelTabLayout]
     private(set) var tabSelectionCycle = 0
     @Published var currentView: NotchViews = .music {
         didSet {
@@ -72,7 +73,7 @@ class BoringViewCoordinator: ObservableObject {
         didSet {
             if !alwaysShowTabs {
                 openLastTabByDefault = false
-                currentView = .music
+                currentView = tabLayout.selection(preferred: .music)
             }
         }
     }
@@ -122,7 +123,7 @@ class BoringViewCoordinator: ObservableObject {
             preferredScreenUUID = NSScreen.main?.displayUUID
         }
         
-        currentView = NotchViews(rawValue: lastNotchView) ?? .music
+        showEmpty()
 
         // Observe changes to accessibility authorization and react accordingly
         accessibilityObserver = NotificationCenter.default.addObserver(
@@ -310,7 +311,15 @@ class BoringViewCoordinator: ObservableObject {
     }
     
     func showEmpty() {
-        currentView = NotchViews(rawValue: lastNotchView) ?? .music
+        currentView = tabLayout.selection(preferred: NotchViews(rawValue: lastNotchView) ?? .music)
+    }
+
+    func updateTabLayout(_ layout: PanelTabLayout) {
+        guard tabLayout != layout else { return }
+        tabLayout = layout
+        Defaults[.panelTabLayout] = layout
+        let selection = layout.selection(preferred: currentView)
+        if selection != currentView { currentView = selection }
     }
 
     /// Polls AXIsProcessTrusted() directly every 2 seconds to detect when the

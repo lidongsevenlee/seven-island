@@ -265,10 +265,15 @@ private struct IslandShortcutRecorder: View {
     var body: some View {
         LabeledContent(title) {
             ShortcutRecorderControl(name: name) { shortcut in
-                let names = TabModel.all.map(\.shortcut) + KeyboardShortcuts.Name.panelActions
+                let panelNames = KeyboardShortcuts.Name.panelActions
+                let names = TabModel.all.map(\.shortcut) + panelNames
                 if let shortcut, let conflict = names.first(where: { $0 != name && $0.shortcut == shortcut }) {
                     name.shortcut = previousShortcut
-                    KeyboardShortcuts.enable(conflict)
+                    if panelNames.contains(conflict) || BoringViewCoordinator.shared.tabLayout.visibleTabs.contains(where: { $0.shortcut == conflict }) {
+                        KeyboardShortcuts.enable(conflict)
+                    } else {
+                        KeyboardShortcuts.disable(conflict)
+                    }
                     showsConflict = true
                 } else {
                     previousShortcut = shortcut
@@ -402,7 +407,7 @@ struct GeneralSettings: View {
             }
 
             Section {
-                ForEach(TabModel.all) { tab in
+                ForEach(coordinator.tabLayout.visibleTabs) { tab in
                     IslandShortcutRecorder(tab.label, name: tab.shortcut)
                 }
             } header: {
@@ -1122,6 +1127,68 @@ struct About: View {
 //    }
 //}
 
+private struct PanelTabSettings: View {
+    @ObservedObject private var coordinator = BoringViewCoordinator.shared
+    @State private var reorder = RowReorder<NotchViews>()
+
+    var body: some View {
+        let tabs = coordinator.tabLayout.orderedTabs
+        let visible = Set(coordinator.tabLayout.visibleTabs.map(\.view))
+
+        Section {
+            Toggle("始终显示标签页", isOn: $coordinator.alwaysShowTabs)
+
+            VStack(spacing: 0) {
+                ForEach(tabs) { tab in
+                    HStack(spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18, height: 22)
+                                .accessibilityHidden(true)
+                            Text(tab.label)
+                            Spacer(minLength: 8)
+                        }
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                        .reorderHandle(for: tab.view, in: reorder) { target in
+                            return {
+                                var layout = coordinator.tabLayout
+                                layout.move(tab.view, onto: target)
+                                coordinator.updateTabLayout(layout)
+                            }
+                        }
+                        .help("拖拽调整顺序")
+
+                        Toggle("显示\(tab.label)", isOn: Binding(
+                            get: { coordinator.tabLayout.isVisible(tab.view) },
+                            set: { isVisible in
+                                var layout = coordinator.tabLayout
+                                layout.setVisible(isVisible, for: tab.view)
+                                coordinator.updateTabLayout(layout)
+                            }
+                        ))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .disabled(visible == [tab.view])
+                    }
+                    .reorderRow(tab.view, in: reorder, background: Color(nsColor: .controlBackgroundColor))
+                    .overlay(alignment: .bottom) {
+                        if tab.id != tabs.last?.id { Divider().allowsHitTesting(false) }
+                    }
+                }
+            }
+            .onChange(of: tabs.map(\.view), initial: true) { _, ids in reorder.setGroups([ids]) }
+            .onDisappear { reorder.reset() }
+        } header: {
+            Text("标签页")
+        } footer: {
+            Text("拖拽标签行调整顺序。前五个位置在刘海左侧，后两个在右侧。至少保留一个可见标签页。")
+        }
+    }
+}
+
 struct Appearance: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
@@ -1140,7 +1207,6 @@ struct Appearance: View {
     var body: some View {
         Form {
             Section {
-                Toggle("始终显示标签页", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {
                     Text("在刘海区域显示设置图标")
                 }
@@ -1148,6 +1214,8 @@ struct Appearance: View {
             } header: {
                 Text("常规")
             }
+
+            PanelTabSettings()
 
             Section {
                 Defaults.Toggle(key: .coloredSpectrogram) {

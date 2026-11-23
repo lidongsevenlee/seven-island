@@ -17,7 +17,7 @@ struct BoringHeader: View {
         HStack(spacing: 0) {
             HStack {
                 if coordinator.alwaysShowTabs {
-                    TabSelectionView()
+                    TabSelectionView(tabs: coordinator.tabLayout.leadingTabs)
                         .padding(.leading, 2)
                         .padding(.trailing, 12)
                 } else if vm.notchState == .open {
@@ -41,7 +41,7 @@ struct BoringHeader: View {
             HStack(spacing: 4) {
                 if vm.notchState == .open {
                     if coordinator.alwaysShowTabs {
-                        TabSelectionView(tabs: TabModel.utilities)
+                        TabSelectionView(tabs: coordinator.tabLayout.trailingTabs)
                     }
                     if isHUDType(coordinator.sneakPeek.type) && coordinator.sneakPeek.show && Defaults[.showOpenNotchHUD] {
                         OpenNotchHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon)

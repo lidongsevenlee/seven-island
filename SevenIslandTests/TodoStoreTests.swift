@@ -85,7 +85,37 @@ enum TodoStoreTests {
         reloaded.delete(allIDs)
         expect(TodoStore(itemsKey: itemsKey).items.isEmpty, "persists clearing all tasks")
 
+        testReordering(itemsKey: itemsKey, today: today, now: now, calendar: calendar)
         print("TodoStoreTests passed")
+    }
+
+    private static func testReordering(itemsKey: Defaults.Key<[TodoItem]>, today: Date, now: Date, calendar: Calendar) {
+        let store = TodoStore(itemsKey: itemsKey)
+        let carryoverDate = today.addingTimeInterval(-60)
+        let carryover = store.add("之前的待办", at: carryoverDate)!
+        let first = store.add("第一项", at: today)!
+        let second = store.add("第二项", at: today.addingTimeInterval(60))!
+        let completed = store.add("已完成", at: now)!
+        store.toggleCompletion(for: completed, at: now)
+
+        expect(store.move(carryover, onto: second, in: .today, on: now, using: calendar), "moves a carryover task up in Today")
+        expect(store.sections(for: .today, on: now, in: calendar).flatMap(\.items).map(\.id) == [carryover, second, first, completed],
+               "reorders open tasks together and keeps completed tasks below them")
+        expect(!store.move(carryover, onto: second, in: .all, on: now, using: calendar), "keeps tasks in their original date groups")
+        expect(!store.move(first, onto: completed, in: .today, on: now, using: calendar), "keeps open and completed tasks in their groups")
+        expect(!store.move(first, onto: first, in: .today, on: now, using: calendar), "ignores dropping a task onto itself")
+        expect(store.move(second, onto: first, in: .day(today), on: now, using: calendar), "moves a task down in a date filter")
+
+        let reloaded = TodoStore(itemsKey: itemsKey)
+        expect(reloaded.sections(for: .today, on: now, in: calendar).flatMap(\.items).map(\.id) == [carryover, first, second, completed],
+               "restores the shared ordering across filters")
+        expect(reloaded.sections(for: .all, on: now, in: calendar).first?.items.map(\.id) == [first, second, completed],
+               "uses manual ordering inside a history group")
+        expect(reloaded.items.first { $0.id == carryover }?.createdAt == carryoverDate, "keeps creation time after reordering")
+        expect(reloaded.items.first { $0.id == completed }?.completedAt == now, "keeps completion time after reordering")
+        let added = reloaded.add("新待办", at: now)!
+        expect(reloaded.sections(for: .today, on: now, in: calendar).first?.items.first?.id == added,
+               "places new tasks at the top after manual sorting")
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) {

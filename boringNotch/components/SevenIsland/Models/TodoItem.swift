@@ -6,6 +6,7 @@ struct TodoItem: Codable, Defaults.Serializable, Equatable, Identifiable {
     var text: String
     let createdAt: Date
     var completedAt: Date?
+    var sortIndex: Int? = nil
 
     var isCompleted: Bool { completedAt != nil }
 }

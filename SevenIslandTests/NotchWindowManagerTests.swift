@@ -1,4 +1,5 @@
 import Foundation
+import Defaults
 import KeyboardShortcuts
 @testable import Seven_Island
 
@@ -11,7 +12,57 @@ enum NotchWindowManagerTests {
         testSinglePanelFollowsPreferredDisplay()
         testModeSwitchAndLockScreen()
         testTabShortcuts()
+        testCustomTabLayout()
         print("NotchWindowManagerTests passed")
+    }
+
+    private static func testCustomTabLayout() {
+        let coordinator = BoringViewCoordinator.shared
+        let previousLayout = coordinator.tabLayout
+        let previousTab = coordinator.currentView
+        defer {
+            coordinator.updateTabLayout(previousLayout)
+            coordinator.currentView = previousTab
+        }
+
+        var layout = PanelTabLayout()
+        layout.move(.toolbox, onto: .clipboard)
+        expect(layout.orderedTabs.map(\.view) == [.music, .toolbox, .clipboard, .vscodeProjects, .memo, .todo, .appLauncher],
+               "dragging upward inserts at the target and shifts intermediate tabs")
+        layout.move(.toolbox, onto: .appLauncher)
+        expect(layout.orderedTabs.map(\.view) == TabModel.all.map(\.view), "dragging downward reaches the final slot")
+        layout.move(.appLauncher, onto: .todo)
+        layout.setVisible(false, for: .music)
+        expect(layout.leadingTabs.map(\.view) == [.clipboard, .vscodeProjects, .memo, .appLauncher],
+               "moves a tab across the notch and hides the chosen icon")
+        expect(layout.trailingTabs.map(\.view) == [.todo, .toolbox], "preserves order on the other side")
+
+        coordinator.currentView = .music
+        coordinator.updateTabLayout(layout)
+        expect(coordinator.currentView == .clipboard, "hiding the selected tab selects the first visible tab")
+        expect(Defaults[.panelTabLayout] == layout, "saves tab order and visibility together")
+
+        let vm = BoringViewModel()
+        vm.toggleTabFromShortcut(.music)
+        expect(vm.notchState == .closed, "a hidden tab cannot open from its shortcut")
+        vm.toggleTabFromShortcut(.appLauncher)
+        expect(vm.notchState == .open && coordinator.currentView == .appLauncher, "a moved tab keeps its own shortcut")
+
+        layout.setVisible(true, for: .music)
+        coordinator.updateTabLayout(layout)
+        vm.toggleTabFromShortcut(.music)
+        expect(coordinator.currentView == .music, "showing a tab restores its shortcut")
+
+        for tab in TabModel.all where tab.view != .memo {
+            layout.setVisible(false, for: tab.view)
+        }
+        layout.setVisible(false, for: .memo)
+        expect(layout.visibleTabs.map(\.view) == [.memo], "preserves the final visible tab")
+
+        let saved = Data(#"{"order":["new-tab","todo","todo"],"hidden":[]}"#.utf8)
+        let restored = try! JSONDecoder().decode(PanelTabLayout.self, from: saved)
+        expect(restored.orderedTabs.map(\.view) == [.todo, .music, .clipboard, .vscodeProjects, .memo, .appLauncher, .toolbox],
+               "loads saved order with duplicate or unfamiliar identifiers and appends missing tabs")
     }
 
     private static func testTabShortcuts() {

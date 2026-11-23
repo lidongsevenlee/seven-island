@@ -247,6 +247,7 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     func toggleTabFromShortcut(_ tab: NotchViews) {
+        guard coordinator.tabLayout.isVisible(tab) else { return }
         if notchState == .open && coordinator.currentView == tab {
             close()
             return
@@ -270,6 +271,10 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func setScreenshotCaptureActive(_ active: Bool) {
         interaction.setScreenshotCaptureActive(active)
+    }
+
+    func setTodoReordering(_ active: Bool) {
+        interaction.setTodoReordering(active)
     }
 
     func pickScreenColor() {
