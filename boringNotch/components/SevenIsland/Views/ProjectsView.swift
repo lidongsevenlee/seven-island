@@ -56,6 +56,7 @@ struct ProjectsView: View {
                 searchPrompt: "搜索项目...",
                 items: filteredProjects,
                 emptyMessage: emptyMessage,
+                makesPanelKey: true,
                 open: { open($0, with: preferred) }
             ) { project in
                 SevenIslandLaunchRow(
