@@ -9,6 +9,7 @@ import AVFoundation
 import Combine
 import Defaults
 import KeyboardShortcuts
+import OSLog
 import Sparkle
 import SwiftUI
 
@@ -138,6 +139,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        let system = ProcessInfo.processInfo.operatingSystemVersionString
+        NotchDiagnostics.logger.notice("""
+            event=app_start version=\(version, privacy: .public) build=\(build, privacy: .public) \
+            macos=\(system, privacy: .public) displays=\(NSScreen.screens.count) \
+            all_displays=\(Defaults[.showOnAllDisplays]) hover_enabled=\(Defaults[.openNotchOnHover]) \
+            first_launch=\(self.coordinator.firstLaunch)
+            """)
         _ = ClipboardHistoryStore.shared
 
         NotificationCenter.default.addObserver(self, selector: #selector(menuTrackingDidBegin),

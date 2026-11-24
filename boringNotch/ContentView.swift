@@ -10,6 +10,7 @@ import AVFoundation
 import Combine
 import Defaults
 import KeyboardShortcuts
+import OSLog
 import SwiftUI
 import SwiftUIIntrospect
 
@@ -30,6 +31,20 @@ struct ContentView: View {
 
     private let openPanelBottomInset: CGFloat = 12
     private let todoContentSpacing: CGFloat = 8
+    private struct MusicDiagnosticPresentation: Equatable {
+        let expansionCycle: Int
+        let tabSelectionCycle: Int
+        let firstLaunch: Bool
+    }
+
+    private var musicDiagnosticPresentation: MusicDiagnosticPresentation? {
+        guard vm.notchState == .open, coordinator.currentView == .music else { return nil }
+        return MusicDiagnosticPresentation(
+            expansionCycle: vm.expansionCycle, tabSelectionCycle: coordinator.tabSelectionCycle,
+            firstLaunch: coordinator.firstLaunch
+        )
+    }
+
     private var openHeaderHeight: CGFloat { max(24, vm.effectiveClosedNotchHeight) }
     private var hiddenNotchBottomInset: CGFloat { vm.effectiveClosedNotchHeight == 0 ? 10 : 0 }
     private var compactTodoContentHeight: CGFloat {
@@ -122,6 +137,9 @@ struct ContentView: View {
                     .padding(.horizontal, vm.notchState == .open ? 12 : 0)
                     .padding(.bottom, vm.notchState == .open ? openPanelBottomInset : 0)
                     .background(.black)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: { height in
+                        vm.measuredPanelHeight = height
+                    }
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -164,6 +182,9 @@ struct ContentView: View {
                         }
                     }
                     .onChange(of: coordinator.currentView) { _, view in
+                        if view != .music {
+                            vm.measuredMusicContentHeight = nil
+                        }
                         guard view != .todo else { return }
                         withAnimation(.smooth(duration: 0.35)) {
                             vm.setOpenNotchHeight(openNotchSize.height)
@@ -198,10 +219,31 @@ struct ContentView: View {
         .onChange(of: musicSpectrumSource, initial: true) { _, source in
             MusicAudioSpectrum.shared.setSource(source, for: spectrumClient)
         }
+        .task(id: musicDiagnosticPresentation) {
+            guard let presentation = musicDiagnosticPresentation else { return }
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled, musicDiagnosticPresentation == presentation else { return }
+            logMusicLayout()
+        }
         .onDisappear {
             vm.cancelPanelTimers()
             MusicAudioSpectrum.shared.setSource(nil, for: spectrumClient)
         }
+    }
+
+    private func logMusicLayout() {
+        let panelHeight = vm.measuredPanelHeight.map { String(describing: $0) } ?? "unmeasured"
+        let contentHeight = vm.measuredMusicContentHeight.map { String(describing: $0) } ?? "unmeasured"
+        let source = Defaults[.mediaController].rawValue
+        let hasTitle = !musicManager.songTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        NotchDiagnostics.logger.notice("""
+            panel=\(self.vm.diagnosticID, privacy: .public) event=music_layout cycle=\(self.vm.expansionCycle) \
+            target_height_pt=\(Double(self.vm.notchSize.height)) visible_height_pt=\(panelHeight, privacy: .public) \
+            content_height_pt=\(contentHeight, privacy: .public) first_launch=\(self.coordinator.firstLaunch) \
+            welcome_animation=\(self.coordinator.helloAnimationRunning) source="\(source, privacy: .public)" \
+            playing=\(self.musicManager.isPlaying) title_available=\(hasTitle) \
+            system_playback_unavailable=\(self.musicManager.isSystemPlaybackUnavailable)
+            """)
     }
 
     @ViewBuilder
@@ -308,6 +350,11 @@ struct ContentView: View {
                     switch coordinator.currentView {
                     case .music:
                         MusicHomeView(albumArtNamespace: albumArtNamespace)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height.rounded() } action: { height in
+                                if vm.notchState == .open && coordinator.currentView == .music {
+                                    vm.measuredMusicContentHeight = height
+                                }
+                            }
                     case .clipboard:
                         ClipboardHistoryView()
                     case .vscodeProjects:

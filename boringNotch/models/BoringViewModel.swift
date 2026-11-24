@@ -7,6 +7,7 @@
 
 import Combine
 import Defaults
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -52,7 +53,10 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     private lazy var interaction = NotchInteraction(
-        pointerIsInside: { [weak self] in self?.isMouseHovering() ?? false },
+        pointerIsInside: { [weak self] in
+            guard let self, self.display != nil else { return nil }
+            return self.isMouseHovering()
+        },
         hoverOpenDelay: { [weak self] in
             guard let self, !self.coordinator.firstLaunch, !self.coordinator.sneakPeek.show,
                   Defaults[.openNotchOnHover] else { return nil }
@@ -79,6 +83,9 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published private(set) var display: NotchDisplay?
     @Published private var openHeight = openNotchSize.height
     private(set) var expansionCycle = 0
+    var diagnosticID: String { interaction.diagnosticID }
+    var measuredPanelHeight: CGFloat?
+    var measuredMusicContentHeight: CGFloat?
     private let defaultClosedNotchSize = getClosedNotchSize()
 
     var closedNotchSize: CGSize { display?.closedNotchSize ?? defaultClosedNotchSize }
@@ -111,6 +118,12 @@ class BoringViewModel: NSObject, ObservableObject {
         guard self.display != display else { return }
         let moved = self.display?.uuid != display?.uuid || self.display?.notchAnchor != display?.notchAnchor
         self.display = display
+        NotchDiagnostics.logger.notice("""
+            panel=\(self.diagnosticID, privacy: .public) event=display_changed \
+            connected=\(display != nil) width_pt=\(Double(display?.frame.width ?? 0)) \
+            height_pt=\(Double(display?.frame.height ?? 0)) physical_notch=\(display?.hasPhysicalNotch == true) \
+            menu_bar_height_pt=\(Double(display?.menuBarHeight ?? 0))
+            """)
         if moved {
             interaction.panelMoved()
         }
@@ -249,6 +262,7 @@ class BoringViewModel: NSObject, ObservableObject {
     func toggleTabFromShortcut(_ tab: NotchViews) {
         guard coordinator.tabLayout.isVisible(tab) else { return }
         if notchState == .open && coordinator.currentView == tab {
+            NotchDiagnostics.logger.notice("panel=\(self.diagnosticID, privacy: .public) event=tab_shortcut_close")
             close()
             return
         }
@@ -331,11 +345,19 @@ class BoringViewModel: NSObject, ObservableObject {
             case .open:
                 expansionCycle += 1
                 openHeight = openNotchSize.height
+                measuredMusicContentHeight = nil
             case .closed: applyClosedEffects()
             }
         }
         interactionState = state
         guard visibilityChanged else { return }
+        let phase = state.notchState == .open ? "open" : "closed"
+        NotchDiagnostics.logger.notice("""
+            panel=\(self.diagnosticID, privacy: .public) event=panel_state state=\(phase, privacy: .public) \
+            cycle=\(self.expansionCycle) tab=\(self.coordinator.currentView.rawValue, privacy: .public) \
+            target_height_pt=\(Double(self.notchSize.height)) first_launch=\(self.coordinator.firstLaunch) \
+            welcome_animation=\(self.coordinator.helloAnimationRunning)
+            """)
         if state.notchState == .open {
             MusicManager.shared.forceUpdate()
         } else {

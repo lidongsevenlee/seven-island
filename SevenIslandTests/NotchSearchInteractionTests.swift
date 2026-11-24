@@ -7,6 +7,7 @@ enum NotchSearchInteractionTests {
     static func main() {
         testHoverOpensAfterDwell()
         testHoverExitUsesPointerLocation()
+        testHoverExitWithoutNotification()
         testWindowMovePreservesExpansion()
         testScreenColorSamplingPreservesExpansion()
         testScreenshotRestoresPointerTracking()
@@ -144,6 +145,19 @@ enum NotchSearchInteractionTests {
         panel.clock.advance(.milliseconds(100))
         expect(panel.isClosed, "genuine mouse exit closes the panel during input")
         expect(!panel.interaction.state.isTextInputFocused, "closing clears input focus")
+    }
+
+    private static func testHoverExitWithoutNotification() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.seconds(1))
+        expect(!panel.isClosed, "hover opens and holds the panel while the pointer is inside")
+
+        panel.interaction.setTextInputFocused(true)
+        panel.pointerInside = false
+        panel.clock.advance(.milliseconds(400))
+        expect(panel.isClosed, "leaving closes the panel even when SwiftUI misses the hover exit")
     }
 
     private static func testShortcutTimeoutUsesPointerLocation() {
@@ -302,12 +316,7 @@ enum NotchSearchInteractionTests {
         panel.interaction.toggleFromShortcut()
         panel.interaction.closeUnlessPinned()
         expect(panel.isClosed, "a clipboard or project action dismisses the unpinned panel")
-        panel.pointerInside = true
-        panel.interaction.hoverChanged(true)
-        panel.clock.advance(.milliseconds(300))
-        expect(!panel.isClosed, "hover reopens after early dismissal")
-
-        panel.pointerInside = false
+        panel.interaction.open()
         panel.clock.advance(.seconds(3))
         expect(!panel.isClosed, "the later opening survives the old shortcut deadline")
     }
