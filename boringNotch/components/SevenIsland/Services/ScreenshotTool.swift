@@ -67,7 +67,7 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
     private var preparation: Task<Void, Never>?
     private var overlays: [ScreenshotSelectionPanel] = []
     private weak var activeOverlay: ScreenshotSelectionPanel?
-    private var pinnedPanels: [NSPanel] = []
+    private var pinnedPanels: [FloatingScreenshotPanel] = []
     private var savePanel: NSSavePanel?
     private let suspendedNotchPanels = NSHashTable<BoringNotchSkyLightWindow>.weakObjects()
     private weak var keyWindowBeforeCapture: NSWindow?
@@ -166,19 +166,28 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         target?.restoreKeyboardFocus()
     }
 
+    func windowsExcludedFromCapture(in windows: [SCWindow], notchPanelIDs: Set<CGWindowID>,
+                                    settingsWindowID: CGWindowID?) -> [SCWindow] {
+        var preservedIDs = notchPanelIDs.union(pinnedPanels.flatMap(\.captureWindowIDs))
+        if let settingsWindowID { preservedIDs.insert(settingsWindowID) }
+        let ownProcess = ProcessInfo.processInfo.processIdentifier
+        return windows.filter {
+            $0.owningApplication?.processID == ownProcess && !preservedIDs.contains($0.windowID)
+        }
+    }
+
     private func captureDisplays(frontmostPID: pid_t?) async throws -> [ScreenshotDisplay] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let ownProcess = ProcessInfo.processInfo.processIdentifier
-        let excluded = content.applications.filter { $0.processID == ownProcess }
         let islandPanels = visibleNotchPanels.filter { $0.sharingType != .none }
         let panelsByID = Dictionary(uniqueKeysWithValues: islandPanels.map { (CGWindowID($0.windowNumber), $0) })
         let settingsWindowID = SettingsWindowController.shared.window.flatMap { window -> CGWindowID? in
             guard window.isVisible, !window.isMiniaturized, window.sharingType != .none else { return nil }
             return CGWindowID(exactly: window.windowNumber)
         }
-        let includedWindows = excluded.isEmpty ? [] : content.windows.filter {
-            panelsByID[$0.windowID] != nil || $0.windowID == settingsWindowID
-        }
+        let excludedWindows = windowsExcludedFromCapture(
+            in: content.windows, notchPanelIDs: Set(panelsByID.keys), settingsWindowID: settingsWindowID
+        )
         let windowRegions = content.windows.compactMap { window -> (CGWindowID, (pid_t?, CGRect))? in
             let pid = window.owningApplication?.processID
             let frame = window.frame
@@ -202,7 +211,7 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
             guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
                   let display = content.displays.first(where: { $0.displayID == id.uint32Value }) else { continue }
 
-            let filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: includedWindows)
+            let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
             let configuration = SCStreamConfiguration()
             configuration.showsCursor = false
             configuration.width = Int((screen.frame.width * CGFloat(filter.pointPixelScale)).rounded())
@@ -326,12 +335,11 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         }
         panel.delegate = self
         pinnedPanels.append(panel)
-        panel.orderFrontRegardless()
-        panel.invalidateShadow()
+        panel.showPin()
     }
 
     func windowWillClose(_ notification: Notification) {
-        guard let panel = notification.object as? NSPanel else { return }
+        guard let panel = notification.object as? FloatingScreenshotPanel else { return }
         pinnedPanels.removeAll { $0 === panel }
     }
 

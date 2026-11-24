@@ -60,10 +60,12 @@ final class ScreenshotSelectionPanel: NSPanel {
 
 @MainActor
 final class FloatingScreenshotPanel: NSPanel {
+    private static let shadowPadding: CGFloat = 16
     private let canvas: ScreenshotSelectionCanvas
     private let imageSize: CGSize
     private var zoom: CGFloat
     private var zoomPercent: Int { Int((zoom * 100).rounded()) }
+    private var shadowPanel: NSPanel?
     private var toolbarPanel: NSPanel?
     private let zoomMenuItem = NSMenuItem(title: "缩放", action: nil, keyEquivalent: "")
     private let toolbarMenuItem = NSMenuItem(title: "显示工具条", action: #selector(toggleToolbar), keyEquivalent: "")
@@ -78,7 +80,7 @@ final class FloatingScreenshotPanel: NSPanel {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         title = "悬浮截图"
         animationBehavior = .none
-        hasShadow = true
+        hasShadow = false
         isOpaque = false
         backgroundColor = .clear
         isFloatingPanel = true
@@ -104,6 +106,32 @@ final class FloatingScreenshotPanel: NSPanel {
 
     override var canBecomeKey: Bool { toolbarPanel != nil }
 
+    var captureWindowIDs: [CGWindowID] {
+        guard isVisible, sharingType != .none else { return [] }
+        return [self, shadowPanel].compactMap { panel in
+            guard let panel, panel.isVisible, panel.sharingType != .none else { return nil }
+            return CGWindowID(exactly: panel.windowNumber)
+        }
+    }
+
+    func showPin() {
+        let shadow = NSPanel(contentRect: frame.insetBy(dx: -Self.shadowPadding, dy: -Self.shadowPadding),
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        shadow.animationBehavior = .none
+        shadow.isOpaque = false
+        shadow.backgroundColor = .clear
+        shadow.hasShadow = false
+        shadow.level = level
+        shadow.hidesOnDeactivate = false
+        shadow.ignoresMouseEvents = true
+        shadow.isReleasedWhenClosed = false
+        shadow.collectionBehavior = collectionBehavior
+        shadow.contentView = FloatingScreenshotShadowView(padding: Self.shadowPadding)
+        shadowPanel = shadow
+        orderFrontRegardless()
+        addChildWindow(shadow, ordered: .below)
+    }
+
     override func sendEvent(_ event: NSEvent) {
         if toolbarPanel != nil, event.type == .keyDown, canvas.handleKey(event) { return }
         super.sendEvent(event)
@@ -111,6 +139,11 @@ final class FloatingScreenshotPanel: NSPanel {
 
     override func close() {
         hideToolbar()
+        if let shadowPanel {
+            removeChildWindow(shadowPanel)
+            shadowPanel.close()
+            self.shadowPanel = nil
+        }
         super.close()
     }
 
@@ -162,12 +195,12 @@ final class FloatingScreenshotPanel: NSPanel {
         let dy = Self.zoomInset(from: frame.height, to: imageSize.height * scale)
         zoom = scale
         setFrame(frame.insetBy(dx: dx, dy: dy), display: false)
+        shadowPanel?.setFrame(frame.insetBy(dx: -Self.shadowPadding, dy: -Self.shadowPadding), display: true)
         canvas.updateFloatingScale()
         layoutToolbar()
         updateZoomMenu()
         canvas.showFloatingZoomBadge(zoomPercent)
         displayIfNeeded()
-        invalidateShadow()
     }
 
     private static func zoomInset(from current: CGFloat, to target: CGFloat) -> CGFloat {
@@ -230,6 +263,31 @@ final class FloatingScreenshotPanel: NSPanel {
         if toolbarPanel.frame != toolbarFrame {
             toolbarPanel.setFrame(toolbarFrame, display: true)
         }
+    }
+}
+
+private final class FloatingScreenshotShadowView: NSView {
+    private let padding: CGFloat
+
+    init(padding: CGFloat) {
+        self.padding = padding
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+    override func draw(_ dirtyRect: CGRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        let imageRect = bounds.insetBy(dx: padding, dy: padding)
+        context.saveGState()
+        context.addRect(bounds)
+        context.addRect(imageRect)
+        context.clip(using: .evenOdd)
+        context.setShadow(offset: CGSize(width: 0, height: -2), blur: 7, color: CGColor(gray: 0, alpha: 0.42))
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(imageRect)
+        context.restoreGState()
     }
 }
 
