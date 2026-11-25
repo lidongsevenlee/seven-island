@@ -4,7 +4,15 @@ import Foundation
 
 @MainActor
 final class TodoStore: ObservableObject {
-    static let shared = TodoStore()
+    static let shared: TodoStore = {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--todo-demo"),
+           let suite = UserDefaults(suiteName: "com.local.seven-island.todo-demo") {
+            return TodoStore(itemsKey: .init("items", default: [], suite: suite))
+        }
+        #endif
+        return TodoStore()
+    }()
 
     @Published private(set) var items: [TodoItem]
     private let itemsKey: Defaults.Key<[TodoItem]>
@@ -39,9 +47,12 @@ final class TodoStore: ObservableObject {
     }
 
     @discardableResult
-    func move(_ sourceID: UUID, onto targetID: UUID, in filter: TodoFilter, on date: Date, using calendar: Calendar) -> Bool {
+    func move(
+        _ sourceID: UUID, onto targetID: UUID, in filter: TodoFilter, groupedBy grouping: TodoDateGrouping = .creation,
+        on date: Date, using calendar: Calendar
+    ) -> Bool {
         guard sourceID != targetID,
-              let section = sections(for: filter, on: date, in: calendar).first(where: { section in
+              let section = sections(for: filter, groupedBy: grouping, on: date, in: calendar).first(where: { section in
                   section.items.contains { $0.id == sourceID }
               }),
               let source = section.items.first(where: { $0.id == sourceID }) else { return false }
@@ -54,7 +65,7 @@ final class TodoStore: ObservableObject {
         group.insert(moved, at: targetIndex)
 
         let groupIDs = Set(group.map(\.id))
-        var ordered = items.sorted(by: isOrderedBefore)
+        var ordered = items.sorted { isOrderedBefore($0, $1) }
         let slots = ordered.indices.filter { groupIDs.contains(ordered[$0].id) }
         for (index, item) in zip(slots, group) {
             ordered[index] = item
@@ -77,13 +88,31 @@ final class TodoStore: ObservableObject {
         save(next)
     }
 
-    func dates(in calendar: Calendar) -> [Date] {
-        Set(items.map { calendar.startOfDay(for: $0.createdAt) }).sorted(by: >)
+    func dates(groupedBy grouping: TodoDateGrouping = .creation, in calendar: Calendar) -> [Date] {
+        let dates = items.compactMap { grouping.date(for: $0) }
+        return Set(dates.map { calendar.startOfDay(for: $0) }).sorted(by: >)
     }
 
-    func items(matching filter: TodoFilter, on referenceDate: Date, in calendar: Calendar) -> [TodoItem] {
+    func dates(inWeekContaining date: Date, in calendar: Calendar) -> [Date] {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: date) else { return [] }
+        var days: Set<Date> = []
+        for item in items {
+            if item.createdAt >= week.start && item.createdAt < week.end {
+                days.insert(calendar.startOfDay(for: item.createdAt))
+            }
+            if let completedAt = item.completedAt, completedAt >= week.start && completedAt < week.end {
+                days.insert(calendar.startOfDay(for: completedAt))
+            }
+        }
+        return days.sorted(by: >)
+    }
+
+    func items(
+        matching filter: TodoFilter, groupedBy grouping: TodoDateGrouping = .creation,
+        on referenceDate: Date, in calendar: Calendar
+    ) -> [TodoItem] {
         switch filter {
-        case .today:
+        case .today where grouping == .creation:
             let today = calendar.startOfDay(for: referenceDate)
             return items.filter { item in
                 if item.createdAt >= today {
@@ -93,21 +122,31 @@ final class TodoStore: ObservableObject {
                 return calendar.isDate(completedAt, inSameDayAs: today)
             }
         case .all:
-            return items
+            return grouping == .creation ? items : items.filter(\.isCompleted)
+        case .today:
+            return items(on: referenceDate, groupedBy: grouping, in: calendar)
         case .day(let date):
-            return items.filter { calendar.isDate($0.createdAt, inSameDayAs: date) }
+            return items(on: date, groupedBy: grouping, in: calendar)
+        }
+    }
+
+    private func items(on date: Date, groupedBy grouping: TodoDateGrouping, in calendar: Calendar) -> [TodoItem] {
+        items.filter { item in
+            guard let itemDate = grouping.date(for: item) else { return false }
+            return calendar.isDate(itemDate, inSameDayAs: date)
         }
     }
 
     func sections(
-        for filter: TodoFilter, on referenceDate: Date, in calendar: Calendar,
+        for filter: TodoFilter, groupedBy grouping: TodoDateGrouping = .creation,
+        on referenceDate: Date, in calendar: Calendar,
         retainingOrderFor pendingCompletionIDs: Set<UUID> = []
     ) -> [TodoSection] {
-        let ordered = items(matching: filter, on: referenceDate, in: calendar).sorted { first, second in
+        let ordered = items(matching: filter, groupedBy: grouping, on: referenceDate, in: calendar).sorted { first, second in
             let firstCompleted = first.isCompleted && !pendingCompletionIDs.contains(first.id)
             let secondCompleted = second.isCompleted && !pendingCompletionIDs.contains(second.id)
             if firstCompleted != secondCompleted { return !firstCompleted }
-            return isOrderedBefore(first, second)
+            return isOrderedBefore(first, second, groupedBy: grouping)
         }
         guard !ordered.isEmpty else { return [] }
 
@@ -115,7 +154,11 @@ final class TodoStore: ObservableObject {
         case .today:
             return [TodoSection(id: .today, items: ordered)]
         case .all:
-            let days = Dictionary(grouping: ordered) { calendar.startOfDay(for: $0.createdAt) }
+            var days: [Date: [TodoItem]] = [:]
+            for item in ordered {
+                guard let date = grouping.date(for: item) else { continue }
+                days[calendar.startOfDay(for: date), default: []].append(item)
+            }
             return days.keys.sorted(by: >).map { TodoSection(id: .day($0), items: days[$0, default: []]) }
         case .day(let day):
             let start = calendar.startOfDay(for: day)
@@ -123,11 +166,11 @@ final class TodoStore: ObservableObject {
         }
     }
 
-    private func isOrderedBefore(_ first: TodoItem, _ second: TodoItem) -> Bool {
+    private func isOrderedBefore(_ first: TodoItem, _ second: TodoItem, groupedBy grouping: TodoDateGrouping = .creation) -> Bool {
         let firstIndex = first.sortIndex ?? -1
         let secondIndex = second.sortIndex ?? -1
         if firstIndex != secondIndex { return firstIndex < secondIndex }
-        return first.createdAt > second.createdAt
+        return (grouping.date(for: first) ?? first.createdAt) > (grouping.date(for: second) ?? second.createdAt)
     }
 
     private func save(_ next: [TodoItem]) {

@@ -17,6 +17,23 @@ enum TodoFilter: Hashable {
     case day(Date)
 }
 
+enum TodoDateGrouping: Hashable {
+    case creation
+    case completion
+
+    func date(for item: TodoItem) -> Date? {
+        switch self {
+        case .creation: item.createdAt
+        case .completion: item.completedAt
+        }
+    }
+}
+
+struct TodoListScope: Hashable {
+    var filter: TodoFilter = .today
+    var grouping: TodoDateGrouping = .creation
+}
+
 struct TodoSection: Identifiable {
     enum ID: Hashable {
         case today

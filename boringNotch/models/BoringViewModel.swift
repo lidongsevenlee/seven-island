@@ -33,8 +33,8 @@ class BoringViewModel: NSObject, ObservableObject {
     }
 
     var isBatteryPopoverActive: Bool {
-        get { interactionState.isBatteryPopoverActive }
-        set { interaction.setBatteryPopoverActive(newValue) }
+        get { interactionState.activePopovers.contains(.battery) }
+        set { interaction.setPopover(.battery, active: newValue) }
     }
 
     var isTextInputFocused: Bool {
@@ -57,6 +57,7 @@ class BoringViewModel: NSObject, ObservableObject {
             guard let self, self.display != nil else { return nil }
             return self.isMouseHovering()
         },
+        pointerLocation: { NSEvent.mouseLocation },
         hoverOpenDelay: { [weak self] in
             guard let self, !self.coordinator.firstLaunch, !self.coordinator.sneakPeek.show,
                   Defaults[.openNotchOnHover] else { return nil }
@@ -289,6 +290,10 @@ class BoringViewModel: NSObject, ObservableObject {
 
     func setTodoReordering(_ active: Bool) {
         interaction.setTodoReordering(active)
+    }
+
+    func setTodoCalendarPresented(_ presented: Bool, keepingPanelOpen: Bool = false) {
+        interaction.setPopover(.todoCalendar, active: presented, keepingPanelOpen: keepingPanelOpen)
     }
 
     func pickScreenColor() {

@@ -181,12 +181,17 @@ final class ScreenshotTool: NSObject, NSWindowDelegate {
         let ownProcess = ProcessInfo.processInfo.processIdentifier
         let islandPanels = visibleNotchPanels.filter { $0.sharingType != .none }
         let panelsByID = Dictionary(uniqueKeysWithValues: islandPanels.map { (CGWindowID($0.windowNumber), $0) })
+        let calendarWindowIDs = islandPanels.flatMap(\.todoCalendarPanels).compactMap { panel -> CGWindowID? in
+            guard panel.isVisible, panel.sharingType != .none else { return nil }
+            return CGWindowID(exactly: panel.windowNumber)
+        }
         let settingsWindowID = SettingsWindowController.shared.window.flatMap { window -> CGWindowID? in
             guard window.isVisible, !window.isMiniaturized, window.sharingType != .none else { return nil }
             return CGWindowID(exactly: window.windowNumber)
         }
         let excludedWindows = windowsExcludedFromCapture(
-            in: content.windows, notchPanelIDs: Set(panelsByID.keys), settingsWindowID: settingsWindowID
+            in: content.windows, notchPanelIDs: Set(panelsByID.keys).union(calendarWindowIDs),
+            settingsWindowID: settingsWindowID
         )
         let windowRegions = content.windows.compactMap { window -> (CGWindowID, (pid_t?, CGRect))? in
             let pid = window.owningApplication?.processID

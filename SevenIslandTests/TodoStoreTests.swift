@@ -86,7 +86,91 @@ enum TodoStoreTests {
         expect(TodoStore(itemsKey: itemsKey).items.isEmpty, "persists clearing all tasks")
 
         testReordering(itemsKey: itemsKey, today: today, now: now, calendar: calendar)
+        let completionKey = Defaults.Key<[TodoItem]>("completionItems", default: [], suite: suite)
+        testCompletionGrouping(itemsKey: completionKey, yesterday: yesterday, today: today, tomorrow: tomorrow,
+                               calendar: calendar)
+        let weekKey = Defaults.Key<[TodoItem]>("weekItems", default: [], suite: suite)
+        testWeekDates(itemsKey: weekKey, in: calendar)
         print("TodoStoreTests passed")
+    }
+
+    private static func testWeekDates(itemsKey: Defaults.Key<[TodoItem]>, in calendar: Calendar) {
+        var calendar = calendar
+        calendar.firstWeekday = 2
+        calendar.minimumDaysInFirstWeek = 4
+        let start = calendar.date(from: DateComponents(year: 2026, month: 12, day: 28))!
+        let previous = calendar.date(byAdding: .day, value: -1, to: start)!
+        let newYear = calendar.date(byAdding: .day, value: 4, to: start)!
+        let end = calendar.date(byAdding: .day, value: 6, to: start)!
+        let next = calendar.date(byAdding: .day, value: 7, to: start)!
+        let store = TodoStore(itemsKey: itemsKey)
+        store.add("本周创建", at: start)
+        let finished = store.add("前一周创建", at: previous)!
+        store.toggleCompletion(for: finished, at: newYear)
+        store.add("本周末创建", at: end)
+        let sameDay = store.add("同一天完成", at: end)!
+        store.toggleCompletion(for: sameDay, at: end)
+        store.add("下周创建", at: next)
+
+        expect(store.dates(inWeekContaining: newYear, in: calendar) == [end, newYear, start],
+               "includes unique creation and completion dates across a year boundary within the chosen week")
+        expect(store.dates(inWeekContaining: next, in: calendar) == [next], "switches to the following week at its boundary")
+        store.toggleCompletion(for: finished, at: next)
+        expect(store.dates(inWeekContaining: newYear, in: calendar) == [end, start],
+               "undoing completion removes a completion-only date from the week")
+    }
+
+    private static func testCompletionGrouping(
+        itemsKey: Defaults.Key<[TodoItem]>, yesterday: Date, today: Date, tomorrow: Date, calendar: Calendar
+    ) {
+        let store = TodoStore(itemsKey: itemsKey)
+        let older = yesterday.addingTimeInterval(-60)
+        let open = store.add("还未完成", at: older)!
+        let historical = store.add("昨天完成", at: older)!
+        let carryover = store.add("隔天完成", at: yesterday)!
+        let sameDay = store.add("当天完成", at: today)!
+        let laterCompletion = today.addingTimeInterval(120)
+        store.toggleCompletion(for: historical, at: yesterday)
+        store.toggleCompletion(for: sameDay, at: today.addingTimeInterval(60))
+        store.toggleCompletion(for: carryover, at: laterCompletion)
+
+        expect(store.dates(groupedBy: .completion, in: calendar) == [today, yesterday],
+               "derives date chips from completion dates")
+        let completed = store.sections(for: .all, groupedBy: .completion, on: laterCompletion, in: calendar)
+        expect(completed.map(\.id) == [.day(today), .day(yesterday)], "groups completed history by local completion day")
+        expect(completed.map { $0.items.map(\.id) } == [[carryover, sameDay], [historical]],
+               "orders by completion time within each day and filters open tasks")
+
+        let todayCompleted = store.sections(for: .today, groupedBy: .completion, on: laterCompletion, in: calendar)
+        expect(todayCompleted.first?.id == .today && todayCompleted.first?.items.map(\.id) == [carryover, sameDay],
+               "Today selects tasks completed today across creation dates")
+        let yesterdayCompleted = store.items(matching: .day(yesterday), groupedBy: .completion,
+                                             on: laterCompletion, in: calendar)
+        expect(yesterdayCompleted.map(\.id) == [historical], "a single completion date uses the same scope as its clear action")
+        let allCompleted = store.items(matching: .all, groupedBy: .completion, on: laterCompletion, in: calendar)
+        expect(Set(allCompleted.map(\.id)) == [historical, carryover, sameDay], "All completed excludes open tasks from its clear scope")
+        let yesterdayCreated = store.items(matching: .day(yesterday), on: laterCompletion, in: calendar)
+        expect(yesterdayCreated.map(\.id) == [carryover], "creation dates retain tasks finished on a later day")
+
+        expect(store.move(carryover, onto: sameDay, in: .all, groupedBy: .completion, on: laterCompletion, using: calendar),
+               "supports reordering tasks in the same completion group")
+        expect(!store.move(carryover, onto: historical, in: .all, groupedBy: .completion, on: laterCompletion, using: calendar),
+               "keeps reordering inside a completion-date group")
+        let reloaded = TodoStore(itemsKey: itemsKey)
+        let reloadedOrder = reloaded.sections(for: .today, groupedBy: .completion, on: laterCompletion, in: calendar)
+        expect(reloadedOrder.first?.items.map(\.id) == [sameDay, carryover], "persists completion-group order")
+
+        reloaded.toggleCompletion(for: historical, at: laterCompletion)
+        expect(reloaded.dates(groupedBy: .completion, in: calendar) == [today], "removes an empty completion date")
+        expect(TodoStore(itemsKey: itemsKey).items.first { $0.id == historical }?.completedAt == nil,
+               "persisted undo clears the recorded completion time")
+        let remainingCreated = reloaded.items(matching: .today, on: laterCompletion, in: calendar)
+        expect(Set(remainingCreated.map(\.id)) == [open, historical, carryover, sameDay],
+               "undo returns a task to the creation-mode carryover list")
+
+        reloaded.toggleCompletion(for: historical, at: tomorrow)
+        let newCompletion = reloaded.sections(for: .today, groupedBy: .completion, on: tomorrow, in: calendar)
+        expect(newCompletion.first?.items.first?.completedAt == tomorrow, "re-completing records the new completion time")
     }
 
     private static func testReordering(itemsKey: Defaults.Key<[TodoItem]>, today: Date, now: Date, calendar: Calendar) {

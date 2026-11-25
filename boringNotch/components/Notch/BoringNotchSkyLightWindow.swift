@@ -43,6 +43,10 @@ class BoringNotchSkyLightWindow: NSPanel {
 
     var isPointerOverPanel: Bool { viewModel?.isMouseHovering() == true }
 
+    var todoCalendarPanels: [TodoCalendarPanel] {
+        (childWindows ?? []).compactMap { $0 as? TodoCalendarPanel }
+    }
+
     func setScreenshotCaptureActive(_ active: Bool) {
         viewModel?.setScreenshotCaptureActive(active)
     }
@@ -109,6 +113,9 @@ class BoringNotchSkyLightWindow: NSPanel {
             sharingType = .none
         } else {
             sharingType = .readWrite
+        }
+        for calendar in todoCalendarPanels {
+            calendar.sharingType = sharingType
         }
     }
     

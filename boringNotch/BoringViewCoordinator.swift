@@ -58,6 +58,8 @@ class BoringViewCoordinator: ObservableObject {
             lastNotchView = currentView.rawValue
         }
     }
+    @Published var todoListScope = TodoListScope()
+    @Published var todoCalendarWeek: Date?
     @Published var helloAnimationRunning: Bool = false
     private var sneakPeekDispatch: DispatchWorkItem?
     private var expandingViewDispatch: DispatchWorkItem?
@@ -101,6 +103,7 @@ class BoringViewCoordinator: ObservableObject {
     @Published var optionKeyPressed: Bool = true
     private var accessibilityObserver: Any?
     private var hudReplacementCancellable: AnyCancellable?
+    private var timeZoneCancellable: AnyCancellable?
     private var accessibilityPollingTask: Task<Void, Never>?
 
     private init() {
@@ -124,6 +127,14 @@ class BoringViewCoordinator: ObservableObject {
         }
         
         showEmpty()
+
+        timeZoneCancellable = NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.todoCalendarWeek != nil { self.todoCalendarWeek = nil }
+                if case .day = self.todoListScope.filter { self.todoListScope.filter = .all }
+            }
 
         // Observe changes to accessibility authorization and react accordingly
         accessibilityObserver = NotificationCenter.default.addObserver(

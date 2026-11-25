@@ -367,8 +367,11 @@ struct ContentView: View {
                         let presentation = TodoView.Presentation(
                             expansionCycle: vm.expansionCycle, tabSelectionCycle: coordinator.tabSelectionCycle
                         )
-                        TodoView(compactContentHeight: compactTodoContentHeight, presentation: presentation)
-                            .id(presentation)
+                        TodoView(
+                            compactContentHeight: compactTodoContentHeight, presentation: presentation,
+                            scope: $coordinator.todoListScope, calendarWeek: $coordinator.todoCalendarWeek
+                        )
+                        .id(presentation)
                     case .toolbox:
                         ToolboxView()
                     }

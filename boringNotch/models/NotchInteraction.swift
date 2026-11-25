@@ -11,8 +11,12 @@ final class NotchInteraction {
         case click, hover, shortcut, tabShortcut
     }
 
+    enum Popover: Hashable {
+        case battery, todoCalendar
+    }
+
     private enum ExitTrigger: String {
-        case hoverEvent, positionCheck, screenshotEnd, unpin, reorderEnd, batteryPopoverEnd
+        case hoverEvent, positionCheck, screenshotEnd, unpin, reorderEnd, popoverEnd
     }
 
     struct State: Equatable {
@@ -21,7 +25,7 @@ final class NotchInteraction {
         var isHovering = false
         var isPinnedOpen = false
         var isTextInputFocused = false
-        var isBatteryPopoverActive = false
+        var activePopovers: Set<Popover> = []
         var isSamplingScreenColor = false
         var isCapturingScreenshot = false
         var isReorderingTodo = false
@@ -32,6 +36,7 @@ final class NotchInteraction {
     let diagnosticID = String(UUID().uuidString.prefix(8))
 
     private let pointerIsInside: @MainActor () -> Bool?
+    private let pointerLocation: @MainActor () -> CGPoint
     private let hoverOpenDelay: @MainActor () -> Duration?
     private let schedule: Schedule
     private let onStateChange: @MainActor (State) -> Void
@@ -42,6 +47,7 @@ final class NotchInteraction {
     private var shortcutCloseDeferredForFocus = false
     private var awaitingPointerEntry = false
     private var awaitingPointerExitAfterEscape = false
+    private var pointerAtPopoverSelection: CGPoint?
 
     private(set) var state = State() {
         didSet {
@@ -54,6 +60,7 @@ final class NotchInteraction {
 
     init(
         pointerIsInside: @escaping @MainActor () -> Bool?,
+        pointerLocation: @escaping @MainActor () -> CGPoint,
         hoverOpenDelay: @escaping @MainActor () -> Duration?,
         schedule: @escaping Schedule = { delay, action in
             Task {
@@ -65,6 +72,7 @@ final class NotchInteraction {
         onStateChange: @escaping @MainActor (State) -> Void = { _ in }
     ) {
         self.pointerIsInside = pointerIsInside
+        self.pointerLocation = pointerLocation
         self.hoverOpenDelay = hoverOpenDelay
         self.schedule = schedule
         self.onStateChange = onStateChange
@@ -85,7 +93,9 @@ final class NotchInteraction {
                 reordering=\(self.state.isReorderingTodo)
                 """)
         }
-        guard !state.isSamplingScreenColor, !state.isCapturingScreenshot, !state.isReorderingTodo else { return }
+        guard !state.isSamplingScreenColor, !state.isCapturingScreenshot, !state.isReorderingTodo,
+              !pointerRemainedAtPopoverSelection else { return }
+        pointerAtPopoverSelection = nil
         if awaitingPointerExitAfterEscape {
             guard !hovering, pointerIsInside() != true else { return }
             awaitingPointerExitAfterEscape = false
@@ -150,10 +160,12 @@ final class NotchInteraction {
 
     private func resetPointerTracking() {
         cancelHoverTransition()
+        pointerAtPopoverSelection = nil
         let inside = pointerIsInside() == true
         if !inside { awaitingPointerExitAfterEscape = false }
         awaitingPointerEntry = state.notchState == .open && !inside
         state.isHovering = inside
+        updatePointerExitCheck()
     }
 
     func open(trigger: OpenTrigger = .click) {
@@ -194,7 +206,7 @@ final class NotchInteraction {
 
     @discardableResult
     func dismissFromEscape() -> Bool {
-        guard state.allowsEscapeDismissal, !state.isSamplingScreenColor, !state.isBatteryPopoverActive,
+        guard state.allowsEscapeDismissal, !state.isSamplingScreenColor, state.activePopovers.isEmpty,
               !state.isCapturingScreenshot else { return false }
         NotchDiagnostics.logger.notice("panel=\(self.diagnosticID, privacy: .public) event=escape_close")
         close()
@@ -221,11 +233,23 @@ final class NotchInteraction {
         }
     }
 
-    func setBatteryPopoverActive(_ active: Bool) {
-        guard state.isBatteryPopoverActive != active else { return }
-        state.isBatteryPopoverActive = active
-        if !active && !state.isHovering && state.notchState == .open {
-            schedulePointerExit(trigger: .batteryPopoverEnd, respectingTextFocus: true)
+    func setPopover(_ popover: Popover, active: Bool, keepingPanelOpen: Bool = false) {
+        guard state.activePopovers.contains(popover) != active else { return }
+        if active {
+            pointerAtPopoverSelection = nil
+            state.activePopovers.insert(popover)
+        } else {
+            state.activePopovers.remove(popover)
+        }
+        if state.activePopovers.isEmpty && state.notchState == .open {
+            if keepingPanelOpen {
+                cancelHoverTransition()
+                awaitingPointerEntry = false
+                pointerAtPopoverSelection = pointerLocation()
+                updatePointerExitCheck()
+            } else if !state.isHovering {
+                schedulePointerExit(trigger: .popoverEnd, respectingTextFocus: true)
+            }
         }
     }
 
@@ -244,6 +268,7 @@ final class NotchInteraction {
     func cancelPendingTransitions() {
         cancelHoverTransition()
         cancelPointerExitCheck()
+        pointerAtPopoverSelection = nil
         shortcutTask?.cancel()
         shortcutTask = nil
         shortcutCloseDeferredForFocus = false
@@ -255,7 +280,7 @@ final class NotchInteraction {
     }
 
     private var pointerDismissalSuspended: Bool {
-        state.isPinnedOpen || state.isBatteryPopoverActive || state.isSamplingScreenColor
+        state.isPinnedOpen || !state.activePopovers.isEmpty || state.isSamplingScreenColor
             || state.isCapturingScreenshot || state.isReorderingTodo
     }
 
@@ -264,8 +289,14 @@ final class NotchInteraction {
         pointerExitCheck = nil
     }
 
+    private var pointerRemainedAtPopoverSelection: Bool {
+        guard let position = pointerAtPopoverSelection else { return false }
+        return pointerLocation() == position
+    }
+
     private func updatePointerExitCheck() {
-        guard state.notchState == .open, state.isHovering, !pointerDismissalSuspended else {
+        guard state.notchState == .open, state.isHovering || pointerAtPopoverSelection != nil,
+              !pointerDismissalSuspended else {
             cancelPointerExitCheck()
             return
         }
@@ -275,9 +306,17 @@ final class NotchInteraction {
         pointerExitCheck = schedule(.milliseconds(150)) { [weak self] in
             guard let self else { return }
             self.pointerExitCheck = nil
+            if self.pointerRemainedAtPopoverSelection {
+                self.updatePointerExitCheck()
+                return
+            }
             guard let inside = self.pointerIsInside() else {
                 NotchDiagnostics.logger.notice("panel=\(self.diagnosticID, privacy: .public) event=pointer_check result=unavailable")
                 return
+            }
+            if self.pointerAtPopoverSelection != nil {
+                self.pointerAtPopoverSelection = nil
+                self.state.isHovering = inside
             }
             if !inside && self.hoverTask == nil {
                 self.schedulePointerExit(trigger: .positionCheck)
@@ -296,6 +335,8 @@ final class NotchInteraction {
     }
 
     private func confirmPointerExit(trigger: ExitTrigger, respectingTextFocus: Bool = false) {
+        guard !pointerRemainedAtPopoverSelection else { return }
+        pointerAtPopoverSelection = nil
         // Typing can cause SwiftUI to report a hover exit while the pointer is still inside.
         let pointer = pointerIsInside()
         let inside = pointer == true
@@ -308,7 +349,7 @@ final class NotchInteraction {
                 panel=\(self.diagnosticID, privacy: .public) event=pointer_exit_check \
                 trigger=\(trigger.rawValue, privacy: .public) pointer=\(location, privacy: .public) action=\(action, privacy: .public) \
                 pinned=\(self.state.isPinnedOpen) text_focus=\(self.state.isTextInputFocused) \
-                respect_text_focus=\(respectingTextFocus) battery_popover=\(self.state.isBatteryPopoverActive) \
+                respect_text_focus=\(respectingTextFocus) popover=\(!self.state.activePopovers.isEmpty) \
                 screenshot=\(self.state.isCapturingScreenshot) color_picker=\(self.state.isSamplingScreenColor) \
                 reordering=\(self.state.isReorderingTodo)
                 """)
@@ -321,7 +362,8 @@ final class NotchInteraction {
     }
 
     private func evaluateShortcutDismissal() {
-        guard state.notchState == .open, !state.isPinnedOpen, !state.isReorderingTodo else { return }
+        guard state.notchState == .open, !state.isPinnedOpen, !state.isReorderingTodo,
+              state.activePopovers.isEmpty, pointerAtPopoverSelection == nil else { return }
         if state.isTextInputFocused {
             shortcutCloseDeferredForFocus = true
         } else if pointerIsInside() != true {

@@ -21,6 +21,8 @@ enum NotchSearchInteractionTests {
         testReopeningCancelsOldTimeout()
         testPanelsHaveIndependentTimers()
         testBatteryPopoverDismissal()
+        testTodoCalendarKeepsSelectedDatesVisible()
+        testTodoCalendarDismissesAfterDirectPointerMove()
         print("NotchSearchInteractionTests passed")
     }
 
@@ -345,12 +347,12 @@ enum NotchSearchInteractionTests {
     private static func testBatteryPopoverDismissal() {
         let panel = Panel()
         panel.interaction.open()
-        panel.interaction.setBatteryPopoverActive(true)
+        panel.interaction.setPopover(.battery, active: true)
         panel.interaction.hoverChanged(false)
         panel.clock.advance(.milliseconds(100))
         expect(!panel.isClosed, "battery popover holds the panel open after pointer exit")
 
-        panel.interaction.setBatteryPopoverActive(false)
+        panel.interaction.setPopover(.battery, active: false)
         panel.pointerInside = true
         panel.clock.advance(.milliseconds(100))
         expect(!panel.isClosed, "popover dismissal rechecks the actual pointer")
@@ -360,10 +362,54 @@ enum NotchSearchInteractionTests {
         expect(panel.isClosed, "hover exit resumes after the popover closes")
 
         panel.interaction.open()
-        panel.interaction.setBatteryPopoverActive(true)
-        panel.interaction.setBatteryPopoverActive(false)
+        panel.interaction.setPopover(.battery, active: true)
+        panel.interaction.setPopover(.battery, active: false)
         panel.clock.advance(.milliseconds(100))
         expect(panel.isClosed, "popover dismissal closes with the pointer outside")
+    }
+
+    private static func testTodoCalendarKeepsSelectedDatesVisible() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.setPopover(.todoCalendar, active: true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(300))
+        expect(!panel.isClosed, "the panel stays open while the pointer moves to the date popover")
+        expect(!panel.interaction.dismissFromEscape(), "the popover gets Escape before the panel")
+
+        panel.pointerInside = true
+        panel.interaction.setPopover(.todoCalendar, active: false, keepingPanelOpen: true)
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(300))
+        expect(!panel.isClosed, "applying a date leaves the new filters visible")
+        panel.pointerInside = true
+        panel.pointerLocation = CGPoint(x: 60, y: 20)
+        panel.clock.advance(.milliseconds(150))
+        expect(panel.interaction.state.isHovering, "pointer polling restores hover tracking after moving back inside")
+        panel.pointerInside = false
+        panel.pointerLocation = CGPoint(x: 60, y: -40)
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(100))
+        expect(panel.isClosed, "hover dismissal resumes after returning to the panel")
+    }
+
+    private static func testTodoCalendarDismissesAfterDirectPointerMove() {
+        let panel = Panel()
+        panel.pointerInside = true
+        panel.interaction.openFromTabShortcut()
+        panel.interaction.setPopover(.todoCalendar, active: true)
+        panel.pointerInside = false
+        panel.pointerLocation = CGPoint(x: 60, y: -20)
+        panel.interaction.setPopover(.todoCalendar, active: false, keepingPanelOpen: true)
+        panel.clock.advance(.milliseconds(450))
+        expect(!panel.isClosed, "selection stays visible while the pointer is stationary")
+
+        panel.pointerLocation = CGPoint(x: 60, y: -80)
+        panel.clock.advance(.milliseconds(250))
+        expect(panel.isClosed, "moving away directly from the former popover closes the panel")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {
@@ -377,10 +423,12 @@ enum NotchSearchInteractionTests {
     private final class Panel {
         let clock: Clock
         var pointerInside = false
+        var pointerLocation = CGPoint.zero
         var hoverDelay: Duration? = .milliseconds(300)
 
         lazy var interaction = NotchInteraction(
             pointerIsInside: { [unowned self] in pointerInside },
+            pointerLocation: { [unowned self] in pointerLocation },
             hoverOpenDelay: { [unowned self] in hoverDelay },
             schedule: clock.schedule
         )
