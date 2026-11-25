@@ -160,6 +160,11 @@ enum AppLauncherService {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = ["-n", directory.path]
+        process.environment = ProcessInfo.processInfo.environment.filter { key, _ in
+            key != "GIT_CONFIG_COUNT"
+                && !key.hasPrefix("GIT_CONFIG_KEY_")
+                && !key.hasPrefix("GIT_CONFIG_VALUE_")
+        }
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
