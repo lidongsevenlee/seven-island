@@ -63,6 +63,7 @@ class BoringViewModel: NSObject, ObservableObject {
                   Defaults[.openNotchOnHover] else { return nil }
             return .seconds(Defaults[.minimumHoverDuration])
         },
+        hoverCloseDelay: { .seconds(Defaults[.hoverCloseDelay]) },
         onStateChange: { [weak self] state in self?.applyInteractionState(state) }
     )
 

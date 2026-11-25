@@ -341,6 +341,7 @@ struct GeneralSettings: View {
     @Default(.mirrorShape) var mirrorShape
     @Default(.showEmojis) var showEmojis
     @Default(.minimumHoverDuration) var minimumHoverDuration
+    @Default(.hoverCloseDelay) var hoverCloseDelay
     @Default(.nonNotchHeight) var nonNotchHeight
     @Default(.nonNotchHeightMode) var nonNotchHeightMode
     @Default(.notchHeight) var notchHeight
@@ -506,22 +507,28 @@ struct GeneralSettings: View {
             }
             Toggle("记住上次的标签页", isOn: $coordinator.openLastTabByDefault)
             if openNotchOnHover {
-                Slider(value: $minimumHoverDuration, in: 0...1, step: 0.1) {
-                    HStack {
-                        Text("悬停延迟")
-                        Spacer()
-                        Text("\(minimumHoverDuration, specifier: "%.1f") 秒")
-                            .foregroundStyle(.secondary)
+                hoverDelaySlider("悬停延迟", value: $minimumHoverDuration)
+                    .onChange(of: minimumHoverDuration) {
+                        NotificationCenter.default.post(
+                            name: Notification.Name.notchHeightChanged, object: nil)
                     }
-                }
-                .onChange(of: minimumHoverDuration) {
-                    NotificationCenter.default.post(
-                        name: Notification.Name.notchHeightChanged, object: nil)
-                }
             }
+            hoverDelaySlider("收回延迟", value: $hoverCloseDelay)
         } header: {
             Text("刘海行为")
         }
+    }
+
+    private func hoverDelaySlider(_ title: LocalizedStringKey, value: Binding<TimeInterval>) -> some View {
+        Slider(value: value, in: 0...1, step: 0.1) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(value.wrappedValue, specifier: "%.1f") 秒")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityLabel(Text(title))
     }
 }
 

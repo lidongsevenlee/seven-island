@@ -38,6 +38,7 @@ final class NotchInteraction {
     private let pointerIsInside: @MainActor () -> Bool?
     private let pointerLocation: @MainActor () -> CGPoint
     private let hoverOpenDelay: @MainActor () -> Duration?
+    private let hoverCloseDelay: @MainActor () -> Duration
     private let schedule: Schedule
     private let onStateChange: @MainActor (State) -> Void
 
@@ -62,6 +63,7 @@ final class NotchInteraction {
         pointerIsInside: @escaping @MainActor () -> Bool?,
         pointerLocation: @escaping @MainActor () -> CGPoint,
         hoverOpenDelay: @escaping @MainActor () -> Duration?,
+        hoverCloseDelay: @escaping @MainActor () -> Duration,
         schedule: @escaping Schedule = { delay, action in
             Task {
                 try? await Task.sleep(for: delay)
@@ -74,6 +76,7 @@ final class NotchInteraction {
         self.pointerIsInside = pointerIsInside
         self.pointerLocation = pointerLocation
         self.hoverOpenDelay = hoverOpenDelay
+        self.hoverCloseDelay = hoverCloseDelay
         self.schedule = schedule
         self.onStateChange = onStateChange
     }
@@ -114,8 +117,10 @@ final class NotchInteraction {
                 guard self.state.isHovering, self.hoverOpenDelay() != nil else { return }
                 self.open(trigger: .hover)
             }
-        } else {
+        } else if state.notchState == .open {
             schedulePointerExit(trigger: .hoverEvent)
+        } else {
+            state.isHovering = false
         }
     }
 
@@ -327,7 +332,7 @@ final class NotchInteraction {
 
     private func schedulePointerExit(trigger: ExitTrigger, respectingTextFocus: Bool = false) {
         cancelHoverTransition()
-        hoverTask = schedule(.milliseconds(100)) { [weak self] in
+        hoverTask = schedule(hoverCloseDelay()) { [weak self] in
             guard let self else { return }
             self.hoverTask = nil
             self.confirmPointerExit(trigger: trigger, respectingTextFocus: respectingTextFocus)

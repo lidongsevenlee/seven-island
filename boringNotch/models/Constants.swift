@@ -95,6 +95,7 @@ extension Defaults.Keys {
     
     // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
+    static let hoverCloseDelay = Key<TimeInterval>("hoverCloseDelay", default: 0.1)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
     static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)

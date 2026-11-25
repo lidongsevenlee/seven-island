@@ -7,6 +7,7 @@ enum NotchSearchInteractionTests {
     static func main() {
         testHoverOpensAfterDwell()
         testHoverExitUsesPointerLocation()
+        testHoverExitUsesConfiguredDelay()
         testHoverExitWithoutNotification()
         testWindowMovePreservesExpansion()
         testScreenColorSamplingPreservesExpansion()
@@ -149,8 +150,41 @@ enum NotchSearchInteractionTests {
         expect(!panel.interaction.state.isTextInputFocused, "closing clears input focus")
     }
 
+    private static func testHoverExitUsesConfiguredDelay() {
+        let panel = Panel()
+        panel.closeDelay = .milliseconds(800)
+        panel.pointerInside = true
+        panel.interaction.openFromTabShortcut()
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(799))
+        expect(!panel.isClosed, "hover exit waits for the configured close delay")
+
+        panel.pointerInside = true
+        panel.interaction.hoverChanged(true)
+        panel.clock.advance(.milliseconds(1))
+        expect(!panel.isClosed, "re-entering cancels the configured close delay")
+
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.milliseconds(799))
+        expect(!panel.isClosed, "a second exit receives the full close delay")
+        panel.clock.advance(.milliseconds(1))
+        expect(panel.isClosed, "the panel closes when the configured delay elapses")
+
+        panel.closeDelay = .zero
+        panel.pointerInside = true
+        panel.interaction.openFromTabShortcut()
+        panel.pointerInside = false
+        panel.interaction.hoverChanged(false)
+        panel.clock.advance(.zero)
+        expect(panel.isClosed, "a zero delay closes as soon as the pointer leaves")
+    }
+
     private static func testHoverExitWithoutNotification() {
         let panel = Panel()
+        panel.closeDelay = .milliseconds(600)
         panel.pointerInside = true
         panel.interaction.hoverChanged(true)
         panel.clock.advance(.seconds(1))
@@ -158,7 +192,9 @@ enum NotchSearchInteractionTests {
 
         panel.interaction.setTextInputFocused(true)
         panel.pointerInside = false
-        panel.clock.advance(.milliseconds(400))
+        panel.clock.advance(.milliseconds(500))
+        expect(!panel.isClosed, "pointer polling also waits for the configured close delay")
+        panel.clock.advance(.milliseconds(250))
         expect(panel.isClosed, "leaving closes the panel even when SwiftUI misses the hover exit")
     }
 
@@ -425,11 +461,13 @@ enum NotchSearchInteractionTests {
         var pointerInside = false
         var pointerLocation = CGPoint.zero
         var hoverDelay: Duration? = .milliseconds(300)
+        var closeDelay: Duration = .milliseconds(100)
 
         lazy var interaction = NotchInteraction(
             pointerIsInside: { [unowned self] in pointerInside },
             pointerLocation: { [unowned self] in pointerLocation },
             hoverOpenDelay: { [unowned self] in hoverDelay },
+            hoverCloseDelay: { [unowned self] in closeDelay },
             schedule: clock.schedule
         )
 
