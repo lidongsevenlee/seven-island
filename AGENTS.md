@@ -36,20 +36,12 @@ xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration Deb
 
 Same sandbox caveat applies. Use `open boringNotch.xcodeproj` to build from Xcode instead — that avoids sandbox restrictions entirely.
 
-## Release flow ("提交发布")
+## Release flow ("发布")
 
-When the user says "提交发布", do the following:
-
-1. **Ask for the new version number** (e.g. "1.1.0"). If they don't specify, ask.
-2. **Run `script/release.sh <version>`** inside the sandbox — this updates MARKETING_VERSION and CURRENT_PROJECT_VERSION in project.pbxproj, commits, and tags.
-3. **Tell the user to run the push command** printed by the script (sandbox blocks git push):
-   ```
-   git push origin main --tags
-   ```
-
-The tag push triggers the GitHub Actions release workflow (`.github/workflows/release.yml`) which builds, DMG-packages, Sparkle-signs, and creates the GitHub Release.
-
-**One-time setup required:** `SPARKLE_PRIVATE_KEY` secret must exist in GitHub repository settings. If missing, the release workflow will fail at the signing step.
+1. Confirm the version. Use the version the user specifies or ask for it. Run the checks relevant to the release changes and commit those changes on `main`.
+2. Run `script/release.sh <version>` from a clean checkout of the release commit. If the working copy has other edits, use a separate worktree and fast-forward `main` to the version commit. Push `main` and the new `v<version>` tag together.
+3. Watch the GitHub Actions **Release** run for the exact tag. Confirm the build, DMG packaging, Release upload, and **Commit Updated Appcast** succeed. Verify that the public release has `Seven-Island-<version>.dmg` and that the live `SUFeedURL` in `boringNotch/Info.plist` lists this version first with the correct build number, DMG URL, and Sparkle signature. The workflow uses the repository's `SPARKLE_PRIVATE_KEY` secret.
+4. Once the DMG is available, update `index.html` on `gh-pages` with the new version, download URL, and release highlights. Commit and push the branch, wait for GitHub Pages to finish deploying, and check that the live page displays the new version and links to the released DMG. [Seven Island landing page](https://lidongsevenlee.github.io/seven-island/)
 
 ## Architecture
 
